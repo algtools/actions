@@ -1,0 +1,23 @@
+{
+  "name": "@algtools/actions",
+  "version": "1.0.0",
+  "description": "Algenium common Github actions for all projects",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/algtools/actions.git"
+  },
+  "keywords": [
+    "github",
+    "actions"
+  ],
+  "author": "rodrigo.spesia@algenium.systems",
+  "license": "SEE LICENSE IN LICENSE",
+  "bugs": {
+    "url": "https://github.com/algtools/actions/issues"
+  },
+  "homepage": "https://github.com/algtools/actions#readme"
+}
