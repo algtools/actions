@@ -381,7 +381,7 @@ jobs:
           echo "  URL: ${{ steps.chromatic.outputs.chromatic_url }}"
           echo ""
           echo "Note: This is a mock test with fake Chromatic token."
-          echo "In production, use: project_token: \${{ secrets.CHROMATIC_PROJECT_TOKEN }}"
+          echo 'In production, use: project_token: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}'
           echo ""
           echo "✓ Complete workflow test executed successfully"
 
