@@ -30,7 +30,7 @@ jobs:
 
       - name: Setup Node.js with .nvmrc
         id: setup-node
-        uses: ./../../actions/setup-node
+        uses: ./.github/actions/setup-node
         with:
           working-directory: '.github/tests/setup-node'
           cache-dependency-path: '.github/tests/setup-node/package-lock.json'
@@ -84,7 +84,7 @@ jobs:
 
       - name: Setup Node.js with explicit version
         id: setup-node
-        uses: ./../../actions/setup-node
+        uses: ./.github/actions/setup-node
         with:
           node-version: '18'
           working-directory: '.github/tests/setup-node'
@@ -135,7 +135,7 @@ jobs:
 
       - name: First run (should cache)
         id: first-run
-        uses: ./../../actions/setup-node
+        uses: ./.github/actions/setup-node
         with:
           working-directory: '.github/tests/setup-node'
           cache-dependency-path: '.github/tests/setup-node/package-lock.json'
@@ -150,7 +150,7 @@ jobs:
 
       - name: Second run (should restore from cache)
         id: second-run
-        uses: ./../../actions/setup-node
+        uses: ./.github/actions/setup-node
         with:
           working-directory: '.github/tests/setup-node'
           cache-dependency-path: '.github/tests/setup-node/package-lock.json'
@@ -183,7 +183,7 @@ jobs:
         run: npm install --package-lock-only
 
       - name: Setup Node.js with skip-audit
-        uses: ./../../actions/setup-node
+        uses: ./.github/actions/setup-node
         with:
           working-directory: '.github/tests/setup-node'
           cache-dependency-path: '.github/tests/setup-node/package-lock.json'
@@ -217,7 +217,7 @@ jobs:
 
       - name: Setup Node.js
         id: setup-node
-        uses: ./../../actions/setup-node
+        uses: ./.github/actions/setup-node
         with:
           node-version: ${{ matrix.node-version }}
           working-directory: '.github/tests/setup-node'
