@@ -54,26 +54,28 @@ jobs:
           echo "✓ Artifact ID: ${{ steps.upload.outputs.artifact_id }}"
           
           # Verify total_files is a number and greater than 0
-          if [ -z "${{ steps.upload.outputs.total_files }}" ]; then
+          TOTAL_FILES="${{ steps.upload.outputs.total_files }}"
+          if [ -z "$TOTAL_FILES" ]; then
             echo "Error: total_files output is empty"
             exit 1
           fi
-          if [ "${{ steps.upload.outputs.total_files }}" -le 0 ]; then
+          if [ "$TOTAL_FILES" -le 0 ]; then
             echo "Error: total_files should be greater than 0"
             exit 1
           fi
-          echo "✓ Total files: ${{ steps.upload.outputs.total_files }}"
+          echo "✓ Total files: $TOTAL_FILES"
           
           # Verify total_size is a number and greater than 0
-          if [ -z "${{ steps.upload.outputs.total_size }}" ]; then
+          TOTAL_SIZE="${{ steps.upload.outputs.total_size }}"
+          if [ -z "$TOTAL_SIZE" ]; then
             echo "Error: total_size output is empty"
             exit 1
           fi
-          if [ "${{ steps.upload.outputs.total_size }}" -le 0 ]; then
+          if [ "$TOTAL_SIZE" -le 0 ]; then
             echo "Error: total_size should be greater than 0"
             exit 1
           fi
-          echo "✓ Total size: ${{ steps.upload.outputs.total_size }} bytes"
+          echo "✓ Total size: $TOTAL_SIZE bytes"
           
           echo ""
           echo "✓ All outputs validated successfully"
@@ -310,8 +312,9 @@ jobs:
             exit 1
           fi
           
-          if [ "${{ steps.upload.outputs.total_files }}" -ne 2 ]; then
-            echo "Error: Expected 2 files on ${{ matrix.os }}"
+          TOTAL_FILES="${{ steps.upload.outputs.total_files }}"
+          if [ "$TOTAL_FILES" -ne 2 ]; then
+            echo "Error: Expected 2 files on ${{ matrix.os }}, got $TOTAL_FILES"
             exit 1
           fi
           
