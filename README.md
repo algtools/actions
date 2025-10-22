@@ -31,6 +31,9 @@ Ensures a wildcard SSL certificate exists in Cloudflare ACM. Idempotent action t
 ### [sentry-release](/.github/actions/sentry-release)
 Creates and finalizes a Sentry release and registers a deployment for the target environment. Integrates with your deployment pipeline to track releases and errors across environments (alpha, beta, prod).
 
+### [comment-pr](/.github/actions/comment-pr)
+Posts or updates comments on Pull Requests with deployment info (e.g., preview URLs, environment details, Chromatic links). Avoids duplicating the same message across retries by using a dedupe key.
+
 ## Available Reusable Workflows
 
 ### [pr-build-reusable.yml](/.github/workflows/pr-build-reusable.yml)
