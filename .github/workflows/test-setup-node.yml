@@ -201,7 +201,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # macOS tests disabled by default (expensive). To enable, add 'macos-latest' to the os array below
+        os: [ubuntu-latest, windows-latest]
         node-version: ['18', '20']
     defaults:
       run:

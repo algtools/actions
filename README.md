@@ -57,6 +57,22 @@ jobs:
 - GitHub CLI (optional, for testing)
 - actionlint (for workflow validation)
 
+### Test Configuration
+
+**macOS Tests**: macOS runner tests are disabled by default to reduce CI costs, as macOS runners are significantly more expensive than Linux/Windows runners. Tests run on Ubuntu and Windows provide sufficient cross-platform coverage for most use cases.
+
+To enable macOS tests when needed:
+1. Edit the relevant workflow file (e.g., `.github/workflows/test-*.yml`)
+2. Add `macos-latest` to the matrix `os` array
+3. Look for comments like: `# macOS tests disabled by default (expensive)`
+
+Example:
+```yaml
+strategy:
+  matrix:
+    os: [ubuntu-latest, windows-latest, macos-latest]  # Add macos-latest here
+```
+
 ### Adding New Actions
 
 1. Create a new directory under `.github/actions/your-action-name/`
