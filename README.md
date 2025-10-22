@@ -22,6 +22,9 @@ Sets up Node.js environment with caching support for faster builds.
 ### [upload-artifacts](/.github/actions/upload-artifacts)
 Uploads build artifacts to GitHub Actions storage with detailed logging and support for multiple file paths.
 
+### [deploy-cloudflare-from-artifact](/.github/actions/deploy-cloudflare-from-artifact)
+Deploys Cloudflare Workers from pre-built artifacts with secure credential handling. Ensures safe and reproducible deployments without exposing code or secrets.
+
 ## Usage
 
 ### Using Custom Actions
