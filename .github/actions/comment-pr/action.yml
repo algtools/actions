@@ -1,0 +1,239 @@
+name: 'Comment PR'
+description: 'Posts or updates a comment on a Pull Request with deployment info, avoiding duplicates using a dedupe key'
+author: 'Algenium Systems'
+
+inputs:
+  pr_number:
+    description: 'Target PR number'
+    required: true
+  message:
+    description: 'Markdown body to post in the comment'
+    required: true
+  dedupe_key:
+    description: 'Optional short key used to detect/update an existing comment (e.g., preview-url, deploy-summary)'
+    required: false
+    default: ''
+  github_token:
+    description: 'GitHub token for API access (defaults to github.token)'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  comment_id:
+    description: 'ID of the created or updated comment'
+    value: ${{ steps.manage-comment.outputs.comment_id }}
+  comment_url:
+    description: 'URL of the created or updated comment'
+    value: ${{ steps.manage-comment.outputs.comment_url }}
+  action:
+    description: 'Action taken (created or updated)'
+    value: ${{ steps.manage-comment.outputs.action }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        echo "::group::Validating inputs"
+        
+        # Validate required inputs
+        if [ -z "${{ inputs.pr_number }}" ]; then
+          echo "::error::pr_number input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.message }}" ]; then
+          echo "::error::message input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.github_token }}" ]; then
+          echo "::error::github_token input is required"
+          exit 1
+        fi
+        
+        # Validate PR number is a positive integer
+        if ! [[ "${{ inputs.pr_number }}" =~ ^[0-9]+$ ]]; then
+          echo "::error::pr_number must be a positive integer, got: ${{ inputs.pr_number }}"
+          exit 1
+        fi
+        
+        echo "✓ All required inputs validated successfully"
+        echo ""
+        echo "Configuration:"
+        echo "  PR Number: ${{ inputs.pr_number }}"
+        echo "  Dedupe Key: ${{ inputs.dedupe_key || '(none)' }}"
+        echo "  Message Length: ${#MESSAGE} characters"
+        echo "::endgroup::"
+      env:
+        MESSAGE: ${{ inputs.message }}
+
+    - name: Manage PR comment
+      id: manage-comment
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        PR_NUMBER: ${{ inputs.pr_number }}
+        DEDUPE_KEY: ${{ inputs.dedupe_key }}
+        COMMENT_BODY: ${{ inputs.message }}
+      run: |
+        echo "::group::Managing PR comment"
+        
+        # Mask the GitHub token
+        echo "::add-mask::${{ inputs.github_token }}"
+        
+        # Get repository information
+        REPO="${{ github.repository }}"
+        
+        echo "Repository: $REPO"
+        echo "PR Number: $PR_NUMBER"
+        echo "Dedupe Key: ${DEDUPE_KEY:-'(none)'}"
+        echo ""
+        
+        # Prepare comment body with dedupe marker if dedupe_key is provided
+        if [ -n "$DEDUPE_KEY" ]; then
+          # Add invisible HTML comment as dedupe marker
+          FULL_COMMENT_BODY="<!-- dedupe-key: $DEDUPE_KEY -->
+        $COMMENT_BODY"
+        else
+          FULL_COMMENT_BODY="$COMMENT_BODY"
+        fi
+        
+        # Function to retry API calls with exponential backoff
+        retry_with_backoff() {
+          local max_attempts=3
+          local timeout=1
+          local attempt=1
+          local exitCode=0
+          
+          while [ $attempt -le $max_attempts ]; do
+            if "$@"; then
+              return 0
+            else
+              exitCode=$?
+            fi
+            
+            echo "Attempt $attempt/$max_attempts failed. Retrying in ${timeout}s..."
+            sleep $timeout
+            attempt=$((attempt + 1))
+            timeout=$((timeout * 2))
+          done
+          
+          echo "::error::Failed after $max_attempts attempts"
+          return $exitCode
+        }
+        
+        # Check if PR exists
+        echo "Verifying PR #$PR_NUMBER exists..."
+        if ! retry_with_backoff gh api "/repos/$REPO/pulls/$PR_NUMBER" > /dev/null 2>&1; then
+          echo "::error::PR #$PR_NUMBER not found in repository $REPO"
+          exit 1
+        fi
+        echo "✓ PR #$PR_NUMBER exists"
+        echo ""
+        
+        # If dedupe_key is provided, search for existing comment
+        EXISTING_COMMENT_ID=""
+        if [ -n "$DEDUPE_KEY" ]; then
+          echo "Searching for existing comment with dedupe key: $DEDUPE_KEY"
+          
+          # Get all comments on the PR
+          COMMENTS_JSON=$(retry_with_backoff gh api \
+            "/repos/$REPO/issues/$PR_NUMBER/comments" \
+            --paginate \
+            -q '.[]')
+          
+          # Search for comment with matching dedupe key
+          if [ -n "$COMMENTS_JSON" ]; then
+            EXISTING_COMMENT_ID=$(echo "$COMMENTS_JSON" | \
+              jq -r --arg key "$DEDUPE_KEY" \
+              'select(.body | startswith("<!-- dedupe-key: \($key) -->")) | .id' | \
+              head -n 1)
+          fi
+          
+          if [ -n "$EXISTING_COMMENT_ID" ]; then
+            echo "Found existing comment with ID: $EXISTING_COMMENT_ID"
+          else
+            echo "No existing comment found with dedupe key: $DEDUPE_KEY"
+          fi
+          echo ""
+        fi
+        
+        # Create or update comment
+        if [ -n "$EXISTING_COMMENT_ID" ]; then
+          echo "Updating existing comment #$EXISTING_COMMENT_ID..."
+          
+          RESPONSE=$(retry_with_backoff gh api \
+            --method PATCH \
+            "/repos/$REPO/issues/comments/$EXISTING_COMMENT_ID" \
+            -f body="$FULL_COMMENT_BODY")
+          
+          COMMENT_ID=$(echo "$RESPONSE" | jq -r '.id')
+          COMMENT_URL=$(echo "$RESPONSE" | jq -r '.html_url')
+          ACTION="updated"
+          
+          echo "✓ Comment updated successfully"
+        else
+          echo "Creating new comment on PR #$PR_NUMBER..."
+          
+          RESPONSE=$(retry_with_backoff gh api \
+            --method POST \
+            "/repos/$REPO/issues/$PR_NUMBER/comments" \
+            -f body="$FULL_COMMENT_BODY")
+          
+          COMMENT_ID=$(echo "$RESPONSE" | jq -r '.id')
+          COMMENT_URL=$(echo "$RESPONSE" | jq -r '.html_url')
+          ACTION="created"
+          
+          echo "✓ Comment created successfully"
+        fi
+        
+        echo ""
+        echo "Comment Details:"
+        echo "  ID: $COMMENT_ID"
+        echo "  URL: $COMMENT_URL"
+        echo "  Action: $ACTION"
+        
+        # Set outputs
+        echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
+        echo "comment_url=$COMMENT_URL" >> $GITHUB_OUTPUT
+        echo "action=$ACTION" >> $GITHUB_OUTPUT
+        
+        echo "::endgroup::"
+
+    - name: Comment summary
+      shell: bash
+      run: |
+        echo "::group::PR Comment Summary"
+        echo "====================================="
+        echo "💬 PR Comment ${{ steps.manage-comment.outputs.action == 'created' && 'Created' || 'Updated' }}"
+        echo "====================================="
+        echo ""
+        echo "PR Details:"
+        echo "  Number: #${{ inputs.pr_number }}"
+        echo "  Repository: ${{ github.repository }}"
+        echo ""
+        echo "Comment Details:"
+        echo "  ID: ${{ steps.manage-comment.outputs.comment_id }}"
+        echo "  URL: ${{ steps.manage-comment.outputs.comment_url }}"
+        echo "  Action: ${{ steps.manage-comment.outputs.action }}"
+        if [ -n "${{ inputs.dedupe_key }}" ]; then
+          echo "  Dedupe Key: ${{ inputs.dedupe_key }}"
+        fi
+        echo ""
+        echo "✓ PR comment workflow completed successfully"
+        echo "::endgroup::"
+        
+        # Add to job summary
+        {
+          echo "## 💬 PR Comment ${{ steps.manage-comment.outputs.action == 'created' && 'Created' || 'Updated' }}"
+          echo ""
+          echo "**PR:** [#${{ inputs.pr_number }}](https://github.com/${{ github.repository }}/pull/${{ inputs.pr_number }})"
+          echo ""
+          echo "**Comment:** [View Comment](${{ steps.manage-comment.outputs.comment_url }})"
+          echo ""
+          echo "**Action:** ${{ steps.manage-comment.outputs.action }}"
+          if [ -n "${{ inputs.dedupe_key }}" ]; then
+            echo ""
+            echo "**Dedupe Key:** \`${{ inputs.dedupe_key }}\`"
+          fi
+        } >> $GITHUB_STEP_SUMMARY

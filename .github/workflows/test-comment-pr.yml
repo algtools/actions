@@ -1,0 +1,201 @@
+name: Test Comment PR Action
+
+on:
+  pull_request:
+    paths:
+      - '.github/actions/comment-pr/**'
+      - '.github/workflows/test-comment-pr.yml'
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to comment on (for manual testing)'
+        required: false
+        type: number
+
+jobs:
+  test-create-comment:
+    name: Test Creating PR Comment
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine PR number
+        id: pr
+        run: |
+          if [ -n "${{ github.event.inputs.pr_number }}" ]; then
+            echo "number=${{ github.event.inputs.pr_number }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          else
+            echo "::error::No PR number available. Run this workflow on a PR or provide pr_number input."
+            exit 1
+          fi
+
+      - name: Test 1 - Create simple comment
+        uses: ./.github/actions/comment-pr
+        with:
+          pr_number: ${{ steps.pr.outputs.number }}
+          message: |
+            ## 🧪 Test Comment (Simple)
+            
+            This is a test comment created by the `comment-pr` action.
+            
+            **Timestamp:** ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}
+            **Run ID:** ${{ github.run_id }}
+
+      - name: Test 2 - Create comment with dedupe key (first run)
+        id: comment-dedupe-1
+        uses: ./.github/actions/comment-pr
+        with:
+          pr_number: ${{ steps.pr.outputs.number }}
+          message: |
+            ## 🔄 Test Comment (Dedupe - Run 1)
+            
+            This comment should be **updated** on the next step, not duplicated.
+            
+            **Run:** 1
+            **Timestamp:** ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}
+          dedupe_key: test-dedupe
+
+      - name: Verify first comment was created
+        run: |
+          if [ "${{ steps.comment-dedupe-1.outputs.action }}" != "created" ]; then
+            echo "::error::Expected action 'created', got '${{ steps.comment-dedupe-1.outputs.action }}'"
+            exit 1
+          fi
+          echo "✓ First comment created successfully"
+          echo "Comment ID: ${{ steps.comment-dedupe-1.outputs.comment_id }}"
+          echo "Comment URL: ${{ steps.comment-dedupe-1.outputs.comment_url }}"
+
+      - name: Wait before update (for clarity in testing)
+        run: sleep 2
+
+      - name: Test 3 - Update comment with dedupe key (second run)
+        id: comment-dedupe-2
+        uses: ./.github/actions/comment-pr
+        with:
+          pr_number: ${{ steps.pr.outputs.number }}
+          message: |
+            ## 🔄 Test Comment (Dedupe - Run 2)
+            
+            This comment was **updated** from Run 1. The dedupe key prevents duplication.
+            
+            **Run:** 2
+            **Timestamp:** ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}
+            **Previous Comment ID:** ${{ steps.comment-dedupe-1.outputs.comment_id }}
+          dedupe_key: test-dedupe
+
+      - name: Verify comment was updated (not created)
+        run: |
+          if [ "${{ steps.comment-dedupe-2.outputs.action }}" != "updated" ]; then
+            echo "::error::Expected action 'updated', got '${{ steps.comment-dedupe-2.outputs.action }}'"
+            exit 1
+          fi
+          if [ "${{ steps.comment-dedupe-2.outputs.comment_id }}" != "${{ steps.comment-dedupe-1.outputs.comment_id }}" ]; then
+            echo "::error::Comment ID changed! Expected ${{ steps.comment-dedupe-1.outputs.comment_id }}, got ${{ steps.comment-dedupe-2.outputs.comment_id }}"
+            exit 1
+          fi
+          echo "✓ Comment updated successfully (same ID)"
+          echo "Comment ID: ${{ steps.comment-dedupe-2.outputs.comment_id }}"
+          echo "Comment URL: ${{ steps.comment-dedupe-2.outputs.comment_url }}"
+
+      - name: Test 4 - Create comment with rich Markdown
+        uses: ./.github/actions/comment-pr
+        with:
+          pr_number: ${{ steps.pr.outputs.number }}
+          message: |
+            ## 🎨 Rich Markdown Test
+            
+            ### Features Tested
+            
+            - ✅ **Bold text**
+            - ✅ _Italic text_
+            - ✅ `Code blocks`
+            - ✅ [Links](https://github.com)
+            
+            ### Table Example
+            
+            | Feature | Status | Notes |
+            |---------|--------|-------|
+            | Basic comment | ✅ Pass | Simple text works |
+            | Dedupe create | ✅ Pass | First comment created |
+            | Dedupe update | ✅ Pass | Second comment updated |
+            | Rich Markdown | ✅ Pass | You're reading it! |
+            
+            ### Code Example
+            
+            ```yaml
+            - uses: algtools/actions/.github/actions/comment-pr@v1
+              with:
+                pr_number: 123
+                message: "Hello, World!"
+                dedupe_key: my-key
+            ```
+            
+            ### Deployment Info Example
+            
+            **Environment:** `test-environment`
+            **URL:** https://test.example.com
+            **Status:** 🟢 Healthy
+            
+            ---
+            
+            _This comment demonstrates rich Markdown formatting capabilities._
+          dedupe_key: test-markdown
+
+  test-final-summary:
+    name: Post Test Summary
+    runs-on: ubuntu-latest
+    needs: test-create-comment
+    if: always()
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine PR number
+        id: pr
+        run: |
+          if [ -n "${{ github.event.inputs.pr_number }}" ]; then
+            echo "number=${{ github.event.inputs.pr_number }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          else
+            echo "number=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Post test summary
+        if: steps.pr.outputs.number != '0'
+        uses: ./.github/actions/comment-pr
+        with:
+          pr_number: ${{ steps.pr.outputs.number }}
+          message: |
+            ## ✅ Comment PR Action Test Summary
+            
+            **Workflow:** `${{ github.workflow }}`
+            **Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            **Status:** ${{ needs.test-create-comment.result == 'success' && '✅ All tests passed' || '❌ Tests failed' }}
+            
+            ### Tests Executed
+            
+            1. ✅ Create simple comment
+            2. ✅ Create comment with dedupe key (first run)
+            3. ✅ Update comment with dedupe key (second run)
+            4. ✅ Rich Markdown formatting
+            
+            ### Results
+            
+            - **Create vs Update:** ${{ needs.test-create-comment.result == 'success' && 'VERIFIED - Comments are properly created and updated' || 'FAILED' }}
+            - **Dedupe Mechanism:** ${{ needs.test-create-comment.result == 'success' && 'WORKING - Same comment ID across runs' || 'FAILED' }}
+            - **Markdown Support:** ${{ needs.test-create-comment.result == 'success' && 'WORKING - See test comment above' || 'FAILED' }}
+            
+            ---
+            
+            _Last updated: ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}_
+          dedupe_key: test-summary
