@@ -25,6 +25,9 @@ Uploads build artifacts to GitHub Actions storage with detailed logging and supp
 ### [deploy-cloudflare-from-artifact](/.github/actions/deploy-cloudflare-from-artifact)
 Deploys Cloudflare Workers from pre-built artifacts with secure credential handling. Ensures safe and reproducible deployments without exposing code or secrets.
 
+### [ensure-wildcard-certificate](/.github/actions/ensure-wildcard-certificate)
+Ensures a wildcard SSL certificate exists in Cloudflare ACM. Idempotent action that creates certificates only when needed and waits for activation.
+
 ## Usage
 
 ### Using Custom Actions
