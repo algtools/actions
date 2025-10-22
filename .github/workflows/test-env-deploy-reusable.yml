@@ -13,6 +13,7 @@ on:
 permissions:
   contents: read
   actions: write
+  pull-requests: write
 
 jobs:
   test-workflow-structure:
@@ -90,6 +91,13 @@ jobs:
             exit 1
           fi
           echo "✓ deploy-cloudflare-from-artifact action referenced"
+          
+          # Check for comment-pr action
+          if ! grep -q "algtools/actions/.github/actions/comment-pr" .github/workflows/env-deploy-reusable.yml; then
+            echo "❌ Missing comment-pr action reference"
+            exit 1
+          fi
+          echo "✓ comment-pr action referenced"
 
       - name: Verify Sentry integration
         run: |
@@ -106,6 +114,45 @@ jobs:
             exit 1
           fi
           echo "✓ Sentry CLI integration present"
+      
+      - name: Verify PR comment integration
+        run: |
+          echo "Checking PR comment integration..."
+          
+          # Check for PR number extraction step
+          if ! grep -q "Get PR number" .github/workflows/env-deploy-reusable.yml; then
+            echo "❌ Missing PR number extraction step"
+            exit 1
+          fi
+          echo "✓ PR number extraction step present"
+          
+          # Check for comment-pr action usage
+          if ! grep -q "Comment on PR" .github/workflows/env-deploy-reusable.yml; then
+            echo "❌ Missing PR comment step"
+            exit 1
+          fi
+          echo "✓ PR comment step present"
+          
+          # Check for dedupe_key parameter
+          if ! grep -q "dedupe_key: 'env-deploy-" .github/workflows/env-deploy-reusable.yml; then
+            echo "❌ Missing dedupe_key parameter"
+            exit 1
+          fi
+          echo "✓ dedupe_key parameter configured"
+          
+          # Check for deployment message with environment
+          if ! grep -q "Deployment completed successfully" .github/workflows/env-deploy-reusable.yml; then
+            echo "❌ Missing deployment success message"
+            exit 1
+          fi
+          echo "✓ Deployment message configured"
+          
+          # Check for conditional execution (if: steps.pr.outputs.pr_number)
+          if ! grep -q "if: steps.pr.outputs.pr_number" .github/workflows/env-deploy-reusable.yml; then
+            echo "❌ Missing conditional for PR-only execution"
+            exit 1
+          fi
+          echo "✓ Conditional PR comment execution configured"
 
       - name: Summary
         run: |
@@ -120,7 +167,9 @@ jobs:
           echo "  ✓ Required outputs (worker_url, deployment_status, etc.)"
           echo "  ✓ ensure-wildcard-certificate action"
           echo "  ✓ deploy-cloudflare-from-artifact action"
+          echo "  ✓ comment-pr action"
           echo "  ✓ Sentry integration (optional)"
+          echo "  ✓ PR comment integration"
           echo ""
           echo "The workflow is properly structured and ready for use."
 

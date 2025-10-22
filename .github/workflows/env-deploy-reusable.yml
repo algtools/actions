@@ -98,6 +98,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   deploy:
@@ -253,6 +254,62 @@ jobs:
           echo "  Organization: $SENTRY_ORG"
           echo "  Project: $SENTRY_PROJECT"
           echo "::endgroup::"
+      
+      # PR Comment Integration (ALG-15)
+      # Automatically posts deployment status to associated PRs
+      # Skips gracefully if no PR is associated (e.g., direct branch pushes)
+      - name: Get PR number
+        id: pr
+        run: |
+          # Check if this workflow run is associated with a pull request
+          PR_NUMBER=""
+          
+          # Try to get PR number from various GitHub context sources
+          if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.event_name }}" = "pull_request_target" ]; then
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          elif [ -n "${{ github.event.issue.number }}" ]; then
+            PR_NUMBER="${{ github.event.issue.number }}"
+          fi
+          
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          
+          if [ -n "$PR_NUMBER" ]; then
+            echo "✓ Detected PR #$PR_NUMBER"
+          else
+            echo "ℹ No PR associated with this workflow run"
+          fi
+      
+      # Post deployment summary comment to PR (only if PR exists)
+      # Uses dedupe_key to update existing comments instead of creating duplicates
+      - name: Comment on PR
+        if: steps.pr.outputs.pr_number != ''
+        uses: algtools/actions/.github/actions/comment-pr@main
+        with:
+          pr_number: ${{ steps.pr.outputs.pr_number }}
+          dedupe_key: 'env-deploy-${{ inputs.environment }}'
+          message: |
+            ✅ **Deployment completed successfully**
+            
+            **Environment:** `${{ inputs.environment }}`
+            🌐 [Visit App](${{ steps.deploy-worker.outputs.worker_url }})
+            🕒 `${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}`
+            🧾 **Release:** `${{ inputs.sentry_release == true && github.sha || steps.deploy-worker.outputs.worker_version }}`
+            
+            <details>
+            <summary>Deployment Details</summary>
+            
+            ### Worker Details
+            - **Name**: `${{ inputs.worker_name }}`
+            - **Version**: `${{ steps.deploy-worker.outputs.worker_version }}`
+            - **Artifact**: `${{ inputs.artifact_name }}`
+            
+            ### SSL Certificate
+            - **Domain**: `*.${{ inputs.custom_domain }}`
+            - **Certificate ID**: `${{ steps.ensure-cert.outputs.certificate_id }}`
+            - **Status**: ${{ steps.ensure-cert.outputs.certificate_status }}
+            - **Created New**: ${{ steps.ensure-cert.outputs.certificate_created }}
+            ${{ inputs.sentry_release == true && format('\n### Sentry Release\n- **Organization**: `{0}`\n- **Project**: `{1}`\n- **Version**: `{2}`', inputs.sentry_org, inputs.sentry_project, github.sha) || '' }}
+            </details>
       
       - name: Deployment summary
         run: |
