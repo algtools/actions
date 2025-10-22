@@ -222,7 +222,7 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             # Direct pull_request trigger
             PR_NUMBER="${{ github.event.pull_request.number }}"
-            echo "PR number from pull_request event: $PR_NUMBER"
+            echo "PR number from pull_request event: ${PR_NUMBER}"
           elif [ "${{ github.event_name }}" = "workflow_run" ]; then
             # workflow_run trigger (e.g., from pull_request_target or fork PRs)
             # Extract from head_branch if it follows a PR pattern
@@ -253,7 +253,7 @@ jobs:
             exit 1
           fi
           
-          echo "✓ Resolved PR number: $PR_NUMBER"
+          echo "✓ Resolved PR number: ${PR_NUMBER}"
           echo "number=${PR_NUMBER}" >> $GITHUB_OUTPUT
           echo "::endgroup::"
       
@@ -295,7 +295,7 @@ jobs:
           # Construct URL: {app_domain}-pr-{num}.{slug}.{dev_zone}
           PREVIEW_URL="https://${APP_DOMAIN}-pr-${PR_NUM}.${SLUG}.${DEV_ZONE}"
           
-          echo "Preview URL: $PREVIEW_URL"
+          echo "Preview URL: ${PREVIEW_URL}"
           echo "url=${PREVIEW_URL}" >> $GITHUB_OUTPUT
           echo "::endgroup::"
 
