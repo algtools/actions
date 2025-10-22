@@ -1,0 +1,27 @@
+# Cursor Rules for algtools/actions
+
+## Project Overview
+This repository hosts reusable GitHub Actions and workflows used across the Algenium and Algtools ecosystem.
+
+## Code Standards
+- Follow GitHub Actions best practices
+- Use semantic versioning for action releases
+- Validate all workflows with actionlint
+- Include comprehensive documentation for each action
+- Use minimal permissions for GITHUB_TOKEN
+
+## Structure
+- `.github/actions/`: Custom reusable actions
+- `.github/workflows/`: Reusable workflows and CI/CD
+- `.github/tests/`: Test files and fixtures
+
+## CI/CD
+- All workflows must pass actionlint validation
+- Use proper security practices (minimal permissions, pinned versions)
+- Document all inputs, outputs, and secrets required
+
+## Documentation
+- Every action must have a README.md in its directory
+- Include usage examples
+- Document all inputs and outputs
+- Specify required permissions
