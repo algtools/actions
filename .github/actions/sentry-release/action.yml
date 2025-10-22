@@ -1,0 +1,214 @@
+name: 'Sentry Release'
+description: 'Creates and finalizes a Sentry release and registers a deployment for the target environment'
+author: 'Algenium Systems'
+
+inputs:
+  sentry_auth_token:
+    description: 'Sentry authentication token (from secrets)'
+    required: true
+  org:
+    description: 'Sentry organization slug'
+    required: true
+  project:
+    description: 'Sentry project slug'
+    required: true
+  release:
+    description: 'Release identifier (defaults to current git SHA)'
+    required: false
+    default: ''
+  environment:
+    description: 'Target environment for deployment (e.g., alpha, beta, prod)'
+    required: true
+
+outputs:
+  release_version:
+    description: 'The Sentry release version that was created'
+    value: ${{ steps.create-release.outputs.release }}
+  deployment_status:
+    description: 'Status of the deployment registration (success or failure)'
+    value: ${{ steps.register-deploy.outputs.status }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        echo "::group::Validating inputs"
+        
+        # Validate required inputs
+        if [ -z "${{ inputs.sentry_auth_token }}" ]; then
+          echo "::error::sentry_auth_token input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.org }}" ]; then
+          echo "::error::org input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.project }}" ]; then
+          echo "::error::project input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.environment }}" ]; then
+          echo "::error::environment input is required"
+          exit 1
+        fi
+        
+        # Determine release version
+        RELEASE="${{ inputs.release }}"
+        if [ -z "$RELEASE" ]; then
+          RELEASE="${{ github.sha }}"
+        fi
+        
+        echo "✓ All required inputs validated successfully"
+        echo ""
+        echo "Configuration:"
+        echo "  Organization: ${{ inputs.org }}"
+        echo "  Project: ${{ inputs.project }}"
+        echo "  Release: $RELEASE"
+        echo "  Environment: ${{ inputs.environment }}"
+        echo "  Auth Token: [REDACTED]"
+        echo "::endgroup::"
+
+    - name: Install Sentry CLI
+      shell: bash
+      run: |
+        echo "::group::Installing Sentry CLI"
+        
+        # Install Sentry CLI via npx to get latest version
+        echo "Verifying Sentry CLI availability..."
+        npx @sentry/cli --version
+        
+        echo ""
+        echo "✓ Sentry CLI is ready"
+        echo "::endgroup::"
+
+    - name: Create Sentry release
+      id: create-release
+      shell: bash
+      env:
+        SENTRY_AUTH_TOKEN: ${{ inputs.sentry_auth_token }}
+        SENTRY_ORG: ${{ inputs.org }}
+        SENTRY_PROJECT: ${{ inputs.project }}
+      run: |
+        echo "::group::Creating Sentry release"
+        
+        # Mask sensitive token in logs
+        echo "::add-mask::${{ inputs.sentry_auth_token }}"
+        
+        # Use github.sha if release input is empty
+        RELEASE="${{ inputs.release }}"
+        if [ -z "$RELEASE" ]; then
+          RELEASE="${{ github.sha }}"
+        fi
+        
+        ORG="${{ inputs.org }}"
+        PROJECT="${{ inputs.project }}"
+        
+        echo "Creating release: $RELEASE"
+        echo "  Organization: $ORG"
+        echo "  Project: $PROJECT"
+        echo ""
+        
+        # Create the release
+        npx @sentry/cli releases new "$RELEASE" --org "$ORG" --project "$PROJECT"
+        
+        echo ""
+        echo "✓ Release created successfully"
+        
+        # Set output
+        echo "release=$RELEASE" >> $GITHUB_OUTPUT
+        
+        echo "::endgroup::"
+
+    - name: Finalize Sentry release
+      shell: bash
+      env:
+        SENTRY_AUTH_TOKEN: ${{ inputs.sentry_auth_token }}
+        SENTRY_ORG: ${{ inputs.org }}
+      run: |
+        echo "::group::Finalizing Sentry release"
+        
+        # Use github.sha if release input is empty
+        RELEASE="${{ inputs.release }}"
+        if [ -z "$RELEASE" ]; then
+          RELEASE="${{ github.sha }}"
+        fi
+        
+        ORG="${{ inputs.org }}"
+        
+        echo "Finalizing release: $RELEASE"
+        echo ""
+        
+        # Finalize the release
+        npx @sentry/cli releases finalize "$RELEASE" --org "$ORG"
+        
+        echo ""
+        echo "✓ Release finalized successfully"
+        echo "::endgroup::"
+
+    - name: Register deployment
+      id: register-deploy
+      shell: bash
+      env:
+        SENTRY_AUTH_TOKEN: ${{ inputs.sentry_auth_token }}
+        SENTRY_ORG: ${{ inputs.org }}
+      run: |
+        echo "::group::Registering deployment"
+        
+        # Use github.sha if release input is empty
+        RELEASE="${{ inputs.release }}"
+        if [ -z "$RELEASE" ]; then
+          RELEASE="${{ github.sha }}"
+        fi
+        
+        ORG="${{ inputs.org }}"
+        ENV="${{ inputs.environment }}"
+        
+        echo "Registering deployment for release: $RELEASE"
+        echo "  Environment: $ENV"
+        echo ""
+        
+        # Register the deployment
+        npx @sentry/cli releases deploys "$RELEASE" new -e "$ENV" --org "$ORG"
+        
+        echo ""
+        echo "✓ Deployment registered successfully"
+        
+        # Set output
+        echo "status=success" >> $GITHUB_OUTPUT
+        
+        echo "::endgroup::"
+
+    - name: Release summary
+      shell: bash
+      run: |
+        echo "::group::Sentry Release Summary"
+        echo "====================================="
+        echo "📊 Sentry Release & Deployment"
+        echo "====================================="
+        echo ""
+        
+        # Use github.sha if release input is empty
+        RELEASE="${{ inputs.release }}"
+        if [ -z "$RELEASE" ]; then
+          RELEASE="${{ github.sha }}"
+        fi
+        
+        echo "Release Details:"
+        echo "  Version: $RELEASE"
+        echo "  Organization: ${{ inputs.org }}"
+        echo "  Project: ${{ inputs.project }}"
+        echo "  Environment: ${{ inputs.environment }}"
+        echo ""
+        echo "Actions Completed:"
+        echo "  ✓ Release created"
+        echo "  ✓ Release finalized"
+        echo "  ✓ Deployment registered"
+        echo ""
+        echo "Security:"
+        echo "  ✓ Auth token redacted from logs"
+        echo "  ✓ Secure credential handling"
+        echo ""
+        echo "✓ Sentry release workflow completed successfully"
+        echo "::endgroup::"
