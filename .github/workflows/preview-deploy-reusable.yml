@@ -254,7 +254,7 @@ jobs:
           fi
           
           echo "✓ Resolved PR number: $PR_NUMBER"
-          echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "number=${PR_NUMBER}" >> $GITHUB_OUTPUT
           echo "::endgroup::"
       
       - name: Ensure wildcard SSL certificate
@@ -296,7 +296,7 @@ jobs:
           PREVIEW_URL="https://${APP_DOMAIN}-pr-${PR_NUM}.${SLUG}.${DEV_ZONE}"
           
           echo "Preview URL: $PREVIEW_URL"
-          echo "url=$PREVIEW_URL" >> $GITHUB_OUTPUT
+          echo "url=${PREVIEW_URL}" >> $GITHUB_OUTPUT
           echo "::endgroup::"
 
   chromatic:
