@@ -1,0 +1,232 @@
+name: Test Environment Deploy Reusable Workflow
+
+on:
+  push:
+    branches:
+      - main
+      - 'cursor/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  test-workflow-structure:
+    name: Test Workflow Structure and Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify workflow file exists
+        run: |
+          echo "Checking for workflow file..."
+          if [ ! -f ".github/workflows/env-deploy-reusable.yml" ]; then
+            echo "❌ env-deploy-reusable.yml not found"
+            exit 1
+          fi
+          echo "✓ Workflow file exists"
+
+      - name: Validate workflow syntax
+        run: |
+          echo "Validating workflow YAML syntax..."
+          
+          # Check for required workflow_call trigger
+          if ! grep -q "workflow_call:" .github/workflows/env-deploy-reusable.yml; then
+            echo "❌ Missing workflow_call trigger"
+            exit 1
+          fi
+          echo "✓ workflow_call trigger present"
+          
+          # Check for required inputs
+          REQUIRED_INPUTS=("environment" "wrangler_config" "zone" "worker_name" "artifact_name" "custom_domain" "slug")
+          for input in "${REQUIRED_INPUTS[@]}"; do
+            if ! grep -q "$input:" .github/workflows/env-deploy-reusable.yml; then
+              echo "❌ Missing required input: $input"
+              exit 1
+            fi
+          done
+          echo "✓ All required inputs defined"
+          
+          # Check for required secrets
+          if ! grep -q "cloudflare_api_token:" .github/workflows/env-deploy-reusable.yml; then
+            echo "❌ Missing cloudflare_api_token secret"
+            exit 1
+          fi
+          if ! grep -q "cloudflare_account_id:" .github/workflows/env-deploy-reusable.yml; then
+            echo "❌ Missing cloudflare_account_id secret"
+            exit 1
+          fi
+          echo "✓ Required secrets defined"
+          
+          # Check for required outputs
+          REQUIRED_OUTPUTS=("worker_url" "deployment_status" "certificate_id")
+          for output in "${REQUIRED_OUTPUTS[@]}"; do
+            if ! grep -q "$output:" .github/workflows/env-deploy-reusable.yml; then
+              echo "❌ Missing required output: $output"
+              exit 1
+            fi
+          done
+          echo "✓ All required outputs defined"
+
+      - name: Check action references
+        run: |
+          echo "Verifying action references..."
+          
+          # Check for ensure-wildcard-certificate action
+          if ! grep -q "algtools/actions/.github/actions/ensure-wildcard-certificate" .github/workflows/env-deploy-reusable.yml; then
+            echo "❌ Missing ensure-wildcard-certificate action reference"
+            exit 1
+          fi
+          echo "✓ ensure-wildcard-certificate action referenced"
+          
+          # Check for deploy-cloudflare-from-artifact action
+          if ! grep -q "algtools/actions/.github/actions/deploy-cloudflare-from-artifact" .github/workflows/env-deploy-reusable.yml; then
+            echo "❌ Missing deploy-cloudflare-from-artifact action reference"
+            exit 1
+          fi
+          echo "✓ deploy-cloudflare-from-artifact action referenced"
+
+      - name: Verify Sentry integration
+        run: |
+          echo "Checking Sentry integration..."
+          
+          if ! grep -q "sentry_release:" .github/workflows/env-deploy-reusable.yml; then
+            echo "❌ Missing sentry_release input"
+            exit 1
+          fi
+          echo "✓ Sentry release input defined"
+          
+          if ! grep -q "sentry-cli" .github/workflows/env-deploy-reusable.yml; then
+            echo "❌ Missing sentry-cli installation"
+            exit 1
+          fi
+          echo "✓ Sentry CLI integration present"
+
+      - name: Summary
+        run: |
+          echo "========================================="
+          echo "✓ Workflow Structure Validation Complete"
+          echo "========================================="
+          echo ""
+          echo "All required components verified:"
+          echo "  ✓ workflow_call trigger"
+          echo "  ✓ Required inputs (environment, worker_name, etc.)"
+          echo "  ✓ Required secrets (Cloudflare credentials)"
+          echo "  ✓ Required outputs (worker_url, deployment_status, etc.)"
+          echo "  ✓ ensure-wildcard-certificate action"
+          echo "  ✓ deploy-cloudflare-from-artifact action"
+          echo "  ✓ Sentry integration (optional)"
+          echo ""
+          echo "The workflow is properly structured and ready for use."
+
+  test-documentation:
+    name: Test Workflow Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify README documentation
+        run: |
+          echo "Checking README.md for workflow documentation..."
+          
+          if ! grep -q "env-deploy-reusable.yml" README.md; then
+            echo "❌ Workflow not documented in README.md"
+            exit 1
+          fi
+          echo "✓ Workflow documented in README"
+          
+          # Check for usage examples
+          if ! grep -A 20 "env-deploy-reusable.yml" README.md | grep -q "example.com"; then
+            echo "❌ Missing usage examples"
+            exit 1
+          fi
+          echo "✓ Usage examples present"
+          
+          # Check for Sentry documentation
+          if ! grep -A 50 "env-deploy-reusable.yml" README.md | grep -q -i "sentry"; then
+            echo "❌ Missing Sentry integration documentation"
+            exit 1
+          fi
+          echo "✓ Sentry integration documented"
+          
+          echo ""
+          echo "✓ Documentation is complete and comprehensive"
+
+  test-build-for-integration:
+    name: Build Test Worker for Integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          node-version: '20'
+          working-directory: '.github/tests/deploy-cloudflare'
+          cache-dependency-path: '.github/tests/deploy-cloudflare/package-lock.json'
+
+      - name: Build test worker
+        uses: ./.github/actions/build-no-secrets
+        with:
+          build_cmd: 'npm run build'
+          working_dir: '.github/tests/deploy-cloudflare'
+          output_dir: 'dist'
+
+      - name: Upload worker artifact
+        uses: ./.github/actions/upload-artifacts
+        with:
+          artifact_name: 'test-env-deploy-worker-${{ github.run_id }}'
+          artifact_paths: '.github/tests/deploy-cloudflare/dist'
+          retention_days: 1
+
+      - name: Build summary
+        run: |
+          echo "✓ Test worker built and uploaded successfully"
+          echo "  Artifact: test-env-deploy-worker-${{ github.run_id }}"
+
+  test-complete:
+    name: All Tests Complete
+    needs:
+      - test-workflow-structure
+      - test-documentation
+      - test-build-for-integration
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "========================================="
+          echo "Environment Deploy Workflow Tests Summary"
+          echo "========================================="
+          echo ""
+          echo "Test Results:"
+          echo "  Workflow Structure: ${{ needs.test-workflow-structure.result }}"
+          echo "  Documentation: ${{ needs.test-documentation.result }}"
+          echo "  Build Integration: ${{ needs.test-build-for-integration.result }}"
+          echo ""
+          
+          # Check if all tests passed
+          if [ "${{ needs.test-workflow-structure.result }}" = "success" ] && \
+             [ "${{ needs.test-documentation.result }}" = "success" ] && \
+             [ "${{ needs.test-build-for-integration.result }}" = "success" ]; then
+            echo "✅ All tests PASSED"
+            echo ""
+            echo "The env-deploy-reusable.yml workflow is ready for production use!"
+            echo ""
+            echo "Note: Actual deployment testing requires valid Cloudflare credentials."
+            echo "The workflow has been validated for structure, documentation, and"
+            echo "integration with the build process. Real deployment testing should be"
+            echo "done in a controlled environment with proper credentials."
+          else
+            echo "❌ Some tests FAILED"
+            echo ""
+            echo "Please review the failed tests above and fix any issues."
+            exit 1
+          fi
