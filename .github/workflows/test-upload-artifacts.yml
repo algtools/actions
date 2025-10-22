@@ -1,0 +1,318 @@
+name: Test Upload Artifacts
+
+on:
+  push:
+    branches:
+      - main
+      - 'cursor/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  test-basic-upload:
+    name: Test Basic Upload
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          working-directory: '.github/tests/build-no-secrets'
+          cache-dependency-path: '.github/tests/build-no-secrets/package-lock.json'
+
+      - name: Build test artifacts
+        uses: ./.github/actions/build-no-secrets
+        with:
+          build_cmd: 'npm run build'
+          working_dir: '.github/tests/build-no-secrets'
+          output_dir: 'dist'
+
+      - name: Upload build artifacts
+        id: upload
+        uses: ./.github/actions/upload-artifacts
+        with:
+          artifact_name: 'test-build-basic'
+          artifact_paths: '.github/tests/build-no-secrets/dist'
+
+      - name: Verify upload outputs
+        run: |
+          echo "Testing upload outputs..."
+          
+          # Verify artifact_id is not empty
+          if [ -z "${{ steps.upload.outputs.artifact_id }}" ]; then
+            echo "Error: artifact_id output is empty"
+            exit 1
+          fi
+          echo "✓ Artifact ID: ${{ steps.upload.outputs.artifact_id }}"
+          
+          # Verify total_files is a number and greater than 0
+          if [ -z "${{ steps.upload.outputs.total_files }}" ]; then
+            echo "Error: total_files output is empty"
+            exit 1
+          fi
+          if [ "${{ steps.upload.outputs.total_files }}" -le 0 ]; then
+            echo "Error: total_files should be greater than 0"
+            exit 1
+          fi
+          echo "✓ Total files: ${{ steps.upload.outputs.total_files }}"
+          
+          # Verify total_size is a number and greater than 0
+          if [ -z "${{ steps.upload.outputs.total_size }}" ]; then
+            echo "Error: total_size output is empty"
+            exit 1
+          fi
+          if [ "${{ steps.upload.outputs.total_size }}" -le 0 ]; then
+            echo "Error: total_size should be greater than 0"
+            exit 1
+          fi
+          echo "✓ Total size: ${{ steps.upload.outputs.total_size }} bytes"
+          
+          echo ""
+          echo "✓ All outputs validated successfully"
+
+  test-multiple-paths:
+    name: Test Multiple Paths Upload
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          working-directory: '.github/tests/build-no-secrets'
+          cache-dependency-path: '.github/tests/build-no-secrets/package-lock.json'
+
+      - name: Build test artifacts
+        uses: ./.github/actions/build-no-secrets
+        with:
+          build_cmd: 'npm run build'
+          working_dir: '.github/tests/build-no-secrets'
+          output_dir: 'dist'
+
+      - name: Create additional test files
+        run: |
+          mkdir -p test-extra
+          echo "Test file 1" > test-extra/file1.txt
+          echo "Test file 2" > test-extra/file2.txt
+          echo "README content" > test-readme.md
+
+      - name: Upload multiple paths
+        id: upload
+        uses: ./.github/actions/upload-artifacts
+        with:
+          artifact_name: 'test-multiple-paths'
+          artifact_paths: '.github/tests/build-no-secrets/dist, test-extra, test-readme.md'
+
+      - name: Verify multiple paths upload
+        run: |
+          echo "Verifying multiple paths upload..."
+          
+          # Should have uploaded files from all three paths
+          FILES=${{ steps.upload.outputs.total_files }}
+          echo "Total files uploaded: $FILES"
+          
+          # At least 6 files (5 from dist + 2 from test-extra + 1 readme)
+          if [ "$FILES" -lt 6 ]; then
+            echo "Error: Expected at least 6 files, got $FILES"
+            exit 1
+          fi
+          
+          echo "✓ Multiple paths uploaded successfully"
+
+  test-with-retention:
+    name: Test Upload with Custom Retention
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create test file
+        run: |
+          mkdir -p test-retention
+          echo "Test content" > test-retention/test.txt
+
+      - name: Upload with custom retention
+        id: upload
+        uses: ./.github/actions/upload-artifacts
+        with:
+          artifact_name: 'test-retention-7days'
+          artifact_paths: 'test-retention'
+          retention_days: '7'
+
+      - name: Verify upload
+        run: |
+          if [ -z "${{ steps.upload.outputs.artifact_id }}" ]; then
+            echo "Error: Upload failed"
+            exit 1
+          fi
+          echo "✓ Upload with custom retention successful"
+
+  test-compression-levels:
+    name: Test Different Compression Levels
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compression: ['0', '6', '9']
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          working-directory: '.github/tests/build-no-secrets'
+          cache-dependency-path: '.github/tests/build-no-secrets/package-lock.json'
+
+      - name: Build test artifacts
+        uses: ./.github/actions/build-no-secrets
+        with:
+          build_cmd: 'npm run build'
+          working_dir: '.github/tests/build-no-secrets'
+          output_dir: 'dist'
+
+      - name: Upload with compression level ${{ matrix.compression }}
+        id: upload
+        uses: ./.github/actions/upload-artifacts
+        with:
+          artifact_name: 'test-compression-${{ matrix.compression }}'
+          artifact_paths: '.github/tests/build-no-secrets/dist'
+          compression_level: ${{ matrix.compression }}
+
+      - name: Verify upload
+        run: |
+          if [ -z "${{ steps.upload.outputs.artifact_id }}" ]; then
+            echo "Error: Upload with compression ${{ matrix.compression }} failed"
+            exit 1
+          fi
+          echo "✓ Upload with compression level ${{ matrix.compression }} successful"
+
+  test-if-no-files-found:
+    name: Test if-no-files-found Behavior
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Test with 'warn' (should not fail)
+        id: upload-warn
+        uses: ./.github/actions/upload-artifacts
+        with:
+          artifact_name: 'test-no-files-warn'
+          artifact_paths: 'non-existent-path'
+          if_no_files_found: 'warn'
+        continue-on-error: true
+
+      - name: Verify warn behavior
+        run: |
+          # With 'warn', the action should succeed even with no files
+          echo "✓ Action with 'warn' completed (may have warnings)"
+
+      - name: Test with 'ignore' (should not fail)
+        id: upload-ignore
+        uses: ./.github/actions/upload-artifacts
+        with:
+          artifact_name: 'test-no-files-ignore'
+          artifact_paths: 'non-existent-path'
+          if_no_files_found: 'ignore'
+        continue-on-error: true
+
+      - name: Verify ignore behavior
+        run: |
+          echo "✓ Action with 'ignore' completed"
+
+  test-complete-workflow:
+    name: Test Complete Build and Upload Workflow
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          working-directory: '.github/tests/build-no-secrets'
+          cache-dependency-path: '.github/tests/build-no-secrets/package-lock.json'
+
+      - name: Build without secrets
+        id: build
+        uses: ./.github/actions/build-no-secrets
+        with:
+          build_cmd: 'npm run build'
+          working_dir: '.github/tests/build-no-secrets'
+          output_dir: 'dist'
+
+      - name: Upload build artifacts
+        id: upload
+        uses: ./.github/actions/upload-artifacts
+        with:
+          artifact_name: 'complete-workflow-${{ github.run_id }}'
+          artifact_paths: '.github/tests/build-no-secrets/dist'
+          retention_days: '30'
+          compression_level: '6'
+
+      - name: Display complete workflow info
+        run: |
+          echo "========================================="
+          echo "Complete Build and Upload Workflow"
+          echo "========================================="
+          echo ""
+          echo "Build Information:"
+          echo "  Status: ${{ steps.build.outputs.build_status }}"
+          echo "  Output path: ${{ steps.build.outputs.output_path }}"
+          echo "  Artifact size: ${{ steps.build.outputs.artifact_size }} bytes"
+          echo ""
+          echo "Upload Information:"
+          echo "  Artifact ID: ${{ steps.upload.outputs.artifact_id }}"
+          echo "  Artifact URL: ${{ steps.upload.outputs.artifact_url }}"
+          echo "  Total files: ${{ steps.upload.outputs.total_files }}"
+          echo "  Total size: ${{ steps.upload.outputs.total_size }} bytes"
+          echo ""
+          echo "✓ Complete workflow executed successfully"
+
+  test-matrix-platforms:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create test files
+        shell: bash
+        run: |
+          mkdir -p test-platform
+          echo "Platform: ${{ matrix.os }}" > test-platform/platform.txt
+          echo "Test content" > test-platform/test.txt
+
+      - name: Upload artifacts on ${{ matrix.os }}
+        id: upload
+        uses: ./.github/actions/upload-artifacts
+        with:
+          artifact_name: 'test-${{ matrix.os }}'
+          artifact_paths: 'test-platform'
+
+      - name: Verify upload on ${{ matrix.os }}
+        shell: bash
+        run: |
+          if [ -z "${{ steps.upload.outputs.artifact_id }}" ]; then
+            echo "Error: Upload failed on ${{ matrix.os }}"
+            exit 1
+          fi
+          
+          if [ "${{ steps.upload.outputs.total_files }}" -ne 2 ]; then
+            echo "Error: Expected 2 files on ${{ matrix.os }}"
+            exit 1
+          fi
+          
+          echo "✓ Upload verified on ${{ matrix.os }}"

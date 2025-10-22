@@ -11,6 +11,17 @@ Algenium common GitHub Actions and reusable workflows for all projects across th
 └── tests/          # Test files and fixtures
 ```
 
+## Available Actions
+
+### [build-no-secrets](/.github/actions/build-no-secrets)
+Builds a project in a clean environment without exposing secrets. Perfect for PR previews or secure builds.
+
+### [setup-node](/.github/actions/setup-node)
+Sets up Node.js environment with caching support for faster builds.
+
+### [upload-artifacts](/.github/actions/upload-artifacts)
+Uploads build artifacts to GitHub Actions storage with detailed logging and support for multiple file paths.
+
 ## Usage
 
 ### Using Custom Actions
