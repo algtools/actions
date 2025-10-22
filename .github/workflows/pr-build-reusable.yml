@@ -35,6 +35,58 @@ on:
         required: false
         type: number
         default: 30
+      deploy_to_dev:
+        description: 'Enable deployment to Cloudflare Workers dev environment with SSL certificate'
+        required: false
+        type: boolean
+        default: false
+      worker_name:
+        description: 'Name of the Cloudflare Worker for dev deployment (required if deploy_to_dev is true)'
+        required: false
+        type: string
+        default: ''
+      wrangler_config:
+        description: 'Path to wrangler.toml configuration file relative to artifact root (required if deploy_to_dev is true)'
+        required: false
+        type: string
+        default: 'wrangler.toml'
+      zone:
+        description: 'Cloudflare zone ID for the domain (required if deploy_to_dev is true)'
+        required: false
+        type: string
+        default: ''
+      custom_domain:
+        description: 'Custom domain for wildcard certificate e.g., dev.example.com for *.dev.example.com (required if deploy_to_dev is true)'
+        required: false
+        type: string
+        default: ''
+      slug:
+        description: 'Project/application slug identifier for certificate management (required if deploy_to_dev is true)'
+        required: false
+        type: string
+        default: ''
+      wrangler_version:
+        description: 'Version of Wrangler to use for deployment (default: latest)'
+        required: false
+        type: string
+        default: 'latest'
+      max_wait_seconds:
+        description: 'Maximum time to wait for certificate activation in seconds (default: 300)'
+        required: false
+        type: number
+        default: 300
+      poll_interval_seconds:
+        description: 'Interval between certificate status checks in seconds (default: 10)'
+        required: false
+        type: number
+        default: 10
+    secrets:
+      cloudflare_api_token:
+        description: 'Cloudflare API token with Workers deployment and SSL certificate permissions (required if deploy_to_dev is true)'
+        required: false
+      cloudflare_account_id:
+        description: 'Cloudflare account ID (required if deploy_to_dev is true)'
+        required: false
     outputs:
       artifact_id:
         description: 'GitHub artifact ID of the uploaded artifact'
@@ -51,6 +103,18 @@ on:
       build_status:
         description: 'Status of the build (success or failure)'
         value: ${{ jobs.build.outputs.build_status }}
+      worker_url:
+        description: 'URL of the deployed Cloudflare Worker (only if deploy_to_dev is true)'
+        value: ${{ jobs.deploy.outputs.worker_url }}
+      deployment_status:
+        description: 'Status of the deployment (only if deploy_to_dev is true)'
+        value: ${{ jobs.deploy.outputs.deployment_status }}
+      certificate_id:
+        description: 'ID of the wildcard SSL certificate (only if deploy_to_dev is true)'
+        value: ${{ jobs.deploy.outputs.certificate_id }}
+      certificate_status:
+        description: 'Status of the SSL certificate (only if deploy_to_dev is true)'
+        value: ${{ jobs.deploy.outputs.certificate_status }}
 
 permissions:
   contents: read
@@ -112,4 +176,106 @@ jobs:
             echo "- **Retention**: ${{ inputs.retention_days }} days"
             echo ""
             echo "✓ Build and upload completed successfully"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy to Dev with SSL
+    needs: build
+    if: inputs.deploy_to_dev == true
+    runs-on: ubuntu-latest
+    environment: dev
+    outputs:
+      worker_url: ${{ steps.deploy-worker.outputs.worker_url }}
+      deployment_status: ${{ steps.deploy-worker.outputs.deployment_status }}
+      certificate_id: ${{ steps.ensure-cert.outputs.certificate_id }}
+      certificate_status: ${{ steps.ensure-cert.outputs.certificate_status }}
+    
+    steps:
+      - name: Validate deployment inputs
+        run: |
+          echo "::group::Validating deployment configuration"
+          
+          # Validate required inputs when deploy_to_dev is enabled
+          if [ -z "${{ inputs.worker_name }}" ]; then
+            echo "::error::worker_name is required when deploy_to_dev is enabled"
+            exit 1
+          fi
+          if [ -z "${{ inputs.zone }}" ]; then
+            echo "::error::zone is required when deploy_to_dev is enabled"
+            exit 1
+          fi
+          if [ -z "${{ inputs.custom_domain }}" ]; then
+            echo "::error::custom_domain is required when deploy_to_dev is enabled"
+            exit 1
+          fi
+          if [ -z "${{ inputs.slug }}" ]; then
+            echo "::error::slug is required when deploy_to_dev is enabled"
+            exit 1
+          fi
+          if [ -z "${{ secrets.cloudflare_api_token }}" ]; then
+            echo "::error::cloudflare_api_token secret is required when deploy_to_dev is enabled"
+            exit 1
+          fi
+          if [ -z "${{ secrets.cloudflare_account_id }}" ]; then
+            echo "::error::cloudflare_account_id secret is required when deploy_to_dev is enabled"
+            exit 1
+          fi
+          
+          echo "✓ All required deployment inputs validated"
+          echo ""
+          echo "Deployment Configuration:"
+          echo "  Worker: ${{ inputs.worker_name }}"
+          echo "  Domain: *.${{ inputs.custom_domain }}"
+          echo "  Zone: $(echo "${{ inputs.zone }}" | head -c 8)***"
+          echo "  Slug: ${{ inputs.slug }}"
+          echo "  Artifact: ${{ inputs.artifact_name }}"
+          echo "::endgroup::"
+      
+      - name: Ensure wildcard SSL certificate
+        id: ensure-cert
+        uses: algtools/actions/.github/actions/ensure-wildcard-certificate@main
+        with:
+          slug: ${{ inputs.slug }}
+          current_zone: ${{ inputs.zone }}
+          custom_domain: ${{ inputs.custom_domain }}
+          cloudflare_api_token: ${{ secrets.cloudflare_api_token }}
+          cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
+          max_wait_seconds: ${{ inputs.max_wait_seconds }}
+          poll_interval_seconds: ${{ inputs.poll_interval_seconds }}
+      
+      - name: Deploy to Cloudflare Workers
+        id: deploy-worker
+        uses: algtools/actions/.github/actions/deploy-cloudflare-from-artifact@main
+        with:
+          artifact_name: ${{ inputs.artifact_name }}
+          worker_name: ${{ inputs.worker_name }}
+          wrangler_config: ${{ inputs.wrangler_config }}
+          cloudflare_api_token: ${{ secrets.cloudflare_api_token }}
+          cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
+          wrangler_version: ${{ inputs.wrangler_version }}
+          deploy_environment: 'dev'
+          dry_run: 'false'
+      
+      - name: Deployment summary
+        run: |
+          {
+            echo "## 🚀 PR Dev Deployment"
+            echo ""
+            echo "### Worker Details"
+            echo "- **Name**: \`${{ inputs.worker_name }}\`"
+            echo "- **URL**: ${{ steps.deploy-worker.outputs.worker_url }}"
+            echo "- **Status**: ${{ steps.deploy-worker.outputs.deployment_status }}"
+            echo "- **Version**: \`${{ steps.deploy-worker.outputs.worker_version }}\`"
+            echo ""
+            echo "### SSL Certificate"
+            echo "- **Domain**: \`*.${{ inputs.custom_domain }}\`"
+            echo "- **Certificate ID**: \`${{ steps.ensure-cert.outputs.certificate_id }}\`"
+            echo "- **Status**: ${{ steps.ensure-cert.outputs.certificate_status }}"
+            echo "- **Created New**: ${{ steps.ensure-cert.outputs.certificate_created }}"
+            echo ""
+            echo "### Artifact"
+            echo "- **Name**: \`${{ inputs.artifact_name }}\`"
+            echo "- **ID**: \`${{ needs.build.outputs.artifact_id }}\`"
+            echo ""
+            echo "✓ PR preview deployed successfully to dev environment with SSL"
           } >> "$GITHUB_STEP_SUMMARY"
