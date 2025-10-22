@@ -27,6 +27,7 @@ jobs:
         with:
           node-version: '20'
           working-directory: '.github/tests/deploy-cloudflare'
+          cache-dependency-path: '.github/tests/deploy-cloudflare/package-lock.json'
 
       - name: Build test worker
         uses: ./.github/actions/build-no-secrets
@@ -82,6 +83,7 @@ jobs:
         with:
           node-version: '20'
           working-directory: '.github/tests/deploy-cloudflare'
+          cache-dependency-path: '.github/tests/deploy-cloudflare/package-lock.json'
 
       - name: Build test worker
         uses: ./.github/actions/build-no-secrets
@@ -208,6 +210,7 @@ jobs:
         with:
           node-version: '20'
           working-directory: '.github/tests/deploy-cloudflare'
+          cache-dependency-path: '.github/tests/deploy-cloudflare/package-lock.json'
 
       - name: Build worker
         id: build
@@ -275,6 +278,7 @@ jobs:
         with:
           node-version: '20'
           working-directory: '.github/tests/deploy-cloudflare'
+          cache-dependency-path: '.github/tests/deploy-cloudflare/package-lock.json'
 
       - name: Build worker
         uses: ./.github/actions/build-no-secrets
@@ -322,6 +326,7 @@ jobs:
         with:
           node-version: '20'
           working-directory: '.github/tests/deploy-cloudflare'
+          cache-dependency-path: '.github/tests/deploy-cloudflare/package-lock.json'
 
       - name: Build worker
         uses: ./.github/actions/build-no-secrets
