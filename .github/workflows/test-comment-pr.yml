@@ -26,10 +26,16 @@ jobs:
       - name: Determine PR number
         id: pr
         run: |
-          if [ -n "${{ github.event.inputs.pr_number }}" ]; then
-            echo "number=${{ github.event.inputs.pr_number }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          PR_INPUT="${{ github.event.inputs.pr_number }}"
+          EVENT_NAME="${{ github.event_name }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          
+          if [ -n "${PR_INPUT}" ]; then
+            echo "Resolved PR number from input: ${PR_INPUT}"
+            echo "number=${PR_INPUT}" >> $GITHUB_OUTPUT
+          elif [ "${EVENT_NAME}" = "pull_request" ]; then
+            echo "Resolved PR number from pull_request event: ${PR_NUMBER}"
+            echo "number=${PR_NUMBER}" >> $GITHUB_OUTPUT
           else
             echo "::error::No PR number available. Run this workflow on a PR or provide pr_number input."
             exit 1
@@ -59,7 +65,7 @@ jobs:
             
             **Run:** 1
             **Timestamp:** ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}
-          dedupe_key: test-dedupe
+          dedupe_key: test-dedupe-${{ github.run_id }}
 
       - name: Verify first comment was created
         run: |
@@ -87,7 +93,7 @@ jobs:
             **Run:** 2
             **Timestamp:** ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}
             **Previous Comment ID:** ${{ steps.comment-dedupe-1.outputs.comment_id }}
-          dedupe_key: test-dedupe
+          dedupe_key: test-dedupe-${{ github.run_id }}
 
       - name: Verify comment was updated (not created)
         run: |
@@ -162,11 +168,18 @@ jobs:
       - name: Determine PR number
         id: pr
         run: |
-          if [ -n "${{ github.event.inputs.pr_number }}" ]; then
-            echo "number=${{ github.event.inputs.pr_number }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          PR_INPUT="${{ github.event.inputs.pr_number }}"
+          EVENT_NAME="${{ github.event_name }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          
+          if [ -n "${PR_INPUT}" ]; then
+            echo "Resolved PR number from input: ${PR_INPUT}"
+            echo "number=${PR_INPUT}" >> $GITHUB_OUTPUT
+          elif [ "${EVENT_NAME}" = "pull_request" ]; then
+            echo "Resolved PR number from pull_request event: ${PR_NUMBER}"
+            echo "number=${PR_NUMBER}" >> $GITHUB_OUTPUT
           else
+            echo "No PR context available"
             echo "number=0" >> $GITHUB_OUTPUT
           fi
 

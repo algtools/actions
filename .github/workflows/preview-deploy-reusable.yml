@@ -1,0 +1,393 @@
+name: 'Preview Deploy - Reusable Workflow'
+# Reusable workflow for deploying PR previews to Cloudflare Workers
+# Automatically posts/updates a comment on the PR with deployment info
+
+on:
+  workflow_call:
+    inputs:
+      # Build configuration
+      build_cmd:
+        description: 'Build command to execute (e.g., "npm run build", "tsc", "yarn build")'
+        required: true
+        type: string
+      artifact_name:
+        description: 'Name of the artifact to upload'
+        required: true
+        type: string
+      artifact_paths:
+        description: 'Comma-separated list of file paths or directories to upload as artifacts'
+        required: true
+        type: string
+      node_version:
+        description: 'Node.js version to install. If not provided, reads from .nvmrc file.'
+        required: false
+        type: string
+        default: ''
+      working_directory:
+        description: 'Working directory for build commands'
+        required: false
+        type: string
+        default: '.'
+      output_dir:
+        description: 'Directory where build output/artifacts will be produced (e.g., "dist", "build")'
+        required: false
+        type: string
+        default: 'dist'
+      
+      # Deployment configuration
+      worker_name:
+        description: 'Name of the Cloudflare Worker for preview deployment'
+        required: true
+        type: string
+      wrangler_config:
+        description: 'Path to wrangler.toml configuration file relative to artifact root'
+        required: false
+        type: string
+        default: 'wrangler.toml'
+      zone:
+        description: 'Cloudflare zone ID for the domain'
+        required: true
+        type: string
+      custom_domain:
+        description: 'Custom domain for wildcard certificate e.g., dev.example.com for *.dev.example.com'
+        required: true
+        type: string
+      slug:
+        description: 'Project/application slug identifier for certificate management'
+        required: true
+        type: string
+      wrangler_version:
+        description: 'Version of Wrangler to use for deployment (default: latest)'
+        required: false
+        type: string
+        default: 'latest'
+      
+      # Preview URL configuration
+      app_domain:
+        description: 'Application domain prefix (used to construct preview URL: {app_domain}-pr-{num}.{slug}.{dev_zone})'
+        required: true
+        type: string
+      dev_zone:
+        description: 'Development zone suffix for preview URLs (e.g., "dev.example.com")'
+        required: true
+        type: string
+      
+      # Chromatic configuration (optional)
+      enable_chromatic:
+        description: 'Enable Chromatic visual testing upload'
+        required: false
+        type: boolean
+        default: false
+      chromatic_project_token:
+        description: 'Chromatic project token (required if enable_chromatic is true)'
+        required: false
+        type: string
+        default: ''
+      storybook_build_dir:
+        description: 'Directory containing Storybook build (required if enable_chromatic is true)'
+        required: false
+        type: string
+        default: 'storybook-static'
+      
+      # Miscellaneous
+      retention_days:
+        description: 'Number of days to retain the artifact (1-90 days, default is repository/org setting)'
+        required: false
+        type: number
+        default: 30
+      max_wait_seconds:
+        description: 'Maximum time to wait for certificate activation in seconds (default: 300)'
+        required: false
+        type: number
+        default: 300
+      poll_interval_seconds:
+        description: 'Interval between certificate status checks in seconds (default: 10)'
+        required: false
+        type: number
+        default: 10
+    
+    secrets:
+      cloudflare_api_token:
+        description: 'Cloudflare API token with Workers deployment and SSL certificate permissions'
+        required: true
+      cloudflare_account_id:
+        description: 'Cloudflare account ID'
+        required: true
+    
+    outputs:
+      # Build outputs
+      artifact_id:
+        description: 'GitHub artifact ID of the uploaded artifact'
+        value: ${{ jobs.build.outputs.artifact_id }}
+      artifact_url:
+        description: 'URL to download the artifact'
+        value: ${{ jobs.build.outputs.artifact_url }}
+      build_status:
+        description: 'Status of the build (success or failure)'
+        value: ${{ jobs.build.outputs.build_status }}
+      
+      # Deploy outputs
+      worker_url:
+        description: 'URL of the deployed Cloudflare Worker'
+        value: ${{ jobs.deploy.outputs.worker_url }}
+      deployment_status:
+        description: 'Status of the deployment'
+        value: ${{ jobs.deploy.outputs.deployment_status }}
+      certificate_id:
+        description: 'ID of the wildcard SSL certificate'
+        value: ${{ jobs.deploy.outputs.certificate_id }}
+      
+      # Preview outputs
+      preview_url:
+        description: 'Public preview URL for the PR'
+        value: ${{ jobs.deploy.outputs.preview_url }}
+      
+      # Chromatic outputs
+      chromatic_url:
+        description: 'URL to Chromatic visual testing results (if enabled)'
+        value: ${{ jobs.chromatic.outputs.chromatic_url }}
+      
+      # Comment outputs
+      comment_id:
+        description: 'ID of the PR comment'
+        value: ${{ jobs.comment.outputs.comment_id }}
+      comment_url:
+        description: 'URL of the PR comment'
+        value: ${{ jobs.comment.outputs.comment_url }}
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact_id }}
+      artifact_url: ${{ steps.upload.outputs.artifact_url }}
+      total_files: ${{ steps.upload.outputs.total_files }}
+      total_size: ${{ steps.upload.outputs.total_size }}
+      build_status: ${{ steps.build.outputs.build_status }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js securely
+        id: setup
+        uses: algtools/actions/.github/actions/setup-node@main
+        with:
+          node-version: ${{ inputs.node_version }}
+          working-directory: ${{ inputs.working_directory }}
+          cache-dependency-path: ${{ inputs.working_directory }}/package-lock.json
+      
+      - name: Build without secrets
+        id: build
+        uses: algtools/actions/.github/actions/build-no-secrets@main
+        with:
+          build_cmd: ${{ inputs.build_cmd }}
+          working_dir: ${{ inputs.working_directory }}
+          output_dir: ${{ inputs.output_dir }}
+      
+      - name: Upload artifacts
+        id: upload
+        uses: algtools/actions/.github/actions/upload-artifacts@main
+        with:
+          artifact_name: ${{ inputs.artifact_name }}
+          artifact_paths: ${{ inputs.artifact_paths }}
+          retention_days: ${{ inputs.retention_days }}
+
+  deploy:
+    name: Deploy Preview
+    needs: build
+    runs-on: ubuntu-latest
+    environment: dev
+    outputs:
+      worker_url: ${{ steps.deploy-worker.outputs.worker_url }}
+      deployment_status: ${{ steps.deploy-worker.outputs.deployment_status }}
+      certificate_id: ${{ steps.ensure-cert.outputs.certificate_id }}
+      preview_url: ${{ steps.preview-url.outputs.url }}
+      pr_number: ${{ steps.resolve-pr.outputs.number }}
+    
+    steps:
+      - name: Resolve PR number
+        id: resolve-pr
+        run: |
+          echo "::group::Resolving PR number"
+          
+          PR_NUMBER=""
+          
+          # Try to get PR number from different event contexts
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Direct pull_request trigger
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+            echo "PR number from pull_request event: ${PR_NUMBER}"
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            # workflow_run trigger (e.g., from pull_request_target or fork PRs)
+            # Extract from head_branch if it follows a PR pattern
+            HEAD_BRANCH="${{ github.event.workflow_run.head_branch }}"
+            echo "Head branch from workflow_run: ${HEAD_BRANCH}"
+            
+            # Try to extract PR number from associated pull requests
+            if [ -n "${{ github.event.workflow_run.pull_requests[0].number }}" ]; then
+              PR_NUMBER="${{ github.event.workflow_run.pull_requests[0].number }}"
+              echo "PR number from workflow_run pull_requests: ${PR_NUMBER}"
+            fi
+          fi
+          
+          # Fallback: try to extract from ref if it's a PR ref
+          if [ -z "$PR_NUMBER" ]; then
+            REF="${{ github.ref }}"
+            if [[ "$REF" =~ refs/pull/([0-9]+)/ ]]; then
+              PR_NUMBER="${BASH_REMATCH[1]}"
+              echo "PR number extracted from ref: ${PR_NUMBER}"
+            fi
+          fi
+          
+          # Validate PR number
+          if [ -z "$PR_NUMBER" ]; then
+            echo "::error::Could not resolve PR number from event context"
+            echo "Event name: ${{ github.event_name }}"
+            echo "Ref: ${{ github.ref }}"
+            exit 1
+          fi
+          
+          echo "✓ Resolved PR number: ${PR_NUMBER}"
+          echo "number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+      
+      - name: Ensure wildcard SSL certificate
+        id: ensure-cert
+        uses: algtools/actions/.github/actions/ensure-wildcard-certificate@main
+        with:
+          slug: ${{ inputs.slug }}
+          current_zone: ${{ inputs.zone }}
+          custom_domain: ${{ inputs.custom_domain }}
+          cloudflare_api_token: ${{ secrets.cloudflare_api_token }}
+          cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
+          max_wait_seconds: ${{ inputs.max_wait_seconds }}
+          poll_interval_seconds: ${{ inputs.poll_interval_seconds }}
+      
+      - name: Deploy to Cloudflare Workers
+        id: deploy-worker
+        uses: algtools/actions/.github/actions/deploy-cloudflare-from-artifact@main
+        with:
+          artifact_name: ${{ inputs.artifact_name }}
+          worker_name: ${{ inputs.worker_name }}
+          wrangler_config: ${{ inputs.wrangler_config }}
+          cloudflare_api_token: ${{ secrets.cloudflare_api_token }}
+          cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
+          wrangler_version: ${{ inputs.wrangler_version }}
+          deploy_environment: 'dev'
+          dry_run: 'false'
+      
+      - name: Construct preview URL
+        id: preview-url
+        run: |
+          echo "::group::Constructing preview URL"
+          
+          PR_NUM="${{ steps.resolve-pr.outputs.number }}"
+          APP_DOMAIN="${{ inputs.app_domain }}"
+          SLUG="${{ inputs.slug }}"
+          DEV_ZONE="${{ inputs.dev_zone }}"
+          
+          # Construct URL: {app_domain}-pr-{num}.{slug}.{dev_zone}
+          PREVIEW_URL="https://${APP_DOMAIN}-pr-${PR_NUM}.${SLUG}.${DEV_ZONE}"
+          
+          echo "Preview URL: ${PREVIEW_URL}"
+          echo "url=${PREVIEW_URL}" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+
+  chromatic:
+    name: Upload to Chromatic
+    needs: build
+    if: inputs.enable_chromatic == true
+    runs-on: ubuntu-latest
+    outputs:
+      chromatic_url: ${{ steps.chromatic-upload.outputs.url }}
+    
+    steps:
+      - name: Validate Chromatic inputs
+        run: |
+          echo "::group::Validating Chromatic configuration"
+          
+          if [ -z "${{ inputs.chromatic_project_token }}" ]; then
+            echo "::error::chromatic_project_token is required when enable_chromatic is true"
+            exit 1
+          fi
+          
+          if [ -z "${{ inputs.storybook_build_dir }}" ]; then
+            echo "::error::storybook_build_dir is required when enable_chromatic is true"
+            exit 1
+          fi
+          
+          echo "✓ Chromatic configuration validated"
+          echo "::endgroup::"
+      
+      - name: Upload to Chromatic
+        id: chromatic-upload
+        uses: algtools/actions/.github/actions/chromatic-upload-from-artifact@main
+        with:
+          artifact_name: ${{ inputs.artifact_name }}
+          project_token: ${{ inputs.chromatic_project_token }}
+          storybook_build_dir: ${{ inputs.storybook_build_dir }}
+
+  comment:
+    name: Comment on PR
+    needs: [deploy, chromatic]
+    if: |
+      always() &&
+      needs.deploy.result == 'success' &&
+      (inputs.enable_chromatic == false || needs.chromatic.result == 'success' || needs.chromatic.result == 'skipped')
+    runs-on: ubuntu-latest
+    outputs:
+      comment_id: ${{ steps.comment-pr.outputs.comment_id }}
+      comment_url: ${{ steps.comment-pr.outputs.comment_url }}
+    
+    steps:
+      - name: Post or update PR comment
+        id: comment-pr
+        uses: algtools/actions/.github/actions/comment-pr@main
+        with:
+          pr_number: ${{ needs.deploy.outputs.pr_number }}
+          message: |
+            ✅ **Preview deployed successfully!**
+            🌐 [Open Preview](${{ needs.deploy.outputs.preview_url }})${{ inputs.enable_chromatic == true && needs.chromatic.outputs.chromatic_url != '' && format('
+            🧩 [Chromatic Visuals]({0})', needs.chromatic.outputs.chromatic_url) || '' }}
+            
+            ---
+            
+            **Deployment Details:**
+            - Worker: `${{ inputs.worker_name }}`
+            - Environment: `dev`
+            - Commit: `${{ github.sha }}`
+          dedupe_key: 'preview-deploy'
+      
+      - name: Summary
+        run: |
+          {
+            echo "## 🚀 Preview Deployment Complete"
+            echo ""
+            echo "### Preview URL"
+            echo "🌐 **[${{ needs.deploy.outputs.preview_url }}](${{ needs.deploy.outputs.preview_url }})**"
+            echo ""
+            
+            if [ "${{ inputs.enable_chromatic }}" = "true" ] && [ -n "${{ needs.chromatic.outputs.chromatic_url }}" ]; then
+              echo "### Chromatic"
+              echo "🧩 **[View Visual Tests](${{ needs.chromatic.outputs.chromatic_url }})**"
+              echo ""
+            fi
+            
+            echo "### Deployment Info"
+            echo "- **Worker**: \`${{ inputs.worker_name }}\`"
+            echo "- **PR**: #${{ needs.deploy.outputs.pr_number }}"
+            echo "- **Status**: ${{ needs.deploy.outputs.deployment_status }}"
+            echo "- **Certificate**: ${{ needs.deploy.outputs.certificate_id }}"
+            echo ""
+            echo "### PR Comment"
+            echo "- **Action**: ${{ steps.comment-pr.outputs.action }}"
+            echo "- **URL**: ${{ steps.comment-pr.outputs.comment_url }}"
+            echo ""
+            echo "✓ Preview deployment completed successfully"
+          } >> "$GITHUB_STEP_SUMMARY"
