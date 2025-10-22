@@ -1,0 +1,113 @@
+name: 'PR Build - Reusable Workflow'
+
+on:
+  workflow_call:
+    inputs:
+      build_cmd:
+        description: 'Build command to execute (e.g., "npm run build", "tsc", "yarn build")'
+        required: true
+        type: string
+      artifact_name:
+        description: 'Name of the artifact to upload'
+        required: true
+        type: string
+      artifact_paths:
+        description: 'Comma-separated list of file paths or directories to upload as artifacts'
+        required: true
+        type: string
+      node_version:
+        description: 'Node.js version to install. If not provided, reads from .nvmrc file.'
+        required: false
+        type: string
+        default: ''
+      working_directory:
+        description: 'Working directory for build commands'
+        required: false
+        type: string
+        default: '.'
+      output_dir:
+        description: 'Directory where build output/artifacts will be produced (e.g., "dist", "build")'
+        required: false
+        type: string
+        default: 'dist'
+      retention_days:
+        description: 'Number of days to retain the artifact (1-90 days, default is repository/org setting)'
+        required: false
+        type: number
+        default: 30
+    outputs:
+      artifact_id:
+        description: 'GitHub artifact ID of the uploaded artifact'
+        value: ${{ jobs.build.outputs.artifact_id }}
+      artifact_url:
+        description: 'URL to download the artifact'
+        value: ${{ jobs.build.outputs.artifact_url }}
+      total_files:
+        description: 'Total number of files uploaded'
+        value: ${{ jobs.build.outputs.total_files }}
+      total_size:
+        description: 'Total size of uploaded files in bytes'
+        value: ${{ jobs.build.outputs.total_size }}
+      build_status:
+        description: 'Status of the build (success or failure)'
+        value: ${{ jobs.build.outputs.build_status }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and Upload Artifacts
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact_id }}
+      artifact_url: ${{ steps.upload.outputs.artifact_url }}
+      total_files: ${{ steps.upload.outputs.total_files }}
+      total_size: ${{ steps.upload.outputs.total_size }}
+      build_status: ${{ steps.build.outputs.build_status }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js securely
+        id: setup
+        uses: algtools/actions/.github/actions/setup-node@main
+        with:
+          node-version: ${{ inputs.node_version }}
+          working-directory: ${{ inputs.working_directory }}
+          cache-dependency-path: ${{ inputs.working_directory }}/package-lock.json
+      
+      - name: Build without secrets
+        id: build
+        uses: algtools/actions/.github/actions/build-no-secrets@main
+        with:
+          build_cmd: ${{ inputs.build_cmd }}
+          working_dir: ${{ inputs.working_directory }}
+          output_dir: ${{ inputs.output_dir }}
+      
+      - name: Upload artifacts
+        id: upload
+        uses: algtools/actions/.github/actions/upload-artifacts@main
+        with:
+          artifact_name: ${{ inputs.artifact_name }}
+          artifact_paths: ${{ inputs.artifact_paths }}
+          retention_days: ${{ inputs.retention_days }}
+      
+      - name: Summary
+        run: |
+          echo "## PR Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Build Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ steps.build.outputs.build_status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Node Version**: ${{ steps.setup.outputs.node-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cache Hit**: ${{ steps.setup.outputs.cache-hit }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifact Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Name**: ${{ inputs.artifact_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **ID**: ${{ steps.upload.outputs.artifact_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total Files**: ${{ steps.upload.outputs.total_files }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total Size**: ${{ steps.upload.outputs.total_size }} bytes" >> $GITHUB_STEP_SUMMARY
+          echo "- **Retention**: ${{ inputs.retention_days }} days" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✓ Build and upload completed successfully" >> $GITHUB_STEP_SUMMARY

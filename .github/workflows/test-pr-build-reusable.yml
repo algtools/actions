@@ -1,0 +1,91 @@
+name: Test PR Build Reusable Workflow
+
+on:
+  push:
+    branches:
+      - main
+      - 'cursor/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-basic:
+    name: Test Basic PR Build
+    uses: ./.github/workflows/pr-build-reusable.yml
+    with:
+      build_cmd: "npm run build"
+      artifact_name: "test-build-basic"
+      artifact_paths: ".github/tests/build-no-secrets/dist"
+      working_directory: ".github/tests/build-no-secrets"
+      output_dir: "dist"
+      retention_days: 1
+
+  verify-outputs:
+    name: Verify Workflow Outputs
+    needs: test-basic
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify outputs
+        run: |
+          echo "Testing workflow outputs..."
+          echo "Artifact ID: ${{ needs.test-basic.outputs.artifact_id }}"
+          echo "Artifact URL: ${{ needs.test-basic.outputs.artifact_url }}"
+          echo "Total Files: ${{ needs.test-basic.outputs.total_files }}"
+          echo "Total Size: ${{ needs.test-basic.outputs.total_size }}"
+          echo "Build Status: ${{ needs.test-basic.outputs.build_status }}"
+          
+          # Verify required outputs are not empty
+          if [ -z "${{ needs.test-basic.outputs.artifact_id }}" ]; then
+            echo "Error: artifact_id output is empty"
+            exit 1
+          fi
+          
+          if [ -z "${{ needs.test-basic.outputs.build_status }}" ]; then
+            echo "Error: build_status output is empty"
+            exit 1
+          fi
+          
+          if [ "${{ needs.test-basic.outputs.build_status }}" != "success" ]; then
+            echo "Error: build_status is not 'success'"
+            exit 1
+          fi
+          
+          if [ -z "${{ needs.test-basic.outputs.total_files }}" ]; then
+            echo "Error: total_files output is empty"
+            exit 1
+          fi
+          
+          if [ -z "${{ needs.test-basic.outputs.total_size }}" ]; then
+            echo "Error: total_size output is empty"
+            exit 1
+          fi
+          
+          echo "✓ All outputs validated successfully"
+
+  test-with-custom-node-version:
+    name: Test with Custom Node Version
+    uses: ./.github/workflows/pr-build-reusable.yml
+    with:
+      build_cmd: "npm run build"
+      artifact_name: "test-build-custom-node"
+      artifact_paths: ".github/tests/build-no-secrets/dist"
+      working_directory: ".github/tests/build-no-secrets"
+      output_dir: "dist"
+      node_version: "20"
+      retention_days: 1
+
+  test-multiple-paths:
+    name: Test Multiple Artifact Paths
+    uses: ./.github/workflows/pr-build-reusable.yml
+    with:
+      build_cmd: "npm run build"
+      artifact_name: "test-build-multiple-paths"
+      artifact_paths: ".github/tests/build-no-secrets/dist, .github/tests/build-no-secrets/package.json"
+      working_directory: ".github/tests/build-no-secrets"
+      output_dir: "dist"
+      retention_days: 1

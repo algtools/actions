@@ -28,6 +28,53 @@ Deploys Cloudflare Workers from pre-built artifacts with secure credential handl
 ### [ensure-wildcard-certificate](/.github/actions/ensure-wildcard-certificate)
 Ensures a wildcard SSL certificate exists in Cloudflare ACM. Idempotent action that creates certificates only when needed and waits for activation.
 
+## Available Reusable Workflows
+
+### [pr-build-reusable.yml](/.github/workflows/pr-build-reusable.yml)
+A complete PR build workflow that sets up Node.js, builds your project without secrets, and uploads artifacts. Perfect for pull request previews and automated testing.
+
+**Features:**
+- Secure Node.js setup with dependency caching
+- Clean build environment without secret exposure
+- Automatic artifact upload with detailed metadata
+- Configurable retention and working directories
+
+**Example Usage:**
+```yaml
+name: PR Build
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    uses: algtools/actions/.github/workflows/pr-build-reusable.yml@main
+    with:
+      build_cmd: "npm run build"
+      artifact_name: "pr-build-${{ github.event.pull_request.number }}"
+      artifact_paths: "dist"
+      working_directory: "."
+      output_dir: "dist"
+      retention_days: 7
+```
+
+**Inputs:**
+- `build_cmd` (required): Build command to execute
+- `artifact_name` (required): Name for the uploaded artifact
+- `artifact_paths` (required): Comma-separated paths to upload
+- `node_version` (optional): Node.js version (defaults to .nvmrc)
+- `working_directory` (optional): Working directory (default: ".")
+- `output_dir` (optional): Build output directory (default: "dist")
+- `retention_days` (optional): Artifact retention in days (default: 30)
+
+**Outputs:**
+- `artifact_id`: GitHub artifact ID
+- `artifact_url`: Download URL for the artifact
+- `total_files`: Number of files uploaded
+- `total_size`: Total size in bytes
+- `build_status`: Build result status
+
 ## Usage
 
 ### Using Custom Actions
