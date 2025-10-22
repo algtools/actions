@@ -1,0 +1,9 @@
+{
+  "name": "chromatic-upload-test",
+  "version": "1.0.0",
+  "description": "Test fixtures for chromatic-upload-from-artifact action",
+  "scripts": {
+    "build-storybook": "node build-storybook.js"
+  },
+  "devDependencies": {}
+}
