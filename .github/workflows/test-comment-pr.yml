@@ -26,10 +26,14 @@ jobs:
       - name: Determine PR number
         id: pr
         run: |
-          if [ -n "${{ github.event.inputs.pr_number }}" ]; then
-            echo "number=${{ github.event.inputs.pr_number }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          PR_INPUT="${{ github.event.inputs.pr_number }}"
+          EVENT_NAME="${{ github.event_name }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          
+          if [ -n "${PR_INPUT}" ]; then
+            echo "number=${PR_INPUT}" >> $GITHUB_OUTPUT
+          elif [ "${EVENT_NAME}" = "pull_request" ]; then
+            echo "number=${PR_NUMBER}" >> $GITHUB_OUTPUT
           else
             echo "::error::No PR number available. Run this workflow on a PR or provide pr_number input."
             exit 1
@@ -162,10 +166,14 @@ jobs:
       - name: Determine PR number
         id: pr
         run: |
-          if [ -n "${{ github.event.inputs.pr_number }}" ]; then
-            echo "number=${{ github.event.inputs.pr_number }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          PR_INPUT="${{ github.event.inputs.pr_number }}"
+          EVENT_NAME="${{ github.event_name }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          
+          if [ -n "${PR_INPUT}" ]; then
+            echo "number=${PR_INPUT}" >> $GITHUB_OUTPUT
+          elif [ "${EVENT_NAME}" = "pull_request" ]; then
+            echo "number=${PR_NUMBER}" >> $GITHUB_OUTPUT
           else
             echo "number=0" >> $GITHUB_OUTPUT
           fi

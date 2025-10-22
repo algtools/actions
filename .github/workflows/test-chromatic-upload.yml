@@ -340,7 +340,7 @@ jobs:
           
           # Get artifact size
           ARTIFACT_SIZE=$(du -sb storybook-static | cut -f1)
-          echo "artifact_size=$ARTIFACT_SIZE" >> $GITHUB_OUTPUT
+          echo "artifact_size=${ARTIFACT_SIZE}" >> $GITHUB_OUTPUT
           
           echo "Storybook build completed:"
           echo "  Size: $ARTIFACT_SIZE bytes"
