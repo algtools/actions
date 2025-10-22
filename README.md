@@ -280,6 +280,144 @@ jobs:
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 ```
 
+---
+
+### [preview-deploy-reusable.yml](/.github/workflows/preview-deploy-reusable.yml)
+A complete PR preview deployment workflow that builds your application, deploys to Cloudflare Workers, optionally uploads to Chromatic for visual testing, and automatically posts/updates a comment on the PR with all deployment information.
+
+**Features:**
+- Full build and deployment pipeline for PR previews
+- Automatic PR comment with deployment info (create/update with no duplicates)
+- Resolves PR number from various event contexts (pull_request, workflow_run, etc.)
+- Works with both regular and Dependabot PRs
+- Optional Chromatic visual testing integration
+- Wildcard SSL certificate management
+- Preview URL construction and sharing
+- Markdown-formatted PR comments with emojis
+
+**Example Usage:**
+```yaml
+name: PR Preview Deploy
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  preview:
+    permissions:
+      contents: read
+      pull-requests: write  # Required for PR comments
+    uses: algtools/actions/.github/workflows/preview-deploy-reusable.yml@main
+    with:
+      # Build configuration
+      build_cmd: "npm run build"
+      artifact_name: "preview-${{ github.event.pull_request.number }}"
+      artifact_paths: "dist,wrangler.toml"
+      working_directory: "."
+      output_dir: "dist"
+      
+      # Deployment configuration
+      worker_name: "my-app-pr-${{ github.event.pull_request.number }}"
+      wrangler_config: "wrangler.toml"
+      zone: "${{ vars.CLOUDFLARE_ZONE_ID }}"
+      custom_domain: "dev.example.com"
+      slug: "my-app"
+      
+      # Preview URL configuration
+      app_domain: "${{ vars.APP_DOMAIN }}"  # e.g., "my-app"
+      dev_zone: "${{ vars.DEV_ZONE }}"      # e.g., "dev.example.com"
+      
+      # Optional: Enable Chromatic
+      enable_chromatic: true
+      chromatic_project_token: "${{ secrets.CHROMATIC_PROJECT_TOKEN }}"
+      storybook_build_dir: "storybook-static"
+    secrets:
+      cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+**Required Inputs:**
+- `build_cmd` (required): Build command to execute
+- `artifact_name` (required): Name for the uploaded artifact
+- `artifact_paths` (required): Comma-separated paths to upload
+- `worker_name` (required): Cloudflare Worker name for preview
+- `zone` (required): Cloudflare zone ID
+- `custom_domain` (required): Domain for wildcard SSL certificate
+- `slug` (required): Project/application slug identifier
+- `app_domain` (required): Application domain prefix for preview URL
+- `dev_zone` (required): Development zone suffix for preview URLs
+
+**Optional Build Inputs:**
+- `node_version` (optional): Node.js version (defaults to .nvmrc)
+- `working_directory` (optional): Working directory (default: ".")
+- `output_dir` (optional): Build output directory (default: "dist")
+- `retention_days` (optional): Artifact retention in days (default: 30)
+- `wrangler_config` (optional): Path to wrangler.toml (default: "wrangler.toml")
+- `wrangler_version` (optional): Wrangler version (default: "latest")
+- `max_wait_seconds` (optional): Max wait for certificate activation (default: 300)
+- `poll_interval_seconds` (optional): Certificate status check interval (default: 10)
+
+**Optional Chromatic Inputs:**
+- `enable_chromatic` (optional): Enable Chromatic visual testing (default: false)
+- `chromatic_project_token` (optional): Chromatic project token (required if enable_chromatic is true)
+- `storybook_build_dir` (optional): Storybook build directory (default: "storybook-static")
+
+**Required Secrets:**
+- `cloudflare_api_token`: Cloudflare API token with Workers and SSL permissions
+- `cloudflare_account_id`: Cloudflare account ID
+
+**Build Outputs:**
+- `artifact_id`: GitHub artifact ID
+- `artifact_url`: Download URL for the artifact
+- `build_status`: Build result status
+
+**Deployment Outputs:**
+- `worker_url`: URL of the deployed Worker
+- `deployment_status`: Deployment status
+- `certificate_id`: SSL certificate ID
+- `preview_url`: Public preview URL for the PR
+
+**Chromatic Outputs (if enabled):**
+- `chromatic_url`: URL to Chromatic visual testing results
+
+**Comment Outputs:**
+- `comment_id`: ID of the PR comment
+- `comment_url`: URL of the PR comment
+
+**PR Comment Example:**
+
+The workflow automatically posts/updates a comment on the PR with this format:
+
+```markdown
+✅ **Preview deployed successfully!**
+🌐 [Open Preview](https://my-app-pr-42.my-app.dev.example.com)
+🧩 [Chromatic Visuals](https://www.chromatic.com/build?appId=...)
+
+---
+
+**Deployment Details:**
+- Worker: `my-app-pr-42`
+- Environment: `dev`
+- Commit: `abc123def456...`
+```
+
+**Key Features:**
+
+1. **Smart PR Number Resolution**: Works with `pull_request`, `workflow_run`, and other event types
+2. **Deduplication**: Uses `dedupe_key: 'preview-deploy'` to update existing comments instead of creating duplicates
+3. **Graceful Chromatic Handling**: Only shows Chromatic link if enabled and URL is available
+4. **Works with Dependabot**: Handles PRs from forks and Dependabot where secrets aren't directly available
+5. **Comprehensive Logging**: Detailed job summaries and outputs for debugging
+
+**Required Permissions:**
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write  # Required for posting PR comments
+```
+
 ## Usage
 
 ### Using Custom Actions
