@@ -1,0 +1,179 @@
+name: 'Upload Artifacts'
+description: 'Uploads build artifacts to GitHub Actions storage with detailed logging and support for multiple file paths'
+author: 'Algenium Systems'
+
+inputs:
+  artifact_name:
+    description: 'Name of the artifact to upload'
+    required: true
+  artifact_paths:
+    description: 'Comma-separated list of file paths or directories to upload as artifacts'
+    required: true
+  retention_days:
+    description: 'Number of days to retain the artifact (1-90 days, default is repository/org setting)'
+    required: false
+    default: ''
+  if_no_files_found:
+    description: 'Behavior if no files are found: warn, error, or ignore'
+    required: false
+    default: 'warn'
+  compression_level:
+    description: 'Compression level (0-9): 0 for no compression, 9 for maximum compression'
+    required: false
+    default: '6'
+
+outputs:
+  artifact_id:
+    description: 'GitHub artifact ID of the uploaded artifact'
+    value: ${{ steps.upload.outputs.artifact-id }}
+  artifact_url:
+    description: 'URL to download the artifact'
+    value: ${{ steps.upload.outputs.artifact-url }}
+  total_files:
+    description: 'Total number of files uploaded'
+    value: ${{ steps.analyze.outputs.file_count }}
+  total_size:
+    description: 'Total size of uploaded files in bytes'
+    value: ${{ steps.analyze.outputs.total_size }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        echo "::group::Validating inputs"
+        if [ -z "${{ inputs.artifact_name }}" ]; then
+          echo "::error::artifact_name input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.artifact_paths }}" ]; then
+          echo "::error::artifact_paths input is required"
+          exit 1
+        fi
+        echo "✓ Inputs validated successfully"
+        echo "  Artifact name: ${{ inputs.artifact_name }}"
+        echo "  Artifact paths: ${{ inputs.artifact_paths }}"
+        echo "  Retention days: ${{ inputs.retention_days || 'default' }}"
+        echo "  If no files found: ${{ inputs.if_no_files_found }}"
+        echo "  Compression level: ${{ inputs.compression_level }}"
+        echo "::endgroup::"
+
+    - name: Analyze artifacts before upload
+      id: analyze
+      shell: bash
+      run: |
+        echo "::group::Analyzing artifacts"
+        
+        # Parse comma-separated paths
+        IFS=',' read -ra PATHS <<< "${{ inputs.artifact_paths }}"
+        
+        TOTAL_FILES=0
+        TOTAL_SIZE=0
+        MISSING_PATHS=""
+        
+        echo "Checking ${#PATHS[@]} path(s)..."
+        echo ""
+        
+        for path in "${PATHS[@]}"; do
+          # Trim whitespace
+          path=$(echo "$path" | xargs)
+          
+          echo "📁 Analyzing: $path"
+          
+          if [ ! -e "$path" ]; then
+            echo "  ⚠️  Warning: Path does not exist"
+            MISSING_PATHS="$MISSING_PATHS $path"
+            continue
+          fi
+          
+          if [ -f "$path" ]; then
+            # Single file
+            SIZE=$(stat -c%s "$path" 2>/dev/null || stat -f%z "$path" 2>/dev/null || echo "0")
+            echo "  Type: File"
+            echo "  Size: $SIZE bytes ($(numfmt --to=iec-i --suffix=B $SIZE 2>/dev/null || echo "$SIZE bytes"))"
+            TOTAL_FILES=$((TOTAL_FILES + 1))
+            TOTAL_SIZE=$((TOTAL_SIZE + SIZE))
+          elif [ -d "$path" ]; then
+            # Directory
+            FILE_COUNT=$(find "$path" -type f | wc -l | xargs)
+            DIR_SIZE=$(du -sb "$path" 2>/dev/null | cut -f1 || du -sk "$path" 2>/dev/null | awk '{print $1 * 1024}')
+            echo "  Type: Directory"
+            echo "  Files: $FILE_COUNT"
+            echo "  Total size: $DIR_SIZE bytes ($(numfmt --to=iec-i --suffix=B $DIR_SIZE 2>/dev/null || du -sh "$path" 2>/dev/null | cut -f1 || echo "$DIR_SIZE bytes"))"
+            
+            # List some files in the directory
+            echo "  Contents (first 5 files):"
+            find "$path" -type f | head -5 | while read -r file; do
+              echo "    - $(basename "$file")"
+            done
+            if [ "$FILE_COUNT" -gt 5 ]; then
+              echo "    ... and $((FILE_COUNT - 5)) more files"
+            fi
+            
+            TOTAL_FILES=$((TOTAL_FILES + FILE_COUNT))
+            TOTAL_SIZE=$((TOTAL_SIZE + DIR_SIZE))
+          fi
+          echo ""
+        done
+        
+        # Check if any paths were missing
+        if [ -n "$MISSING_PATHS" ]; then
+          echo "⚠️  Warning: Some paths do not exist:$MISSING_PATHS"
+          if [ "${{ inputs.if_no_files_found }}" == "error" ]; then
+            echo "::error::Missing paths and if_no_files_found is set to 'error'"
+            exit 1
+          fi
+        fi
+        
+        # Summary
+        echo "=================================="
+        echo "📊 Upload Summary"
+        echo "=================================="
+        echo "Total files: $TOTAL_FILES"
+        echo "Total size: $TOTAL_SIZE bytes ($(numfmt --to=iec-i --suffix=B $TOTAL_SIZE 2>/dev/null || echo "$TOTAL_SIZE bytes"))"
+        echo "Artifact name: ${{ inputs.artifact_name }}"
+        echo ""
+        
+        # Set outputs
+        echo "file_count=$TOTAL_FILES" >> $GITHUB_OUTPUT
+        echo "total_size=$TOTAL_SIZE" >> $GITHUB_OUTPUT
+        
+        if [ "$TOTAL_FILES" -eq 0 ]; then
+          echo "⚠️  Warning: No files found to upload"
+        fi
+        
+        echo "::endgroup::"
+
+    - name: Upload artifacts
+      id: upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact_name }}
+        path: ${{ inputs.artifact_paths }}
+        retention-days: ${{ inputs.retention_days }}
+        if-no-files-found: ${{ inputs.if_no_files_found }}
+        compression-level: ${{ inputs.compression_level }}
+
+    - name: Upload summary
+      shell: bash
+      run: |
+        echo "::group::Upload Summary"
+        echo "✓ Artifact uploaded successfully"
+        echo ""
+        echo "Artifact Details:"
+        echo "  Name: ${{ inputs.artifact_name }}"
+        echo "  ID: ${{ steps.upload.outputs.artifact-id }}"
+        echo "  URL: ${{ steps.upload.outputs.artifact-url }}"
+        echo "  Files: ${{ steps.analyze.outputs.file_count }}"
+        echo "  Size: ${{ steps.analyze.outputs.total_size }} bytes"
+        
+        if [ -n "${{ inputs.retention_days }}" ]; then
+          echo "  Retention: ${{ inputs.retention_days }} days"
+        else
+          echo "  Retention: Repository default"
+        fi
+        
+        echo ""
+        echo "✓ Upload complete"
+        echo "::endgroup::"
