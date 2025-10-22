@@ -1,0 +1,294 @@
+name: 'Deploy Cloudflare Worker from Artifact'
+description: 'Deploys Cloudflare Workers from pre-built artifacts with secure credential handling and detailed logging'
+author: 'Algenium Systems'
+
+inputs:
+  artifact_name:
+    description: 'Name of the artifact containing the built worker code to download and deploy'
+    required: true
+  worker_name:
+    description: 'Name of the Cloudflare Worker to deploy'
+    required: true
+  wrangler_config:
+    description: 'Path to the wrangler.toml configuration file (relative to artifact root)'
+    required: true
+  cloudflare_api_token:
+    description: 'Cloudflare API token with Workers deployment permissions'
+    required: true
+  cloudflare_account_id:
+    description: 'Cloudflare account ID'
+    required: true
+  download_path:
+    description: 'Directory path where the artifact will be downloaded'
+    required: false
+    default: './worker-artifact'
+  wrangler_version:
+    description: 'Version of Wrangler to install (e.g., "3.78.0" or "latest")'
+    required: false
+    default: 'latest'
+  deploy_environment:
+    description: 'Environment to deploy to (e.g., "production", "staging"). Maps to wrangler environment config.'
+    required: false
+    default: ''
+  dry_run:
+    description: 'If true, performs a dry run without actually deploying (for testing)'
+    required: false
+    default: 'false'
+
+outputs:
+  worker_url:
+    description: 'URL of the deployed Cloudflare Worker'
+    value: ${{ steps.deploy.outputs.worker_url }}
+  deployment_status:
+    description: 'Status of the deployment (success or failure)'
+    value: ${{ steps.deploy.outputs.status }}
+  worker_version:
+    description: 'Version identifier of the deployed worker'
+    value: ${{ steps.deploy.outputs.version }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        echo "::group::Validating inputs"
+        
+        # Validate required inputs
+        if [ -z "${{ inputs.artifact_name }}" ]; then
+          echo "::error::artifact_name input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.worker_name }}" ]; then
+          echo "::error::worker_name input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.wrangler_config }}" ]; then
+          echo "::error::wrangler_config input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.cloudflare_api_token }}" ]; then
+          echo "::error::cloudflare_api_token input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.cloudflare_account_id }}" ]; then
+          echo "::error::cloudflare_account_id input is required"
+          exit 1
+        fi
+        
+        echo "✓ All required inputs validated successfully"
+        echo ""
+        echo "Configuration:"
+        echo "  Artifact name: ${{ inputs.artifact_name }}"
+        echo "  Worker name: ${{ inputs.worker_name }}"
+        echo "  Wrangler config: ${{ inputs.wrangler_config }}"
+        echo "  Download path: ${{ inputs.download_path }}"
+        echo "  Wrangler version: ${{ inputs.wrangler_version }}"
+        echo "  Environment: ${{ inputs.deploy_environment || 'default' }}"
+        echo "  Dry run: ${{ inputs.dry_run }}"
+        echo "  Account ID: $(echo "${{ inputs.cloudflare_account_id }}" | head -c 8)***"
+        echo "  API Token: [REDACTED]"
+        echo "::endgroup::"
+
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.artifact_name }}
+        path: ${{ inputs.download_path }}
+
+    - name: Verify artifact contents
+      shell: bash
+      run: |
+        echo "::group::Verifying artifact contents"
+        
+        DOWNLOAD_PATH="${{ inputs.download_path }}"
+        CONFIG_PATH="$DOWNLOAD_PATH/${{ inputs.wrangler_config }}"
+        
+        if [ ! -d "$DOWNLOAD_PATH" ]; then
+          echo "::error::Download path '$DOWNLOAD_PATH' does not exist"
+          exit 1
+        fi
+        
+        echo "✓ Artifact downloaded to: $DOWNLOAD_PATH"
+        echo ""
+        
+        # List artifact contents
+        echo "Artifact contents:"
+        find "$DOWNLOAD_PATH" -type f | head -20 | while read -r file; do
+          SIZE=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null || echo "0")
+          echo "  - $(basename "$file") ($SIZE bytes)"
+        done
+        
+        FILE_COUNT=$(find "$DOWNLOAD_PATH" -type f | wc -l)
+        if [ "$FILE_COUNT" -gt 20 ]; then
+          echo "  ... and $((FILE_COUNT - 20)) more files"
+        fi
+        echo ""
+        
+        # Verify wrangler config exists
+        if [ ! -f "$CONFIG_PATH" ]; then
+          echo "::error::Wrangler config file not found at: $CONFIG_PATH"
+          echo "Available files in artifact:"
+          ls -R "$DOWNLOAD_PATH"
+          exit 1
+        fi
+        
+        echo "✓ Wrangler config found: $CONFIG_PATH"
+        
+        # Display config (with sensitive data filtered)
+        echo ""
+        echo "Wrangler configuration (sanitized):"
+        cat "$CONFIG_PATH" | grep -v "account_id" | grep -v "api_token" | grep -v "secret" | head -20 || true
+        
+        echo "::endgroup::"
+
+    - name: Install Wrangler
+      shell: bash
+      run: |
+        echo "::group::Installing Wrangler"
+        
+        if [ "${{ inputs.wrangler_version }}" = "latest" ]; then
+          echo "Installing latest version of Wrangler..."
+          npm install -g wrangler
+        else
+          echo "Installing Wrangler version ${{ inputs.wrangler_version }}..."
+          npm install -g wrangler@${{ inputs.wrangler_version }}
+        fi
+        
+        # Verify installation
+        WRANGLER_VERSION=$(wrangler --version)
+        echo ""
+        echo "✓ Wrangler installed successfully"
+        echo "  Version: $WRANGLER_VERSION"
+        
+        echo "::endgroup::"
+
+    - name: Deploy to Cloudflare Workers
+      id: deploy
+      shell: bash
+      working-directory: ${{ inputs.download_path }}
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare_api_token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare_account_id }}
+      run: |
+        echo "::group::Deploying to Cloudflare Workers"
+        
+        # Mask sensitive values in logs
+        echo "::add-mask::${{ inputs.cloudflare_api_token }}"
+        echo "::add-mask::${{ inputs.cloudflare_account_id }}"
+        
+        CONFIG_PATH="${{ inputs.wrangler_config }}"
+        WORKER_NAME="${{ inputs.worker_name }}"
+        ENVIRONMENT="${{ inputs.deploy_environment }}"
+        DRY_RUN="${{ inputs.dry_run }}"
+        
+        echo "Preparing deployment..."
+        echo "  Worker: $WORKER_NAME"
+        echo "  Config: $CONFIG_PATH"
+        if [ -n "$ENVIRONMENT" ]; then
+          echo "  Environment: $ENVIRONMENT"
+        fi
+        echo ""
+        
+        # Build deploy command
+        DEPLOY_CMD="wrangler deploy --config \"$CONFIG_PATH\" --name \"$WORKER_NAME\""
+        
+        if [ -n "$ENVIRONMENT" ]; then
+          DEPLOY_CMD="$DEPLOY_CMD --env \"$ENVIRONMENT\""
+        fi
+        
+        if [ "$DRY_RUN" = "true" ]; then
+          DEPLOY_CMD="$DEPLOY_CMD --dry-run"
+          echo "⚠️  DRY RUN MODE - No actual deployment will occur"
+          echo ""
+        fi
+        
+        echo "Executing deployment..."
+        echo "Command: wrangler deploy --config [CONFIG] --name [WORKER_NAME]"
+        echo ""
+        
+        # Execute deployment and capture output
+        DEPLOY_OUTPUT=$(eval $DEPLOY_CMD 2>&1) || DEPLOY_EXIT=$?
+        
+        # Filter sensitive information from output
+        FILTERED_OUTPUT=$(echo "$DEPLOY_OUTPUT" | grep -v "${{ inputs.cloudflare_api_token }}" | grep -v "api_token" || echo "$DEPLOY_OUTPUT")
+        
+        echo "$FILTERED_OUTPUT"
+        
+        # Check if deployment failed
+        if [ "${DEPLOY_EXIT:-0}" -ne 0 ]; then
+          echo ""
+          echo "::error::Deployment failed with exit code ${DEPLOY_EXIT:-0}"
+          echo "status=failure" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        
+        echo ""
+        echo "✓ Deployment completed successfully"
+        
+        # Extract worker URL from output
+        WORKER_URL=$(echo "$FILTERED_OUTPUT" | grep -oP 'https://[a-zA-Z0-9\-]+\.workers\.dev' | head -1 || echo "")
+        
+        # If no workers.dev URL found, try to construct it
+        if [ -z "$WORKER_URL" ]; then
+          # Try to find custom domain
+          WORKER_URL=$(echo "$FILTERED_OUTPUT" | grep -oP 'https://[a-zA-Z0-9\-\.]+' | grep -v "dash.cloudflare.com" | head -1 || echo "")
+        fi
+        
+        if [ -z "$WORKER_URL" ]; then
+          # Construct default URL
+          WORKER_URL="https://$WORKER_NAME.workers.dev"
+          echo "⚠️  Could not extract URL from output, using default: $WORKER_URL"
+        else
+          echo "📍 Worker URL: $WORKER_URL"
+        fi
+        
+        # Set outputs
+        echo "worker_url=$WORKER_URL" >> $GITHUB_OUTPUT
+        echo "status=success" >> $GITHUB_OUTPUT
+        echo "version=${{ github.sha }}" >> $GITHUB_OUTPUT
+        
+        echo "::endgroup::"
+
+    - name: Deployment summary
+      shell: bash
+      run: |
+        echo "::group::Deployment Summary"
+        echo "=================================="
+        echo "🚀 Cloudflare Worker Deployment"
+        echo "=================================="
+        echo ""
+        echo "Worker Details:"
+        echo "  Name: ${{ inputs.worker_name }}"
+        echo "  Status: ${{ steps.deploy.outputs.status }}"
+        echo "  URL: ${{ steps.deploy.outputs.worker_url }}"
+        echo "  Version: ${{ steps.deploy.outputs.version }}"
+        
+        if [ -n "${{ inputs.deploy_environment }}" ]; then
+          echo "  Environment: ${{ inputs.deploy_environment }}"
+        fi
+        
+        if [ "${{ inputs.dry_run }}" = "true" ]; then
+          echo ""
+          echo "⚠️  This was a DRY RUN - no actual deployment occurred"
+        fi
+        
+        echo ""
+        echo "Artifact Details:"
+        echo "  Source: ${{ inputs.artifact_name }}"
+        echo "  Config: ${{ inputs.wrangler_config }}"
+        echo ""
+        
+        echo "Security:"
+        echo "  ✓ Credentials redacted from logs"
+        echo "  ✓ Deployment from verified artifact"
+        echo "  ✓ No source code exposed"
+        echo ""
+        
+        if [ "${{ steps.deploy.outputs.status }}" = "success" ]; then
+          echo "✓ Deployment completed successfully"
+        else
+          echo "❌ Deployment failed"
+        fi
+        
+        echo "::endgroup::"

@@ -1,0 +1,13 @@
+# Wrangler configuration for test worker
+name = "test-worker"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# Test environments
+[env.staging]
+name = "test-worker-staging"
+vars = { ENVIRONMENT = "staging", VERSION = "staging-v1" }
+
+[env.production]
+name = "test-worker-production"
+vars = { ENVIRONMENT = "production", VERSION = "production-v1" }

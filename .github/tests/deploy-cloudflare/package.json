@@ -1,0 +1,18 @@
+{
+  "name": "test-cloudflare-worker",
+  "version": "1.0.0",
+  "description": "Test Cloudflare Worker for deploy-cloudflare-from-artifact action",
+  "main": "worker.js",
+  "type": "module",
+  "scripts": {
+    "build": "mkdir -p dist && cp worker.js dist/worker.js && cp wrangler.toml dist/wrangler.toml",
+    "test": "echo \"Test passed\""
+  },
+  "keywords": [
+    "cloudflare",
+    "worker",
+    "test"
+  ],
+  "author": "Algenium Systems",
+  "license": "MIT"
+}

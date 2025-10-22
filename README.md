@@ -22,6 +22,9 @@ Sets up Node.js environment with caching support for faster builds.
 ### [upload-artifacts](/.github/actions/upload-artifacts)
 Uploads build artifacts to GitHub Actions storage with detailed logging and support for multiple file paths.
 
+### [deploy-cloudflare-from-artifact](/.github/actions/deploy-cloudflare-from-artifact)
+Deploys Cloudflare Workers from pre-built artifacts with secure credential handling. Ensures safe and reproducible deployments without exposing code or secrets.
+
 ## Usage
 
 ### Using Custom Actions
@@ -53,6 +56,22 @@ jobs:
 - Git
 - GitHub CLI (optional, for testing)
 - actionlint (for workflow validation)
+
+### Test Configuration
+
+**macOS Tests**: macOS runner tests are disabled by default to reduce CI costs, as macOS runners are significantly more expensive than Linux/Windows runners. Tests run on Ubuntu and Windows provide sufficient cross-platform coverage for most use cases.
+
+To enable macOS tests when needed:
+1. Edit the relevant workflow file (e.g., `.github/workflows/test-*.yml`)
+2. Add `macos-latest` to the matrix `os` array
+3. Look for comments like: `# macOS tests disabled by default (expensive)`
+
+Example:
+```yaml
+strategy:
+  matrix:
+    os: [ubuntu-latest, windows-latest, macos-latest]  # Add macos-latest here
+```
 
 ### Adding New Actions
 
