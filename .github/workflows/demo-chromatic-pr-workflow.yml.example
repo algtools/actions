@@ -1,0 +1,130 @@
+# Example Chromatic PR Workflow
+# This is a demonstration of how to use the chromatic-upload-from-artifact action
+# in a real PR workflow with comments.
+# 
+# To use this workflow:
+# 1. Rename this file to remove the .example extension
+# 2. Add CHROMATIC_PROJECT_TOKEN to your repository secrets
+# 3. Customize the Storybook build command and paths as needed
+
+name: Chromatic PR Visual Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+permissions:
+  contents: read
+  actions: write
+  pull-requests: write
+
+jobs:
+  build-storybook:
+    name: Build Storybook
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for Chromatic to track changes
+
+      - name: Setup Node.js
+        uses: algtools/actions/.github/actions/setup-node@v1
+        with:
+          node-version: '20'
+          # Adjust working-directory if your project is in a subdirectory
+          # working-directory: './frontend'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Storybook (without secrets)
+        run: npm run build-storybook
+        # This builds to storybook-static by default
+
+      - name: Upload Storybook artifact
+        id: upload
+        uses: algtools/actions/.github/actions/upload-artifacts@v1
+        with:
+          artifact_name: 'storybook-pr-${{ github.event.pull_request.number }}'
+          artifact_paths: 'storybook-static'
+          retention_days: '30'
+
+      - name: Show upload summary
+        run: |
+          echo "📦 Storybook artifact uploaded successfully"
+          echo "Files: ${{ steps.upload.outputs.total_files }}"
+          echo "Size: ${{ steps.upload.outputs.total_size }} bytes"
+
+  chromatic-upload:
+    name: Upload to Chromatic
+    needs: build-storybook
+    runs-on: ubuntu-latest
+    steps:
+      - name: Upload Storybook to Chromatic
+        id: chromatic
+        uses: algtools/actions/.github/actions/chromatic-upload-from-artifact@v1
+        with:
+          artifact_name: 'storybook-pr-${{ github.event.pull_request.number }}'
+          project_token: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          exit_zero_on_changes: 'true'  # Don't fail on visual changes
+
+      - name: Comment PR with Chromatic link
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ steps.chromatic.outputs.build_status }}';
+            const url = '${{ steps.chromatic.outputs.chromatic_url }}';
+            
+            let body = '## 🎨 Chromatic Visual Review\n\n';
+            
+            if (status === 'success') {
+              body += `✅ Storybook has been uploaded to Chromatic!\n\n`;
+              body += `**[View Chromatic Build](${url})**\n\n`;
+              body += `This build includes visual snapshots of all your components. `;
+              body += `Review any visual changes and approve them in Chromatic.`;
+            } else {
+              body += `⚠️ There was an issue uploading to Chromatic.\n\n`;
+              body += `Please check the workflow logs for details.`;
+            }
+            
+            // Find existing comment
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const existingComment = comments.data.find(
+              comment => comment.body.includes('🎨 Chromatic Visual Review')
+            );
+            
+            // Update or create comment
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+      - name: Add job summary
+        if: always()
+        run: |
+          echo "## 🎨 Chromatic Upload Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ steps.chromatic.outputs.build_status }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build URL:** ${{ steps.chromatic.outputs.chromatic_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Review your visual changes in Chromatic to ensure components look as expected." >> $GITHUB_STEP_SUMMARY
