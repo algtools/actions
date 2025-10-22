@@ -28,6 +28,9 @@ Deploys Cloudflare Workers from pre-built artifacts with secure credential handl
 ### [ensure-wildcard-certificate](/.github/actions/ensure-wildcard-certificate)
 Ensures a wildcard SSL certificate exists in Cloudflare ACM. Idempotent action that creates certificates only when needed and waits for activation.
 
+### [sentry-release](/.github/actions/sentry-release)
+Creates and finalizes a Sentry release and registers a deployment for the target environment. Integrates with your deployment pipeline to track releases and errors across environments (alpha, beta, prod).
+
 ## Available Reusable Workflows
 
 ### [pr-build-reusable.yml](/.github/workflows/pr-build-reusable.yml)
