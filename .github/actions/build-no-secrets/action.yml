@@ -127,8 +127,9 @@ runs:
         echo "path=$ABS_PATH" >> $GITHUB_OUTPUT
         echo "Absolute path: $ABS_PATH"
         
-        # Calculate total size
-        SIZE=$(du -sb "$OUTPUT_DIR" | cut -f1)
+        # Calculate total size (cross-platform: use -sk for kilobytes, then convert to bytes)
+        SIZE_KB=$(du -sk "$OUTPUT_DIR" | cut -f1)
+        SIZE=$((SIZE_KB * 1024))
         echo "size=$SIZE" >> $GITHUB_OUTPUT
         echo "Total size: $SIZE bytes ($(du -sh "$OUTPUT_DIR" | cut -f1))"
         
