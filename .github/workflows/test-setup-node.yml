@@ -1,0 +1,238 @@
+name: Test Setup Node Action
+
+on:
+  push:
+    branches:
+      - main
+      - 'cursor/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-with-nvmrc:
+    name: Test with .nvmrc
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .github/tests/setup-node
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate package-lock.json
+        working-directory: .github/tests/setup-node
+        run: npm install --package-lock-only
+
+      - name: Setup Node.js with .nvmrc
+        id: setup-node
+        uses: ./../../actions/setup-node
+        with:
+          working-directory: '.github/tests/setup-node'
+          cache-dependency-path: '.github/tests/setup-node/package-lock.json'
+
+      - name: Verify Node.js version
+        working-directory: .github/tests/setup-node
+        run: |
+          NODE_VERSION=$(node --version)
+          echo "Installed Node.js version: $NODE_VERSION"
+          if [[ ! "$NODE_VERSION" =~ ^v20\. ]]; then
+            echo "Error: Expected Node.js v20.x, got $NODE_VERSION"
+            exit 1
+          fi
+          echo "✓ Node.js version verification passed"
+
+      - name: Verify dependencies installed
+        working-directory: .github/tests/setup-node
+        run: |
+          if [ ! -d "node_modules" ]; then
+            echo "Error: node_modules directory not found"
+            exit 1
+          fi
+          if [ ! -d "node_modules/lodash" ]; then
+            echo "Error: lodash package not installed"
+            exit 1
+          fi
+          echo "✓ Dependencies installation verified"
+
+      - name: Run test script
+        working-directory: .github/tests/setup-node
+        run: npm test
+
+      - name: Display outputs
+        run: |
+          echo "Node version output: ${{ steps.setup-node.outputs.node-version }}"
+          echo "Cache hit: ${{ steps.setup-node.outputs.cache-hit }}"
+
+  test-with-explicit-version:
+    name: Test with explicit version
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .github/tests/setup-node
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate package-lock.json
+        working-directory: .github/tests/setup-node
+        run: npm install --package-lock-only
+
+      - name: Setup Node.js with explicit version
+        id: setup-node
+        uses: ./../../actions/setup-node
+        with:
+          node-version: '18'
+          working-directory: '.github/tests/setup-node'
+          cache-dependency-path: '.github/tests/setup-node/package-lock.json'
+
+      - name: Verify Node.js version
+        working-directory: .github/tests/setup-node
+        run: |
+          NODE_VERSION=$(node --version)
+          echo "Installed Node.js version: $NODE_VERSION"
+          if [[ ! "$NODE_VERSION" =~ ^v18\. ]]; then
+            echo "Error: Expected Node.js v18.x, got $NODE_VERSION"
+            exit 1
+          fi
+          echo "✓ Node.js version verification passed"
+
+      - name: Verify dependencies installed
+        working-directory: .github/tests/setup-node
+        run: |
+          if [ ! -d "node_modules" ]; then
+            echo "Error: node_modules directory not found"
+            exit 1
+          fi
+          echo "✓ Dependencies installation verified"
+
+      - name: Run test script
+        working-directory: .github/tests/setup-node
+        run: npm test
+
+      - name: Display outputs
+        run: |
+          echo "Node version output: ${{ steps.setup-node.outputs.node-version }}"
+          echo "Cache hit: ${{ steps.setup-node.outputs.cache-hit }}"
+
+  test-cache-restoration:
+    name: Test cache restoration
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .github/tests/setup-node
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate package-lock.json
+        working-directory: .github/tests/setup-node
+        run: npm install --package-lock-only
+
+      - name: First run (should cache)
+        id: first-run
+        uses: ./../../actions/setup-node
+        with:
+          working-directory: '.github/tests/setup-node'
+          cache-dependency-path: '.github/tests/setup-node/package-lock.json'
+
+      - name: Check first run cache status
+        run: |
+          echo "First run cache hit: ${{ steps.first-run.outputs.cache-hit }}"
+
+      - name: Clear node_modules
+        working-directory: .github/tests/setup-node
+        run: rm -rf node_modules
+
+      - name: Second run (should restore from cache)
+        id: second-run
+        uses: ./../../actions/setup-node
+        with:
+          working-directory: '.github/tests/setup-node'
+          cache-dependency-path: '.github/tests/setup-node/package-lock.json'
+
+      - name: Check second run cache status
+        run: |
+          echo "Second run cache hit: ${{ steps.second-run.outputs.cache-hit }}"
+
+      - name: Verify cache worked
+        working-directory: .github/tests/setup-node
+        run: |
+          if [ ! -d "node_modules" ]; then
+            echo "Error: node_modules not restored from cache"
+            exit 1
+          fi
+          echo "✓ Cache restoration verified"
+
+  test-skip-audit:
+    name: Test skip audit option
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .github/tests/setup-node
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate package-lock.json
+        working-directory: .github/tests/setup-node
+        run: npm install --package-lock-only
+
+      - name: Setup Node.js with skip-audit
+        uses: ./../../actions/setup-node
+        with:
+          working-directory: '.github/tests/setup-node'
+          cache-dependency-path: '.github/tests/setup-node/package-lock.json'
+          skip-audit: 'true'
+
+      - name: Verify setup completed
+        working-directory: .github/tests/setup-node
+        run: |
+          echo "✓ Setup completed with skip-audit enabled"
+          npm --version
+          node --version
+
+  test-matrix:
+    name: Test on ${{ matrix.os }} with Node ${{ matrix.node-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: ['18', '20']
+    defaults:
+      run:
+        working-directory: .github/tests/setup-node
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate package-lock.json
+        working-directory: .github/tests/setup-node
+        shell: bash
+        run: npm install --package-lock-only
+
+      - name: Setup Node.js
+        id: setup-node
+        uses: ./../../actions/setup-node
+        with:
+          node-version: ${{ matrix.node-version }}
+          working-directory: '.github/tests/setup-node'
+          cache-dependency-path: '.github/tests/setup-node/package-lock.json'
+
+      - name: Verify installation
+        working-directory: .github/tests/setup-node
+        shell: bash
+        run: |
+          node --version
+          npm --version
+          npm test
+
+      - name: Display outputs
+        shell: bash
+        run: |
+          echo "Node version: ${{ steps.setup-node.outputs.node-version }}"
+          echo "Cache hit: ${{ steps.setup-node.outputs.cache-hit }}"

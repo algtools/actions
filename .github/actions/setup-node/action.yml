@@ -1,0 +1,99 @@
+name: 'Setup Node.js Securely'
+description: 'Sets up Node.js environment with caching and security audit checks'
+author: 'Algenium Systems'
+
+inputs:
+  node-version:
+    description: 'Node.js version to install. If not provided, reads from .nvmrc file.'
+    required: false
+    default: ''
+  cache-dependency-path:
+    description: 'Path to package-lock.json for cache key computation'
+    required: false
+    default: 'package-lock.json'
+  working-directory:
+    description: 'Working directory for npm commands'
+    required: false
+    default: '.'
+  skip-audit:
+    description: 'Skip npm audit step (default: false)'
+    required: false
+    default: 'false'
+
+outputs:
+  node-version:
+    description: 'The Node.js version that was installed'
+    value: ${{ steps.node-version.outputs.version }}
+  cache-hit:
+    description: 'Whether dependencies were restored from cache'
+    value: ${{ steps.cache-dependencies.outputs.cache-hit }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Read Node.js version from .nvmrc
+      id: nvmrc
+      if: inputs.node-version == ''
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        if [ -f .nvmrc ]; then
+          echo "version=$(cat .nvmrc | tr -d '[:space:]')" >> $GITHUB_OUTPUT
+          echo "✓ Read Node.js version from .nvmrc: $(cat .nvmrc | tr -d '[:space:]')"
+        else
+          echo "::error::No .nvmrc file found and no node-version input provided"
+          exit 1
+        fi
+
+    - name: Set Node.js version
+      id: node-version
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.node-version }}" ]; then
+          echo "version=${{ inputs.node-version }}" >> $GITHUB_OUTPUT
+          echo "✓ Using Node.js version from input: ${{ inputs.node-version }}"
+        else
+          echo "version=${{ steps.nvmrc.outputs.version }}" >> $GITHUB_OUTPUT
+          echo "✓ Using Node.js version from .nvmrc: ${{ steps.nvmrc.outputs.version }}"
+        fi
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ steps.node-version.outputs.version }}
+
+    - name: Cache dependencies
+      id: cache-dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.npm
+          node_modules
+        key: npm-${{ runner.os }}-${{ hashFiles(format('{0}/{1}', inputs.working-directory, inputs.cache-dependency-path)) }}
+        restore-keys: |
+          npm-${{ runner.os }}-
+
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "::group::Installing dependencies"
+        echo "Running: npm ci --ignore-scripts"
+        npm ci --ignore-scripts
+        echo "✓ Dependencies installed successfully"
+        echo "::endgroup::"
+
+    - name: Run npm audit
+      if: inputs.skip-audit != 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      continue-on-error: true
+      run: |
+        echo "::group::Running npm audit"
+        echo "Running security audit (non-blocking)..."
+        if npm audit --audit-level=moderate; then
+          echo "✓ No vulnerabilities found"
+        else
+          echo "::warning::npm audit found vulnerabilities. Please review and update dependencies."
+        fi
+        echo "::endgroup::"
