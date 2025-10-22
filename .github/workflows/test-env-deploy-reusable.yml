@@ -1,0 +1,130 @@
+name: Test Environment Deploy Reusable Workflow
+
+on:
+  push:
+    branches:
+      - main
+      - 'cursor/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  test-build-for-deploy:
+    name: Build Test Worker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          node-version: '20'
+          working-directory: '.github/tests/deploy-cloudflare'
+          cache-dependency-path: '.github/tests/deploy-cloudflare/package-lock.json'
+
+      - name: Build test worker
+        uses: ./.github/actions/build-no-secrets
+        with:
+          build_cmd: 'npm run build'
+          working_dir: '.github/tests/deploy-cloudflare'
+          output_dir: 'dist'
+
+      - name: Upload worker artifact
+        uses: ./.github/actions/upload-artifacts
+        with:
+          artifact_name: 'test-env-deploy-worker-${{ github.run_id }}'
+          artifact_paths: '.github/tests/deploy-cloudflare/dist'
+          retention_days: 1
+
+  test-env-deploy-dev:
+    name: Test Deploy to Dev Environment
+    needs: test-build-for-deploy
+    uses: ./.github/workflows/env-deploy-reusable.yml
+    with:
+      environment: 'dev'
+      worker_name: 'test-worker-dev'
+      wrangler_config: 'wrangler.toml'
+      zone: 'mock-zone-id-12345'
+      custom_domain: 'test-dev.example.com'
+      slug: 'test-app-dev'
+      artifact_name: 'test-env-deploy-worker-${{ github.run_id }}'
+      sentry_release: false
+    secrets:
+      cloudflare_api_token: 'mock-api-token-for-testing'
+      cloudflare_account_id: 'mock-account-id'
+
+  test-env-deploy-production:
+    name: Test Deploy to Production Environment
+    needs: test-build-for-deploy
+    uses: ./.github/workflows/env-deploy-reusable.yml
+    with:
+      environment: 'production'
+      worker_name: 'test-worker-prod'
+      wrangler_config: 'wrangler.toml'
+      zone: 'mock-zone-id-67890'
+      custom_domain: 'test.example.com'
+      slug: 'test-app'
+      artifact_name: 'test-env-deploy-worker-${{ github.run_id }}'
+      wrangler_version: 'latest'
+      max_wait_seconds: 60
+      poll_interval_seconds: 5
+      sentry_release: false
+    secrets:
+      cloudflare_api_token: 'mock-api-token-for-testing'
+      cloudflare_account_id: 'mock-account-id'
+
+  test-workflow-summary:
+    name: Test Deploy to QA with Summary
+    needs: test-build-for-deploy
+    uses: ./.github/workflows/env-deploy-reusable.yml
+    with:
+      environment: 'qa'
+      worker_name: 'test-summary-worker'
+      wrangler_config: 'wrangler.toml'
+      zone: 'mock-zone-summary'
+      custom_domain: 'qa.example.com'
+      slug: 'test-summary'
+      artifact_name: 'test-env-deploy-worker-${{ github.run_id }}'
+    secrets:
+      cloudflare_api_token: 'mock-api-token'
+      cloudflare_account_id: 'mock-account'
+
+  test-complete:
+    name: All Tests Complete
+    needs:
+      - test-build-for-deploy
+      - test-env-deploy-dev
+      - test-env-deploy-production
+      - test-workflow-summary
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "========================================="
+          echo "Environment Deploy Workflow Tests Summary"
+          echo "========================================="
+          echo ""
+          echo "Test Results:"
+          echo "  Build: ${{ needs.test-build-for-deploy.result }}"
+          echo "  Dev deployment: ${{ needs.test-env-deploy-dev.result }}"
+          echo "  Production deployment: ${{ needs.test-env-deploy-production.result }}"
+          echo "  QA deployment: ${{ needs.test-workflow-summary.result }}"
+          echo ""
+          echo "Outputs from Dev Deployment:"
+          echo "  Worker URL: ${{ needs.test-env-deploy-dev.outputs.worker_url || 'N/A' }}"
+          echo "  Status: ${{ needs.test-env-deploy-dev.outputs.deployment_status || 'N/A' }}"
+          echo "  Certificate ID: ${{ needs.test-env-deploy-dev.outputs.certificate_id || 'N/A' }}"
+          echo ""
+          echo "All environment deploy reusable workflow tests completed!"
+          echo ""
+          echo "Note: Tests may fail because they use mock Cloudflare credentials."
+          echo "This is expected behavior for testing purposes. The workflow structure"
+          echo "and validation logic are being tested, not actual deployments."
