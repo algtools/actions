@@ -108,15 +108,27 @@ runs:
           esac
         fi
 
-        # Use provided cache-dependency-path or detected lockfile
+        # Use provided cache-dependency-path or build the path from working-directory + lockfile
         if [ -n "${{ inputs.cache-dependency-path }}" ]; then
-          LOCKFILE="${{ inputs.cache-dependency-path }}"
+          CACHE_PATH="${{ inputs.cache-dependency-path }}"
+        else
+          # Build path relative to repo root
+          WORK_DIR="${{ inputs.working-directory }}"
+          if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
+            CACHE_PATH="$LOCKFILE"
+          else
+            # Remove trailing slash if present
+            WORK_DIR="${WORK_DIR%/}"
+            CACHE_PATH="${WORK_DIR}/${LOCKFILE}"
+          fi
         fi
 
         echo "package-manager=$PM" >> $GITHUB_OUTPUT
         echo "lockfile=$LOCKFILE" >> $GITHUB_OUTPUT
+        echo "cache-path=$CACHE_PATH" >> $GITHUB_OUTPUT
         echo "✓ Detected package manager: $PM"
         echo "✓ Using lockfile: $LOCKFILE"
+        echo "✓ Cache path: $CACHE_PATH"
 
     - name: Setup pnpm
       if: steps.detect-pm.outputs.package-manager == 'pnpm'
@@ -125,11 +137,12 @@ runs:
         version: 8
 
     - name: Setup Node.js
+      id: setup-node
       uses: actions/setup-node@v4
       with:
         node-version: ${{ steps.node-version.outputs.version }}
         cache: ${{ steps.detect-pm.outputs.package-manager }}
-        cache-dependency-path: ${{ format('{0}/{1}', inputs.working-directory, steps.detect-pm.outputs.lockfile) }}
+        cache-dependency-path: ${{ steps.detect-pm.outputs.cache-path }}
 
     - name: Install dependencies
       if: inputs.skip-install != 'true'
