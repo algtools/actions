@@ -145,12 +145,10 @@ jobs:
             echo "Deleting worker '${WORKER_NAME}'..."
 
             # Use wrangler to delete the worker
-            npx wrangler@latest delete "${WORKER_NAME}" \
+            if npx wrangler@latest delete "${WORKER_NAME}" \
               --api-token "${{ secrets.cloudflare_api_token }}" \
               --account-id "${{ secrets.cloudflare_account_id }}" \
-              --force
-
-            if [ $? -eq 0 ]; then
+              --force; then
               echo "✅ Worker '${WORKER_NAME}' deleted successfully"
               echo "deleted=true" >> "$GITHUB_OUTPUT"
               echo "action=deleted" >> "$GITHUB_OUTPUT"
@@ -195,12 +193,10 @@ jobs:
               echo "Found certificate ID: ${CERT_ID}"
 
               # Delete the certificate
-              curl -s -X DELETE \
+              if curl -s -X DELETE \
                 "https://api.cloudflare.com/client/v4/accounts/${{ secrets.cloudflare_account_id }}/certificates/${CERT_ID}" \
                 -H "Authorization: Bearer ${{ secrets.cloudflare_api_token }}" \
-                -H "Content-Type: application/json"
-
-              if [ $? -eq 0 ]; then
+                -H "Content-Type: application/json"; then
                 echo "✅ Certificate for '${DOMAIN}' deleted successfully"
                 echo "deleted=true" >> "$GITHUB_OUTPUT"
                 echo "action=deleted" >> "$GITHUB_OUTPUT"
