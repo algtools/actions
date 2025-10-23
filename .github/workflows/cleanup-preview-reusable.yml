@@ -144,18 +144,21 @@ jobs:
           else
             echo "Deleting worker '${WORKER_NAME}'..."
 
+            # Set environment variables for Wrangler authentication
+            export CLOUDFLARE_API_TOKEN="${{ secrets.cloudflare_api_token }}"
+            export CLOUDFLARE_ACCOUNT_ID="${{ secrets.cloudflare_account_id }}"
+
             # Use wrangler to delete the worker
-            if npx wrangler@latest delete "${WORKER_NAME}" \
-              --api-token "${{ secrets.cloudflare_api_token }}" \
-              --account-id "${{ secrets.cloudflare_account_id }}" \
-              --force; then
+            if npx wrangler@latest delete --name "${WORKER_NAME}" --force; then
               echo "✅ Worker '${WORKER_NAME}' deleted successfully"
               echo "deleted=true" >> "$GITHUB_OUTPUT"
               echo "action=deleted" >> "$GITHUB_OUTPUT"
             else
-              echo "❌ Failed to delete worker '${WORKER_NAME}'"
+              EXIT_CODE=$?
+              echo "❌ Failed to delete worker '${WORKER_NAME}' (exit code: ${EXIT_CODE})"
               echo "deleted=false" >> "$GITHUB_OUTPUT"
               echo "action=failed" >> "$GITHUB_OUTPUT"
+              exit ${EXIT_CODE}
             fi
           fi
 
@@ -233,17 +236,25 @@ jobs:
           if [ "$DRY_RUN" = "true" ]; then
             STATUS="dry_run_complete"
             echo "🔍 Dry run completed successfully"
+          elif [ "$WORKER_ACTION" = "failed" ]; then
+            STATUS="failed"
+            echo "❌ Cleanup failed (worker deletion failed)"
+            exit 1
           elif [ "$WORKER_ACTION" = "deleted" ] || [ "$WORKER_ACTION" = "skipped" ]; then
             if [ "$CERT_ACTION" = "deleted" ] || [ "$CERT_ACTION" = "skipped" ] || [ "$CERT_ACTION" = "not_found" ]; then
               STATUS="success"
               echo "✅ Cleanup completed successfully"
-            else
+            elif [ "$CERT_ACTION" = "failed" ]; then
               STATUS="partial_success"
               echo "⚠️  Cleanup completed with warnings (certificate deletion failed)"
+            else
+              STATUS="success"
+              echo "✅ Cleanup completed successfully"
             fi
           else
             STATUS="failed"
             echo "❌ Cleanup failed"
+            exit 1
           fi
 
           echo "status=${STATUS}" >> "$GITHUB_OUTPUT"
