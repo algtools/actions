@@ -27,6 +27,10 @@ inputs:
     description: 'Skip security audit step (default: false)'
     required: false
     default: 'false'
+  github-token:
+    description: 'GitHub token for authenticating with GitHub Package Registry (required for @algtools packages)'
+    required: false
+    default: ''
 
 outputs:
   node-version:
@@ -156,6 +160,31 @@ runs:
         node-version: ${{ steps.node-version.outputs.version }}
         cache: ${{ steps.detect-pm.outputs.package-manager }}
         cache-dependency-path: ${{ steps.detect-pm.outputs.cache-path }}
+
+    - name: Configure npm authentication for GitHub Packages
+      if: inputs.skip-install != 'true'
+      shell: bash
+      run: |
+        echo "::group::Configuring GitHub Package Registry authentication"
+
+        TOKEN="${{ inputs.github-token }}"
+
+        if [ -n "$TOKEN" ]; then
+          echo "✓ Configuring authentication for GitHub Package Registry"
+
+          # Mask the token in logs
+          echo "::add-mask::$TOKEN"
+
+          # Configure for @algtools scope
+          npm config set //npm.pkg.github.com/:_authToken="$TOKEN"
+          npm config set @algtools:registry=https://npm.pkg.github.com/
+
+          echo "✓ GitHub Package Registry authentication configured"
+        else
+          echo "::warning::github-token not provided, @algtools packages from GitHub Registry may fail to install"
+        fi
+
+        echo "::endgroup::"
 
     - name: Install dependencies
       if: inputs.skip-install != 'true'

@@ -113,6 +113,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   build:
@@ -135,6 +136,7 @@ jobs:
         with:
           node-version: ${{ inputs.node_version }}
           working-directory: ${{ inputs.working_directory }}
+          github-token: ${{ github.token }}
 
       - name: Build without secrets
         id: build
