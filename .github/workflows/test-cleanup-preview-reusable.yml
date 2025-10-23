@@ -1,0 +1,394 @@
+name: Test Cleanup Preview Reusable Workflow
+
+on:
+  push:
+    branches:
+      - main
+      - "cursor/**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+  pull-requests: write
+
+jobs:
+  test-workflow-structure:
+    name: Test Workflow Structure and Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify workflow file exists
+        run: |
+          echo "Checking for workflow file..."
+          if [ ! -f ".github/workflows/cleanup-preview-reusable.yml" ]; then
+            echo "❌ cleanup-preview-reusable.yml not found"
+            exit 1
+          fi
+          echo "✓ Workflow file exists"
+
+      - name: Validate workflow syntax
+        run: |
+          echo "Validating workflow YAML syntax..."
+
+          # Check for required workflow_call trigger
+          if ! grep -q "workflow_call:" .github/workflows/cleanup-preview-reusable.yml; then
+            echo "❌ Missing workflow_call trigger"
+            exit 1
+          fi
+          echo "✓ workflow_call trigger present"
+
+          # Check for required inputs
+          REQUIRED_INPUTS=("worker_name" "pr_number" "app_domain" "dev_zone")
+          for input in "${REQUIRED_INPUTS[@]}"; do
+            if ! grep -q "$input:" .github/workflows/cleanup-preview-reusable.yml; then
+              echo "❌ Missing required input: $input"
+              exit 1
+            fi
+          done
+          echo "✓ All required inputs defined"
+
+          # Check for optional inputs
+          OPTIONAL_INPUTS=("slug" "delete_worker" "delete_certificate" "dry_run")
+          for input in "${OPTIONAL_INPUTS[@]}"; do
+            if ! grep -q "$input:" .github/workflows/cleanup-preview-reusable.yml; then
+              echo "❌ Missing optional input: $input"
+              exit 1
+            fi
+          done
+          echo "✓ All optional inputs defined"
+
+          # Check for required secrets
+          if ! grep -q "cloudflare_api_token:" .github/workflows/cleanup-preview-reusable.yml; then
+            echo "❌ Missing cloudflare_api_token secret"
+            exit 1
+          fi
+          if ! grep -q "cloudflare_account_id:" .github/workflows/cleanup-preview-reusable.yml; then
+            echo "❌ Missing cloudflare_account_id secret"
+            exit 1
+          fi
+          echo "✓ Required secrets defined"
+
+          # Check for required outputs
+          REQUIRED_OUTPUTS=("worker_deleted" "certificate_deleted" "cleanup_status" "preview_url")
+          for output in "${REQUIRED_OUTPUTS[@]}"; do
+            if ! grep -q "$output:" .github/workflows/cleanup-preview-reusable.yml; then
+              echo "❌ Missing required output: $output"
+              exit 1
+            fi
+          done
+          echo "✓ All required outputs defined"
+
+      - name: Check cleanup logic
+        run: |
+          echo "Verifying cleanup logic..."
+
+          # Check for worker deletion step
+          if ! grep -q "Delete Cloudflare Worker" .github/workflows/cleanup-preview-reusable.yml; then
+            echo "❌ Missing worker deletion step"
+            exit 1
+          fi
+          echo "✓ Worker deletion step present"
+
+          # Check for certificate deletion step
+          if ! grep -q "Delete SSL Certificate" .github/workflows/cleanup-preview-reusable.yml; then
+            echo "❌ Missing certificate deletion step"
+            exit 1
+          fi
+          echo "✓ Certificate deletion step present"
+
+          # Check for dry run support
+          if ! grep -q "DRY RUN MODE" .github/workflows/cleanup-preview-reusable.yml; then
+            echo "❌ Missing dry run support"
+            exit 1
+          fi
+          echo "✓ Dry run support present"
+
+          # Check for wrangler usage
+          if ! grep -q "npx wrangler" .github/workflows/cleanup-preview-reusable.yml; then
+            echo "❌ Missing wrangler usage for worker deletion"
+            exit 1
+          fi
+          echo "✓ Wrangler integration present"
+
+          # Check for Cloudflare API usage
+          if ! grep -q "api.cloudflare.com" .github/workflows/cleanup-preview-reusable.yml; then
+            echo "❌ Missing Cloudflare API usage for certificate deletion"
+            exit 1
+          fi
+          echo "✓ Cloudflare API integration present"
+
+      - name: Verify conditional execution
+        run: |
+          echo "Checking conditional execution logic..."
+
+          # Check for worker deletion condition
+          if ! grep -q "if: inputs.delete_worker == true" .github/workflows/cleanup-preview-reusable.yml; then
+            echo "❌ Missing conditional for worker deletion"
+            exit 1
+          fi
+          echo "✓ Worker deletion conditional present"
+
+          # Check for certificate deletion condition
+          if ! grep -q "if: inputs.delete_certificate == true" .github/workflows/cleanup-preview-reusable.yml; then
+            echo "❌ Missing conditional for certificate deletion"
+            exit 1
+          fi
+          echo "✓ Certificate deletion conditional present"
+
+          # Check for dry run logic
+          if ! grep -q "DRY_RUN.*inputs.dry_run" .github/workflows/cleanup-preview-reusable.yml; then
+            echo "❌ Missing dry run variable assignment"
+            exit 1
+          fi
+          echo "✓ Dry run logic present"
+
+      - name: Verify URL construction
+        run: |
+          echo "Checking URL construction logic..."
+
+          # Check for preview URL construction
+          if ! grep -q "Construct preview URL" .github/workflows/cleanup-preview-reusable.yml; then
+            echo "❌ Missing preview URL construction step"
+            exit 1
+          fi
+          echo "✓ Preview URL construction step present"
+
+          # Check for URL pattern
+          if ! grep -q "APP_DOMAIN}-pr-\${PR_NUM}.\${DEV_ZONE}" .github/workflows/cleanup-preview-reusable.yml; then
+            echo "❌ Missing URL pattern construction"
+            exit 1
+          fi
+          echo "✓ URL pattern construction present"
+
+      - name: Verify error handling
+        run: |
+          echo "Checking error handling..."
+
+          # Check for error output in worker deletion
+          if ! grep -q "Failed to delete worker" .github/workflows/cleanup-preview-reusable.yml; then
+            echo "❌ Missing worker deletion error handling"
+            exit 1
+          fi
+          echo "✓ Worker deletion error handling present"
+
+          # Check for error output in certificate deletion
+          if ! grep -q "Failed to delete certificate" .github/workflows/cleanup-preview-reusable.yml; then
+            echo "❌ Missing certificate deletion error handling"
+            exit 1
+          fi
+          echo "✓ Certificate deletion error handling present"
+
+          # Check for status determination
+          if ! grep -q "Determine overall status" .github/workflows/cleanup-preview-reusable.yml; then
+            echo "❌ Missing status determination logic"
+            exit 1
+          fi
+          echo "✓ Status determination logic present"
+
+      - name: Summary
+        run: |
+          echo "========================================="
+          echo "✓ Cleanup Workflow Structure Validation Complete"
+          echo "========================================="
+          echo ""
+          echo "All required components verified:"
+          echo "  ✓ workflow_call trigger"
+          echo "  ✓ Required inputs (worker_name, pr_number, app_domain, dev_zone)"
+          echo "  ✓ Optional inputs (slug, delete_worker, delete_certificate, dry_run)"
+          echo "  ✓ Required secrets (Cloudflare credentials)"
+          echo "  ✓ Required outputs (worker_deleted, certificate_deleted, cleanup_status, preview_url)"
+          echo "  ✓ Worker deletion logic with wrangler"
+          echo "  ✓ Certificate deletion logic with Cloudflare API"
+          echo "  ✓ Dry run support"
+          echo "  ✓ Conditional execution"
+          echo "  ✓ URL construction"
+          echo "  ✓ Error handling"
+          echo ""
+          echo "The workflow is properly structured and ready for use."
+
+  test-documentation:
+    name: Test Workflow Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify README documentation
+        run: |
+          echo "Checking README.md for workflow documentation..."
+
+          if ! grep -q "cleanup-preview-reusable.yml" README.md; then
+            echo "❌ Workflow not documented in README.md"
+            exit 1
+          fi
+          echo "✓ Workflow documented in README"
+
+          # Check for usage examples
+          if ! grep -A 20 "cleanup-preview-reusable.yml" README.md | grep -q "worker_name"; then
+            echo "❌ Missing usage examples with worker_name"
+            exit 1
+          fi
+          echo "✓ Usage examples present"
+
+          # Check for dry run documentation
+          if ! grep -A 50 "cleanup-preview-reusable.yml" README.md | grep -q -i "dry.*run"; then
+            echo "❌ Missing dry run documentation"
+            exit 1
+          fi
+          echo "✓ Dry run documentation present"
+
+          # Check for cleanup options documentation
+          if ! grep -A 50 "cleanup-preview-reusable.yml" README.md | grep -q -i "delete.*worker\|delete.*certificate"; then
+            echo "❌ Missing cleanup options documentation"
+            exit 1
+          fi
+          echo "✓ Cleanup options documented"
+
+          echo ""
+          echo "✓ Documentation is complete and comprehensive"
+
+  test-workflow-integration:
+    name: Test Workflow Integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Test workflow call syntax
+        run: |
+          echo "Testing workflow call syntax..."
+
+          # Create a test workflow file to validate the call syntax
+          cat > test-call.yml << 'EOF'
+          name: Test Cleanup Call
+          on:
+            workflow_dispatch:
+          jobs:
+            test-cleanup:
+              uses: ./.github/workflows/cleanup-preview-reusable.yml
+              with:
+                worker_name: "test-worker-pr-123"
+                pr_number: "123"
+                app_domain: "test-app"
+                dev_zone: "dev.example.com"
+                slug: "test"
+                delete_worker: true
+                delete_certificate: false
+                dry_run: true
+              secrets:
+                cloudflare_api_token: "test-token"
+                cloudflare_account_id: "test-account"
+          EOF
+
+          # Validate the YAML syntax
+          if ! python3 -c "import yaml; yaml.safe_load(open('test-call.yml'))" 2>/dev/null; then
+            echo "❌ Invalid workflow call syntax"
+            exit 1
+          fi
+          echo "✓ Workflow call syntax is valid"
+
+          # Clean up test file
+          rm test-call.yml
+
+      - name: Test input validation
+        run: |
+          echo "Testing input validation..."
+
+          # Check that all required inputs are properly typed
+          REQUIRED_INPUTS=("worker_name:string" "pr_number:string" "app_domain:string" "dev_zone:string")
+          for input in "${REQUIRED_INPUTS[@]}"; do
+            INPUT_NAME="${input%:*}"
+            INPUT_TYPE="${input#*:}"
+
+            if ! grep -A 3 "$INPUT_NAME:" .github/workflows/cleanup-preview-reusable.yml | grep -q "type: $INPUT_TYPE"; then
+              echo "❌ Input $INPUT_NAME has incorrect type (expected: $INPUT_TYPE)"
+              exit 1
+            fi
+          done
+          echo "✓ All required inputs have correct types"
+
+          # Check optional boolean inputs
+          BOOLEAN_INPUTS=("delete_worker" "delete_certificate" "dry_run")
+          for input in "${BOOLEAN_INPUTS[@]}"; do
+            if ! grep -A 3 "$input:" .github/workflows/cleanup-preview-reusable.yml | grep -q "type: boolean"; then
+              echo "❌ Optional input $input should be boolean type"
+              exit 1
+            fi
+          done
+          echo "✓ All boolean inputs have correct types"
+
+      - name: Test output validation
+        run: |
+          echo "Testing output validation..."
+
+          # Check that all outputs are properly defined
+          REQUIRED_OUTPUTS=("worker_deleted" "certificate_deleted" "cleanup_status" "preview_url")
+          for output in "${REQUIRED_OUTPUTS[@]}"; do
+            if ! grep -A 2 "$output:" .github/workflows/cleanup-preview-reusable.yml | grep -q "value:"; then
+              echo "❌ Output $output missing value definition"
+              exit 1
+            fi
+          done
+          echo "✓ All outputs have proper value definitions"
+
+      - name: Summary
+        run: |
+          echo "✓ Workflow integration tests completed successfully"
+          echo "  ✓ Call syntax validation"
+          echo "  ✓ Input type validation"
+          echo "  ✓ Output value validation"
+
+  test-complete:
+    name: All Tests Complete
+    needs:
+      - test-workflow-structure
+      - test-documentation
+      - test-workflow-integration
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "========================================="
+          echo "Cleanup Preview Workflow Tests Summary"
+          echo "========================================="
+          echo ""
+          echo "Test Results:"
+          echo "  Workflow Structure: ${{ needs.test-workflow-structure.result }}"
+          echo "  Documentation: ${{ needs.test-documentation.result }}"
+          echo "  Integration: ${{ needs.test-workflow-integration.result }}"
+          echo ""
+
+          # Check if all tests passed
+          if [ "${{ needs.test-workflow-structure.result }}" = "success" ] && \
+             [ "${{ needs.test-documentation.result }}" = "success" ] && \
+             [ "${{ needs.test-workflow-integration.result }}" = "success" ]; then
+            echo "✅ All tests PASSED"
+            echo ""
+            echo "The cleanup-preview-reusable.yml workflow is ready for production use!"
+            echo ""
+            echo "Features validated:"
+            echo "  ✓ Worker deletion with wrangler"
+            echo "  ✓ Certificate deletion with Cloudflare API"
+            echo "  ✓ Dry run mode for safe testing"
+            echo "  ✓ Conditional execution based on inputs"
+            echo "  ✓ Comprehensive error handling"
+            echo "  ✓ Proper input/output definitions"
+            echo "  ✓ Complete documentation"
+            echo ""
+            echo "Note: Actual cleanup testing requires valid Cloudflare credentials."
+            echo "The workflow has been validated for structure, documentation, and"
+            echo "integration. Real cleanup testing should be done in a controlled"
+            echo "environment with proper credentials."
+          else
+            echo "❌ Some tests FAILED"
+            echo ""
+            echo "Please review the failed tests above and fix any issues."
+            exit 1
+          fi

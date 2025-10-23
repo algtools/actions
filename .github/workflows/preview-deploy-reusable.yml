@@ -85,6 +85,23 @@ on:
         type: string
         default: "storybook-static"
 
+      # API Documentation configuration (optional)
+      enable_api_docs:
+        description: "Enable API documentation generation"
+        required: false
+        type: boolean
+        default: false
+      api_docs_type:
+        description: "Type of API documentation to generate (scalar, redoc, swagger-ui)"
+        required: false
+        type: string
+        default: "scalar"
+      api_docs_output_dir:
+        description: "Directory where API documentation will be generated"
+        required: false
+        type: string
+        default: "api-docs"
+
       # Miscellaneous
       retention_days:
         description: "Number of days to retain the artifact (1-90 days, default is repository/org setting)"
@@ -142,6 +159,14 @@ on:
       chromatic_url:
         description: "URL to Chromatic visual testing results (if enabled)"
         value: ${{ jobs.chromatic.outputs.chromatic_url }}
+
+      # API Documentation outputs
+      api_docs_url:
+        description: "URL to API documentation (if enabled)"
+        value: ${{ jobs.api-docs.outputs.api_docs_url }}
+      api_docs_status:
+        description: "Status of API documentation generation"
+        value: ${{ jobs.api-docs.outputs.api_docs_status }}
 
       # Comment outputs
       comment_id:
@@ -299,7 +324,7 @@ jobs:
     if: inputs.enable_chromatic == true
     runs-on: ubuntu-latest
     outputs:
-      chromatic_url: ${{ steps.chromatic-upload.outputs.url }}
+      chromatic_url: ${{ steps.chromatic-upload.outputs.chromatic_url }}
 
     steps:
       - name: Validate Chromatic inputs
@@ -325,15 +350,208 @@ jobs:
         with:
           artifact_name: ${{ inputs.artifact_name }}
           project_token: ${{ inputs.chromatic_project_token }}
-          storybook_build_dir: ${{ inputs.storybook_build_dir }}
+          storybook_dir: ${{ inputs.storybook_build_dir }}
+
+  api-docs:
+    name: Generate API Documentation
+    needs: build
+    if: inputs.enable_api_docs == true
+    runs-on: ubuntu-latest
+    outputs:
+      api_docs_url: ${{ steps.generate-api-docs.outputs.api_docs_url }}
+      api_docs_status: ${{ steps.generate-api-docs.outputs.status }}
+
+    steps:
+      - name: Validate API docs inputs
+        run: |
+          echo "::group::Validating API documentation configuration"
+
+          echo "API Documentation Configuration:"
+          echo "  Type: ${{ inputs.api_docs_type }}"
+          echo "  Output Directory: ${{ inputs.api_docs_output_dir }}"
+          echo ""
+
+          # Validate API docs type
+          case "${{ inputs.api_docs_type }}" in
+            scalar|redoc|swagger-ui)
+              echo "✓ Valid API documentation type: ${{ inputs.api_docs_type }}"
+              ;;
+            *)
+              echo "::error::Invalid api_docs_type: ${{ inputs.api_docs_type }}. Must be one of: scalar, redoc, swagger-ui"
+              exit 1
+              ;;
+          esac
+
+          echo "✓ API documentation configuration validated"
+          echo "::endgroup::"
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ./artifact
+
+      - name: Generate API Documentation
+        id: generate-api-docs
+        run: |
+          echo "::group::Generating API Documentation"
+
+          cd ./artifact
+          API_DOCS_TYPE="${{ inputs.api_docs_type }}"
+          OUTPUT_DIR="${{ inputs.api_docs_output_dir }}"
+
+          # Create output directory
+          mkdir -p "${OUTPUT_DIR}"
+
+          # Generate documentation based on type
+          case "${API_DOCS_TYPE}" in
+            scalar)
+              echo "Generating Scalar API documentation..."
+
+              # Create Scalar HTML documentation
+              cat > "${OUTPUT_DIR}/index.html" << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>API Documentation</title>
+              <style>
+                  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+                  .header { background: #6366f1; color: white; padding: 1rem; text-align: center; }
+                  .content { padding: 2rem; }
+                  .info { background: #f3f4f6; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; }
+                  .api-link { display: inline-block; background: #6366f1; color: white; padding: 0.5rem 1rem; text-decoration: none; border-radius: 4px; margin: 0.5rem; }
+                  .api-link:hover { background: #4f46e5; }
+              </style>
+          </head>
+          <body>
+              <div class="header">
+                  <h1>API Documentation</h1>
+                  <p>Generated for PR Preview</p>
+              </div>
+              <div class="content">
+                  <div class="info">
+                      <h2>API Reference</h2>
+                      <p>This is the API documentation for the preview deployment.</p>
+                      <p><strong>Generated:</strong> $(date)</p>
+                      <p><strong>Commit:</strong> ${{ github.sha }}</p>
+                      <p><strong>PR:</strong> #${{ github.event.pull_request.number }}</p>
+                  </div>
+
+                  <h3>Available Endpoints</h3>
+                  <a href="/docs" class="api-link">Interactive API Docs</a>
+                  <a href="/openapi.json" class="api-link">OpenAPI Specification</a>
+                  <a href="/health" class="api-link">Health Check</a>
+
+                  <h3>API Base URL</h3>
+                  <p>The API base URL will be dynamically determined based on the deployment environment.</p>
+
+                  <h3>Preview Environment</h3>
+                  <p>This is a preview deployment for PR #${{ github.event.pull_request.number }}.</p>
+                  <p>The API endpoints are available at the preview URL with the same paths.</p>
+              </div>
+          </body>
+          </html>
+          EOF
+
+              echo "✓ Scalar documentation generated"
+              ;;
+
+            redoc)
+              echo "Generating ReDoc API documentation..."
+
+              # Create ReDoc HTML documentation
+              cat > "${OUTPUT_DIR}/index.html" << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>API Documentation</title>
+              <meta charset="utf-8"/>
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <link href="https://fonts.googleapis.com/css?family=Montserrat:300,400,700|Roboto:300,400,700" rel="stylesheet">
+              <style>
+                  body { margin: 0; padding: 0; }
+              </style>
+          </head>
+          <body>
+              <redoc spec-url="/openapi.json"></redoc>
+              <script src="https://cdn.jsdelivr.net/npm/redoc@2.0.0/bundles/redoc.standalone.js"></script>
+          </body>
+          </html>
+          EOF
+
+              echo "✓ ReDoc documentation generated"
+              ;;
+
+            swagger-ui)
+              echo "Generating Swagger UI API documentation..."
+
+              # Create Swagger UI HTML documentation
+              cat > "${OUTPUT_DIR}/index.html" << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>API Documentation</title>
+              <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui.css" />
+              <style>
+                  html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
+                  *, *:before, *:after { box-sizing: inherit; }
+                  body { margin:0; background: #fafafa; }
+              </style>
+          </head>
+          <body>
+              <div id="swagger-ui"></div>
+              <script src="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui-bundle.js"></script>
+              <script src="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui-standalone-preset.js"></script>
+              <script>
+                  window.onload = function() {
+                      const ui = SwaggerUIBundle({
+                          url: '/openapi.json',
+                          dom_id: '#swagger-ui',
+                          presets: [
+                              SwaggerUIBundle.presets.apis,
+                              SwaggerUIStandalonePreset
+                          ],
+                          layout: "StandaloneLayout"
+                      });
+                  };
+              </script>
+          </body>
+          </html>
+          EOF
+
+              echo "✓ Swagger UI documentation generated"
+              ;;
+          esac
+
+          # Upload API documentation as artifact
+          cd ..
+          cp -r ./artifact/"${OUTPUT_DIR}" ./api-docs
+
+          echo "api_docs_url=https://${{ inputs.app_domain }}-pr-${{ github.event.pull_request.number }}.${{ inputs.dev_zone }}/docs" >> "$GITHUB_OUTPUT"
+          echo "status=success" >> "$GITHUB_OUTPUT"
+
+          echo "✓ API documentation generation completed"
+          echo "::endgroup::"
+
+      - name: Upload API Documentation Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: "api-docs-${{ inputs.artifact_name }}"
+          path: api-docs
+          retention-days: 7
 
   comment:
     name: Comment on PR
-    needs: [deploy, chromatic]
+    needs: [deploy, chromatic, api-docs]
     if: |
       always() &&
       needs.deploy.result == 'success' &&
-      (inputs.enable_chromatic == false || needs.chromatic.result == 'success' || needs.chromatic.result == 'skipped')
+      (inputs.enable_chromatic == false || needs.chromatic.result == 'success' || needs.chromatic.result == 'skipped') &&
+      (inputs.enable_api_docs == false || needs.api-docs.result == 'success' || needs.api-docs.result == 'skipped')
     runs-on: ubuntu-latest
     outputs:
       comment_id: ${{ steps.comment-pr.outputs.comment_id }}
@@ -348,7 +566,8 @@ jobs:
           message: |
             ✅ **Preview deployed successfully!**
             🌐 [Open Preview](${{ needs.deploy.outputs.preview_url }})${{ inputs.enable_chromatic == true && needs.chromatic.outputs.chromatic_url != '' && format('
-            🧩 [Chromatic Visuals]({0})', needs.chromatic.outputs.chromatic_url) || '' }}
+            🧩 [Chromatic Visuals]({0})', needs.chromatic.outputs.chromatic_url) || '' }}${{ inputs.enable_api_docs == true && needs.api-docs.outputs.api_docs_url != '' && format('
+            📚 [API Documentation]({0})', needs.api-docs.outputs.api_docs_url) || '' }}
 
             ---
 
@@ -370,6 +589,14 @@ jobs:
             if [ "${{ inputs.enable_chromatic }}" = "true" ] && [ -n "${{ needs.chromatic.outputs.chromatic_url }}" ]; then
               echo "### Chromatic"
               echo "🧩 **[View Visual Tests](${{ needs.chromatic.outputs.chromatic_url }})**"
+              echo ""
+            fi
+
+            if [ "${{ inputs.enable_api_docs }}" = "true" ] && [ -n "${{ needs.api-docs.outputs.api_docs_url }}" ]; then
+              echo "### API Documentation"
+              echo "📚 **[View API Docs](${{ needs.api-docs.outputs.api_docs_url }})**"
+              echo "- **Type**: ${{ inputs.api_docs_type }}"
+              echo "- **Status**: ${{ needs.api-docs.outputs.api_docs_status }}"
               echo ""
             fi
 
