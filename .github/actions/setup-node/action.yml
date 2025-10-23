@@ -108,18 +108,31 @@ runs:
           esac
         fi
 
-        # Use provided cache-dependency-path or build the path from working-directory + lockfile
-        if [ -n "${{ inputs.cache-dependency-path }}" ]; then
-          CACHE_PATH="${{ inputs.cache-dependency-path }}"
-        else
-          # Build path relative to repo root
-          WORK_DIR="${{ inputs.working-directory }}"
+        # Build path relative to repo root using detected lockfile
+        # If package manager was auto-detected, always use the detected lockfile
+        # If explicitly specified, use provided cache-dependency-path or build from detected lockfile
+        WORK_DIR="${{ inputs.working-directory }}"
+        if [ "${{ inputs.package-manager }}" = "auto" ]; then
+          # Auto-detection mode: always use detected lockfile
           if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
             CACHE_PATH="$LOCKFILE"
           else
             # Remove trailing slash if present
             WORK_DIR="${WORK_DIR%/}"
             CACHE_PATH="${WORK_DIR}/${LOCKFILE}"
+          fi
+        else
+          # Explicit package manager: use provided path or build from lockfile
+          if [ -n "${{ inputs.cache-dependency-path }}" ]; then
+            CACHE_PATH="${{ inputs.cache-dependency-path }}"
+          else
+            if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
+              CACHE_PATH="$LOCKFILE"
+            else
+              # Remove trailing slash if present
+              WORK_DIR="${WORK_DIR%/}"
+              CACHE_PATH="${WORK_DIR}/${LOCKFILE}"
+            fi
           fi
         fi
 
