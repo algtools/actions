@@ -30,6 +30,14 @@ inputs:
     description: 'Environment to deploy to (e.g., "production", "staging"). Maps to wrangler environment config.'
     required: false
     default: ''
+  custom_domain:
+    description: 'Custom domain to attach to the worker (e.g., "app.example.com"). If provided, requires zone_id.'
+    required: false
+    default: ''
+  zone_id:
+    description: 'Cloudflare zone ID for the custom domain. Required if custom_domain is provided.'
+    required: false
+    default: ''
   dry_run:
     description: 'If true, performs a dry run without actually deploying (for testing)'
     required: false
@@ -88,6 +96,12 @@ runs:
         echo "  Dry run: ${{ inputs.dry_run }}"
         echo "  Account ID: $(echo "${{ inputs.cloudflare_account_id }}" | head -c 8)***"
         echo "  API Token: [REDACTED]"
+
+        if [ -n "${{ inputs.custom_domain }}" ]; then
+          echo "  Custom domain: ${{ inputs.custom_domain }}"
+          echo "  Zone ID: $(echo "${{ inputs.zone_id }}" | head -c 8)***"
+        fi
+
         echo "::endgroup::"
 
     - name: Download artifact
@@ -185,6 +199,101 @@ runs:
           cat "$CONFIG_PATH" | head -20
         else
           echo "⚠️  dist/index.js not found, using config as-is"
+        fi
+
+        echo "::endgroup::"
+
+    - name: Add custom domain to wrangler config
+      shell: bash
+      run: |
+        echo "::group::Configuring custom domain"
+
+        CUSTOM_DOMAIN="${{ inputs.custom_domain }}"
+        ZONE_ID="${{ inputs.zone_id }}"
+
+        if [ -n "$CUSTOM_DOMAIN" ]; then
+          if [ -z "$ZONE_ID" ]; then
+            echo "::error::zone_id is required when custom_domain is provided"
+            exit 1
+          fi
+
+          DOWNLOAD_PATH="${{ inputs.download_path }}"
+          CONFIG_PATH="$DOWNLOAD_PATH/${{ inputs.wrangler_config }}"
+          ENVIRONMENT="${{ inputs.deploy_environment }}"
+
+          echo "Adding custom domain route to wrangler config..."
+          echo "  Domain: $CUSTOM_DOMAIN"
+          echo "  Zone ID: $(echo "$ZONE_ID" | head -c 8)***"
+
+          # Use Node.js to add the routes configuration to the environment
+          node -e "
+            const fs = require('fs');
+            const configPath = '$CONFIG_PATH';
+
+            // Read the config file
+            let content = fs.readFileSync(configPath, 'utf8');
+
+            try {
+              // Parse as JSON (comments should already be stripped or this is pure JSON)
+              const config = JSON.parse(content);
+
+              const domain = '$CUSTOM_DOMAIN';
+              const zoneId = '$ZONE_ID';
+              const environment = '$ENVIRONMENT';
+
+              // Add route to the appropriate environment
+              if (environment && config.env && config.env[environment]) {
+                // Add to specific environment
+                if (!config.env[environment].routes) {
+                  config.env[environment].routes = [];
+                }
+
+                // Check if route already exists
+                const routeExists = config.env[environment].routes.some(r => r.pattern === domain);
+
+                if (!routeExists) {
+                  config.env[environment].routes.push({
+                    pattern: domain,
+                    zone_id: zoneId,
+                    custom_domain: true
+                  });
+                  console.log('✓ Added custom domain route to ' + environment + ' environment');
+                } else {
+                  console.log('ℹ Custom domain route already exists in ' + environment + ' environment');
+                }
+              } else {
+                // Add to top-level config
+                if (!config.routes) {
+                  config.routes = [];
+                }
+
+                const routeExists = config.routes.some(r => r.pattern === domain);
+
+                if (!routeExists) {
+                  config.routes.push({
+                    pattern: domain,
+                    zone_id: zoneId,
+                    custom_domain: true
+                  });
+                  console.log('✓ Added custom domain route to top-level config');
+                } else {
+                  console.log('ℹ Custom domain route already exists in top-level config');
+                }
+              }
+
+              // Write back
+              fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+            } catch (error) {
+              console.error('Failed to add custom domain:', error.message);
+              process.exit(1);
+            }
+          " || exit 1
+
+          echo ""
+          echo "Updated wrangler config (showing routes):"
+          cat "$CONFIG_PATH" | grep -A 10 '"routes"' | head -20 || echo "No routes section found"
+        else
+          echo "No custom domain provided, skipping custom domain configuration"
         fi
 
         echo "::endgroup::"
