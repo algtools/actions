@@ -133,11 +133,11 @@ jobs:
           fi
           echo "✓ PR comment step present"
 
-          # Check for dedupe_key parameter
-          if ! grep -q "dedupe_key: 'env-deploy-" .github/workflows/env-deploy-reusable.yml; then
-            echo "❌ Missing dedupe_key parameter"
-            exit 1
-          fi
+            # Check for dedupe_key parameter
+            if ! grep -q 'dedupe_key: "env-deploy-' .github/workflows/env-deploy-reusable.yml; then
+              echo "❌ Missing dedupe_key parameter"
+              exit 1
+            fi
           echo "✓ dedupe_key parameter configured"
 
           # Check for deployment message with environment
