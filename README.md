@@ -279,14 +279,15 @@ jobs:
 ---
 
 ### [preview-deploy-reusable.yml](/.github/workflows/preview-deploy-reusable.yml)
-A complete PR preview deployment workflow that builds your application, deploys to Cloudflare Workers, optionally uploads to Chromatic for visual testing, and automatically posts/updates a comment on the PR with all deployment information.
+A complete PR preview deployment workflow that builds your application, deploys to Cloudflare Workers, optionally uploads to Chromatic for visual testing or generates API documentation, and automatically posts/updates a comment on the PR with all deployment information.
 
 **Features:**
 - Full build and deployment pipeline for PR previews
 - Automatic PR comment with deployment info (create/update with no duplicates)
 - Resolves PR number from various event contexts (pull_request, workflow_run, etc.)
 - Works with both regular and Dependabot PRs
-- Optional Chromatic visual testing integration
+- Optional Chromatic visual testing integration (for web templates)
+- Optional API documentation generation (for API templates)
 - Wildcard SSL certificate management
 - Preview URL construction and sharing
 - Markdown-formatted PR comments with emojis
@@ -332,6 +333,47 @@ jobs:
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 ```
 
+**Example Usage (API Documentation):**
+```yaml
+name: PR Preview Deploy
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  preview:
+    permissions:
+      contents: read
+      pull-requests: write  # Required for PR comments
+    uses: algtools/actions/.github/workflows/preview-deploy-reusable.yml@main
+    with:
+      # Build configuration
+      build_cmd: "npm run test && npm run lint && npm run type-check"
+      artifact_name: "preview-${{ github.event.pull_request.number }}"
+      artifact_paths: "src,package.json,pnpm-lock.yaml,wrangler.jsonc"
+      working_directory: "."
+      retention_days: 7
+
+      # Deployment configuration
+      worker_name: "my-api-pr-${{ github.event.pull_request.number }}"
+      wrangler_config: "wrangler.jsonc"
+      zone: "${{ vars.CLOUDFLARE_ZONE_ID }}"
+      custom_domain: "dev.example.com"
+
+      # Preview URL configuration
+      app_domain: "${{ vars.APP_DOMAIN }}"  # e.g., "my-api"
+      dev_zone: "${{ vars.DEV_ZONE }}"      # e.g., "dev.example.com"
+
+      # Optional: Enable API Documentation
+      enable_api_docs: true
+      api_docs_type: "scalar"
+      api_docs_output_dir: "api-docs"
+    secrets:
+      cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
 **Required Inputs:**
 - `build_cmd` (required): Build command to execute
 - `artifact_name` (required): Name for the uploaded artifact
@@ -357,6 +399,11 @@ jobs:
 - `chromatic_project_token` (optional): Chromatic project token (required if enable_chromatic is true)
 - `storybook_build_dir` (optional): Storybook build directory (default: "storybook-static")
 
+**Optional API Documentation Inputs:**
+- `enable_api_docs` (optional): Enable API documentation generation (default: false)
+- `api_docs_type` (optional): Type of API documentation (scalar, redoc, swagger-ui) (default: "scalar")
+- `api_docs_output_dir` (optional): Directory where API documentation will be generated (default: "api-docs")
+
 **Required Secrets:**
 - `cloudflare_api_token`: Cloudflare API token with Workers and SSL permissions
 - `cloudflare_account_id`: Cloudflare account ID
@@ -375,6 +422,10 @@ jobs:
 **Chromatic Outputs (if enabled):**
 - `chromatic_url`: URL to Chromatic visual testing results
 
+**API Documentation Outputs (if enabled):**
+- `api_docs_url`: URL to API documentation
+- `api_docs_status`: Status of API documentation generation
+
 **Comment Outputs:**
 - `comment_id`: ID of the PR comment
 - `comment_url`: URL of the PR comment
@@ -383,10 +434,40 @@ jobs:
 
 The workflow automatically posts/updates a comment on the PR with this format:
 
+**For Web Templates (with Chromatic):**
 ```markdown
 ✅ **Preview deployed successfully!**
 🌐 [Open Preview](https://my-app-pr-42.my-app.dev.example.com)
 🧩 [Chromatic Visuals](https://www.chromatic.com/build?appId=...)
+
+---
+
+**Deployment Details:**
+- Worker: `my-app-pr-42`
+- Environment: `dev`
+- Commit: `abc123def456...`
+```
+
+**For API Templates (with API Documentation):**
+```markdown
+✅ **Preview deployed successfully!**
+🌐 [Open Preview](https://my-api-pr-42.my-api.dev.example.com)
+📚 [API Documentation](https://my-api-pr-42.my-api.dev.example.com/docs)
+
+---
+
+**Deployment Details:**
+- Worker: `my-api-pr-42`
+- Environment: `dev`
+- Commit: `abc123def456...`
+```
+
+**For Templates with Both:**
+```markdown
+✅ **Preview deployed successfully!**
+🌐 [Open Preview](https://my-app-pr-42.my-app.dev.example.com)
+🧩 [Chromatic Visuals](https://www.chromatic.com/build?appId=...)
+📚 [API Documentation](https://my-app-pr-42.my-app.dev.example.com/docs)
 
 ---
 
@@ -401,8 +482,10 @@ The workflow automatically posts/updates a comment on the PR with this format:
 1. **Smart PR Number Resolution**: Works with `pull_request`, `workflow_run`, and other event types
 2. **Deduplication**: Uses `dedupe_key: 'preview-deploy'` to update existing comments instead of creating duplicates
 3. **Graceful Chromatic Handling**: Only shows Chromatic link if enabled and URL is available
-4. **Works with Dependabot**: Handles PRs from forks and Dependabot where secrets aren't directly available
-5. **Comprehensive Logging**: Detailed job summaries and outputs for debugging
+4. **API Documentation Support**: Generates Scalar, ReDoc, or Swagger UI documentation for API templates
+5. **Template Flexibility**: Supports both web templates (Chromatic) and API templates (API docs)
+6. **Works with Dependabot**: Handles PRs from forks and Dependabot where secrets aren't directly available
+7. **Comprehensive Logging**: Detailed job summaries and outputs for debugging
 
 **Required Permissions:**
 
@@ -411,6 +494,153 @@ permissions:
   contents: read
   pull-requests: write  # Required for posting PR comments
 ```
+
+---
+
+### [cleanup-preview-reusable.yml](/.github/workflows/cleanup-preview-reusable.yml)
+A reusable workflow for cleaning up PR preview environments when pull requests are closed. Removes Cloudflare Workers and optionally SSL certificates to prevent resource accumulation and reduce costs.
+
+**Features:**
+- Automatic cleanup of Cloudflare Workers when PRs are closed
+- Optional SSL certificate deletion (with safety warnings)
+- Dry run mode for safe testing without actual deletion
+- Comprehensive cleanup status reporting
+- Preview URL construction for reference
+- Conditional execution based on cleanup preferences
+- Detailed logging and error handling
+
+**Example Usage:**
+```yaml
+name: Cleanup Preview Environment
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  cleanup:
+    uses: algtools/actions/.github/workflows/cleanup-preview-reusable.yml@main
+    with:
+      worker_name: "${{ vars.APP_NAME || 'my-app' }}-pr-${{ github.event.pull_request.number }}"
+      pr_number: "${{ github.event.pull_request.number }}"
+      app_domain: "${{ vars.APP_DOMAIN || vars.APP_NAME || 'my-app' }}"
+      dev_zone: "${{ vars.DEV_ZONE || 'dev.example.com' }}"
+      slug: "${{ vars.SLUG || 'template' }}"
+      delete_worker: true
+      delete_certificate: false  # Certificates are usually shared
+      dry_run: false
+    secrets:
+      cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+**Required Inputs:**
+- `worker_name` (required): Name of the Cloudflare Worker to delete
+- `pr_number` (required): Pull request number for cleanup identification
+- `app_domain` (required): Application domain prefix for preview URL construction
+- `dev_zone` (required): Development zone suffix for preview URLs
+
+**Optional Inputs:**
+- `slug` (optional): Project slug for additional identification (default: "")
+- `delete_worker` (optional): Whether to delete the Cloudflare Worker (default: true)
+- `delete_certificate` (optional): Whether to delete the SSL certificate (default: false)
+- `dry_run` (optional): Perform dry run without actual deletion (default: false)
+
+**Required Secrets:**
+- `cloudflare_api_token`: Cloudflare API token with Workers and SSL permissions
+- `cloudflare_account_id`: Cloudflare account ID
+
+**Outputs:**
+- `worker_deleted`: Whether the worker was successfully deleted
+- `certificate_deleted`: Whether the certificate was successfully deleted
+- `cleanup_status`: Overall status of the cleanup operation
+- `preview_url`: The preview URL that was cleaned up
+
+**Cleanup Options:**
+
+1. **Worker Deletion** (recommended):
+   ```yaml
+   with:
+     delete_worker: true  # Default: true
+   ```
+
+2. **Certificate Deletion** (use with caution):
+   ```yaml
+   with:
+     delete_certificate: true  # Default: false
+   ```
+   ⚠️ **Warning**: Certificates are often shared across deployments. Only delete if you're sure the certificate is not used by other deployments.
+
+3. **Dry Run Mode** (for testing):
+   ```yaml
+   with:
+     dry_run: true  # Default: false
+   ```
+   This will log what would be deleted without actually performing the deletion.
+
+**Complete PR Lifecycle Example:**
+
+```yaml
+# .github/workflows/pr-preview.yml
+name: PR Preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  preview:
+    uses: algtools/actions/.github/workflows/preview-deploy-reusable.yml@main
+    with:
+      build_cmd: "npm run build"
+      artifact_name: "preview-${{ github.event.pull_request.number }}"
+      artifact_paths: "dist,wrangler.toml"
+      worker_name: "my-app-pr-${{ github.event.pull_request.number }}"
+      zone: "${{ vars.CLOUDFLARE_ZONE_ID }}"
+      custom_domain: "dev.example.com"
+      app_domain: "my-app"
+      dev_zone: "dev.example.com"
+    secrets:
+      cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+# .github/workflows/cleanup-preview.yml
+name: Cleanup Preview
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  cleanup:
+    uses: algtools/actions/.github/workflows/cleanup-preview-reusable.yml@main
+    with:
+      worker_name: "my-app-pr-${{ github.event.pull_request.number }}"
+      pr_number: "${{ github.event.pull_request.number }}"
+      app_domain: "my-app"
+      dev_zone: "dev.example.com"
+      delete_worker: true
+      delete_certificate: false
+    secrets:
+      cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+**Safety Features:**
+
+1. **Dry Run Support**: Test cleanup logic without actual deletion
+2. **Conditional Execution**: Only delete resources when explicitly requested
+3. **Certificate Safety**: Defaults to not deleting certificates (shared resource)
+4. **Error Handling**: Graceful handling of missing resources
+5. **Detailed Logging**: Comprehensive logs for debugging and auditing
+
+**Best Practices:**
+
+1. **Always use dry_run: true first** to test your cleanup configuration
+2. **Set delete_certificate: false** unless you're certain certificates aren't shared
+3. **Use consistent naming patterns** for workers to ensure proper cleanup
+4. **Monitor cleanup logs** to ensure resources are being properly removed
+5. **Set up alerts** for failed cleanup operations
 
 ## Usage
 

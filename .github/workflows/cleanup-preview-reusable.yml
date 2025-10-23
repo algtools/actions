@@ -1,0 +1,279 @@
+name: "Cleanup Preview - Reusable Workflow"
+# Reusable workflow for cleaning up PR preview environments
+# Removes Cloudflare Workers and SSL certificates when PRs are closed
+
+on:
+  workflow_call:
+    inputs:
+      # Worker configuration
+      worker_name:
+        description: "Name of the Cloudflare Worker to delete (e.g., 'app-pr-123')"
+        required: true
+        type: string
+      pr_number:
+        description: "Pull request number for cleanup identification"
+        required: true
+        type: string
+
+      # Domain configuration
+      app_domain:
+        description: "Application domain prefix (used to construct preview URL)"
+        required: true
+        type: string
+      dev_zone:
+        description: 'Development zone suffix for preview URLs (e.g., "dev.example.com")'
+        required: true
+        type: string
+
+      # Optional configuration
+      slug:
+        description: "Project slug for additional identification (optional)"
+        required: false
+        type: string
+        default: ""
+
+      # Cleanup options
+      delete_worker:
+        description: "Whether to delete the Cloudflare Worker (default: true)"
+        required: false
+        type: boolean
+        default: true
+      delete_certificate:
+        description: "Whether to delete the SSL certificate (default: false - certificates are shared)"
+        required: false
+        type: boolean
+        default: false
+      dry_run:
+        description: "Perform a dry run without actually deleting resources (default: false)"
+        required: false
+        type: boolean
+        default: false
+
+    secrets:
+      cloudflare_api_token:
+        description: "Cloudflare API token with Workers and SSL certificate permissions"
+        required: true
+      cloudflare_account_id:
+        description: "Cloudflare account ID"
+        required: true
+
+    outputs:
+      # Cleanup outputs
+      worker_deleted:
+        description: "Whether the worker was successfully deleted"
+        value: ${{ jobs.cleanup.outputs.worker_deleted }}
+      certificate_deleted:
+        description: "Whether the certificate was successfully deleted"
+        value: ${{ jobs.cleanup.outputs.certificate_deleted }}
+      cleanup_status:
+        description: "Overall status of the cleanup operation"
+        value: ${{ jobs.cleanup.outputs.cleanup_status }}
+
+      # Preview URL for reference
+      preview_url:
+        description: "The preview URL that was cleaned up"
+        value: ${{ jobs.cleanup.outputs.preview_url }}
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  cleanup:
+    name: Cleanup Preview Environment
+    runs-on: ubuntu-latest
+    outputs:
+      worker_deleted: ${{ steps.cleanup-worker.outputs.deleted }}
+      certificate_deleted: ${{ steps.cleanup-certificate.outputs.deleted }}
+      cleanup_status: ${{ steps.cleanup-summary.outputs.status }}
+      preview_url: ${{ steps.construct-url.outputs.url }}
+
+    steps:
+      - name: Construct preview URL
+        id: construct-url
+        run: |
+          echo "::group::Constructing preview URL for cleanup reference"
+
+          PR_NUM="${{ inputs.pr_number }}"
+          APP_DOMAIN="${{ inputs.app_domain }}"
+          DEV_ZONE="${{ inputs.dev_zone }}"
+
+          # Construct URL: {app_domain}-pr-{num}.{dev_zone}
+          PREVIEW_URL="https://${APP_DOMAIN}-pr-${PR_NUM}.${DEV_ZONE}"
+
+          echo "Preview URL to cleanup: ${PREVIEW_URL}"
+          echo "url=${PREVIEW_URL}" >> "$GITHUB_OUTPUT"
+          echo "::endgroup::"
+
+      - name: Validate cleanup configuration
+        run: |
+          echo "::group::Validating cleanup configuration"
+
+          echo "Cleanup Configuration:"
+          echo "  Worker Name: ${{ inputs.worker_name }}"
+          echo "  PR Number: ${{ inputs.pr_number }}"
+          echo "  Preview URL: ${{ steps.construct-url.outputs.url }}"
+          echo "  Delete Worker: ${{ inputs.delete_worker }}"
+          echo "  Delete Certificate: ${{ inputs.delete_certificate }}"
+          echo "  Dry Run: ${{ inputs.dry_run }}"
+          echo ""
+
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "🔍 DRY RUN MODE - No resources will be deleted"
+          else
+            echo "⚠️  LIVE MODE - Resources will be permanently deleted"
+          fi
+
+          echo "::endgroup::"
+
+      - name: Delete Cloudflare Worker
+        id: cleanup-worker
+        if: inputs.delete_worker == true
+        run: |
+          echo "::group::Deleting Cloudflare Worker"
+
+          WORKER_NAME="${{ inputs.worker_name }}"
+          DRY_RUN="${{ inputs.dry_run }}"
+
+          echo "Worker to delete: ${WORKER_NAME}"
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "🔍 DRY RUN: Would delete worker '${WORKER_NAME}'"
+            echo "deleted=true" >> "$GITHUB_OUTPUT"
+            echo "action=dry_run" >> "$GITHUB_OUTPUT"
+          else
+            echo "Deleting worker '${WORKER_NAME}'..."
+
+            # Use wrangler to delete the worker
+            npx wrangler@latest delete "${WORKER_NAME}" \
+              --api-token "${{ secrets.cloudflare_api_token }}" \
+              --account-id "${{ secrets.cloudflare_account_id }}" \
+              --force
+
+            if [ $? -eq 0 ]; then
+              echo "✅ Worker '${WORKER_NAME}' deleted successfully"
+              echo "deleted=true" >> "$GITHUB_OUTPUT"
+              echo "action=deleted" >> "$GITHUB_OUTPUT"
+            else
+              echo "❌ Failed to delete worker '${WORKER_NAME}'"
+              echo "deleted=false" >> "$GITHUB_OUTPUT"
+              echo "action=failed" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+          echo "::endgroup::"
+
+      - name: Delete SSL Certificate (if requested)
+        id: cleanup-certificate
+        if: inputs.delete_certificate == true
+        run: |
+          echo "::group::Deleting SSL Certificate"
+
+          APP_DOMAIN="${{ inputs.app_domain }}"
+          DEV_ZONE="${{ inputs.dev_zone }}"
+          DOMAIN="${APP_DOMAIN}.${DEV_ZONE}"
+          DRY_RUN="${{ inputs.dry_run }}"
+
+          echo "Certificate domain: ${DOMAIN}"
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "🔍 DRY RUN: Would delete certificate for '${DOMAIN}'"
+            echo "deleted=true" >> "$GITHUB_OUTPUT"
+            echo "action=dry_run" >> "$GITHUB_OUTPUT"
+          else
+            echo "⚠️  WARNING: Deleting SSL certificates can affect other deployments"
+            echo "Deleting certificate for '${DOMAIN}'..."
+
+            # Get certificate ID first
+            CERT_ID=$(curl -s -X GET \
+              "https://api.cloudflare.com/client/v4/accounts/${{ secrets.cloudflare_account_id }}/certificates" \
+              -H "Authorization: Bearer ${{ secrets.cloudflare_api_token }}" \
+              -H "Content-Type: application/json" | \
+              jq -r ".result[] | select(.hostnames[] | contains(\"${DOMAIN}\")) | .id" | head -1)
+
+            if [ -n "$CERT_ID" ] && [ "$CERT_ID" != "null" ]; then
+              echo "Found certificate ID: ${CERT_ID}"
+
+              # Delete the certificate
+              curl -s -X DELETE \
+                "https://api.cloudflare.com/client/v4/accounts/${{ secrets.cloudflare_account_id }}/certificates/${CERT_ID}" \
+                -H "Authorization: Bearer ${{ secrets.cloudflare_api_token }}" \
+                -H "Content-Type: application/json"
+
+              if [ $? -eq 0 ]; then
+                echo "✅ Certificate for '${DOMAIN}' deleted successfully"
+                echo "deleted=true" >> "$GITHUB_OUTPUT"
+                echo "action=deleted" >> "$GITHUB_OUTPUT"
+              else
+                echo "❌ Failed to delete certificate for '${DOMAIN}'"
+                echo "deleted=false" >> "$GITHUB_OUTPUT"
+                echo "action=failed" >> "$GITHUB_OUTPUT"
+              fi
+            else
+              echo "ℹ️  No certificate found for '${DOMAIN}'"
+              echo "deleted=true" >> "$GITHUB_OUTPUT"
+              echo "action=not_found" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+          echo "::endgroup::"
+
+      - name: Cleanup Summary
+        id: cleanup-summary
+        run: |
+          echo "::group::Cleanup Summary"
+
+          WORKER_ACTION="${{ steps.cleanup-worker.outputs.action || 'skipped' }}"
+          CERT_ACTION="${{ steps.cleanup-certificate.outputs.action || 'skipped' }}"
+          DRY_RUN="${{ inputs.dry_run }}"
+
+          echo "Cleanup Results:"
+          echo "  Worker: ${WORKER_ACTION}"
+          echo "  Certificate: ${CERT_ACTION}"
+          echo "  Mode: $([ "$DRY_RUN" = "true" ] && echo "DRY RUN" || echo "LIVE")"
+          echo ""
+
+          # Determine overall status
+          if [ "$DRY_RUN" = "true" ]; then
+            STATUS="dry_run_complete"
+            echo "🔍 Dry run completed successfully"
+          elif [ "$WORKER_ACTION" = "deleted" ] || [ "$WORKER_ACTION" = "skipped" ]; then
+            if [ "$CERT_ACTION" = "deleted" ] || [ "$CERT_ACTION" = "skipped" ] || [ "$CERT_ACTION" = "not_found" ]; then
+              STATUS="success"
+              echo "✅ Cleanup completed successfully"
+            else
+              STATUS="partial_success"
+              echo "⚠️  Cleanup completed with warnings (certificate deletion failed)"
+            fi
+          else
+            STATUS="failed"
+            echo "❌ Cleanup failed"
+          fi
+
+          echo "status=${STATUS}" >> "$GITHUB_OUTPUT"
+          echo "::endgroup::"
+
+      - name: Summary
+        run: |
+          {
+            echo "## 🧹 Preview Cleanup Complete"
+            echo ""
+            echo "### Cleanup Details"
+            echo "- **Preview URL**: ${{ steps.construct-url.outputs.url }}"
+            echo "- **Worker**: ${{ inputs.worker_name }}"
+            echo "- **PR**: #${{ inputs.pr_number }}"
+            echo "- **Mode**: $([ "${{ inputs.dry_run }}" = "true" ] && echo "DRY RUN" || echo "LIVE")"
+            echo ""
+
+            echo "### Results"
+            echo "- **Worker**: ${{ steps.cleanup-worker.outputs.action || 'skipped' }}"
+            echo "- **Certificate**: ${{ steps.cleanup-certificate.outputs.action || 'skipped' }}"
+            echo "- **Status**: ${{ steps.cleanup-summary.outputs.status }}"
+            echo ""
+
+            if [ "${{ inputs.dry_run }}" = "true" ]; then
+              echo "🔍 **Dry run completed** - No resources were actually deleted"
+            else
+              echo "✅ **Cleanup completed** - Preview environment resources removed"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
