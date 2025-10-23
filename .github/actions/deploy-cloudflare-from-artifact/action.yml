@@ -155,21 +155,41 @@ runs:
           echo "Built worker found at dist/index.js"
           echo "Updating wrangler config to use built file..."
 
-          # Strip comments from JSONC and update the main field
-          # Remove single-line comments (//...) and multi-line comments (/*...*/)
-          # Then update the main field using jq
+          # Use Node.js to properly parse JSONC, update main field, and write valid JSON
+          node -e "
+            const fs = require('fs');
+            const configPath = '$CONFIG_PATH';
 
-          # First, remove comments (preserving strings with //)
-          sed 's|//.*$||g; s|/\*.*\*/||g' "$CONFIG_PATH" > "${CONFIG_PATH}.tmp"
+            // Read the JSONC file
+            let content = fs.readFileSync(configPath, 'utf8');
 
-          # Update main field and remove $schema (which points to node_modules)
-          jq '.main = "dist/index.js" | del(."$schema")' "${CONFIG_PATH}.tmp" > "${CONFIG_PATH}.updated"
+            // Strip comments from JSONC
+            // Remove single-line comments
+            content = content.replace(/\/\/.*$/gm, '');
+            // Remove multi-line comments
+            content = content.replace(/\/\*[\s\S]*?\*\//g, '');
+            // Remove trailing commas (common in JSONC)
+            content = content.replace(/,(\s*[}\]])/g, '\$1');
 
-          # Replace original config
-          mv "${CONFIG_PATH}.updated" "$CONFIG_PATH"
-          rm -f "${CONFIG_PATH}.tmp"
+            try {
+              // Parse the cleaned JSON
+              const config = JSON.parse(content);
 
-          echo "✓ Updated main field to: dist/index.js"
+              // Update the main field
+              config.main = 'dist/index.js';
+
+              // Remove \$schema field (points to node_modules which won't exist)
+              delete config['\$schema'];
+
+              // Write back as clean JSON
+              fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+              console.log('✓ Updated main field to: dist/index.js');
+            } catch (error) {
+              console.error('Failed to parse config:', error.message);
+              process.exit(1);
+            }
+          " || exit 1
+
           echo ""
           echo "Updated configuration (first 20 lines):"
           cat "$CONFIG_PATH" | head -20
