@@ -17,7 +17,7 @@ Algenium common GitHub Actions and reusable workflows for all projects across th
 Builds a project in a clean environment without exposing secrets. Perfect for PR previews or secure builds.
 
 ### [setup-node](/.github/actions/setup-node)
-Sets up Node.js environment with caching support for faster builds.
+Sets up Node.js environment with automatic package manager detection (npm, pnpm, yarn) and intelligent caching support for faster builds. Auto-detects lockfiles and configures the appropriate package manager with optimized caching.
 
 ### [upload-artifacts](/.github/actions/upload-artifacts)
 Uploads build artifacts to GitHub Actions storage with detailed logging and support for multiple file paths.

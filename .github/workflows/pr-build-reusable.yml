@@ -135,7 +135,6 @@ jobs:
         with:
           node-version: ${{ inputs.node_version }}
           working-directory: ${{ inputs.working_directory }}
-          cache-dependency-path: ${{ inputs.working_directory }}/package-lock.json
 
       - name: Build without secrets
         id: build
@@ -161,6 +160,7 @@ jobs:
             echo "### Build Information"
             echo "- **Status**: ${{ steps.build.outputs.build_status }}"
             echo "- **Node Version**: ${{ steps.setup.outputs.node-version }}"
+            echo "- **Package Manager**: ${{ steps.setup.outputs.package-manager }}"
             echo "- **Cache Hit**: ${{ steps.setup.outputs.cache-hit }}"
             echo ""
             echo "### Artifact Details"
