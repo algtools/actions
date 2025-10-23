@@ -17,7 +17,7 @@ Algenium common GitHub Actions and reusable workflows for all projects across th
 Builds a project in a clean environment without exposing secrets. Perfect for PR previews or secure builds.
 
 ### [setup-node](/.github/actions/setup-node)
-Sets up Node.js environment with caching support for faster builds.
+Sets up Node.js environment with automatic package manager detection (npm, pnpm, yarn) and intelligent caching support for faster builds. Auto-detects lockfiles and configures the appropriate package manager with optimized caching.
 
 ### [upload-artifacts](/.github/actions/upload-artifacts)
 Uploads build artifacts to GitHub Actions storage with detailed logging and support for multiple file paths.
@@ -138,17 +138,19 @@ jobs:
 ---
 
 ### [env-deploy-reusable.yml](/.github/workflows/env-deploy-reusable.yml)
-A comprehensive deployment workflow for deploying Cloudflare Workers to dev/qa/production environments. Handles wildcard SSL certificates, artifact-based deployments, and optional Sentry release tracking.
+A comprehensive deployment workflow for deploying Cloudflare Workers to dev/qa/production environments. Handles wildcard SSL certificates, artifact-based deployments, optional Sentry release tracking, and automatic GitHub release creation.
 
 **Features:**
 - Automatic wildcard SSL certificate management with Cloudflare ACM
 - Secure deployment from pre-built artifacts
 - Environment-specific configurations
+- GitHub Deployments tracking in repository UI
+- Optional GitHub Release creation for production deployments
 - Optional Sentry release integration for error tracking
 - Comprehensive deployment summaries with all key information
 - Idempotent certificate operations
 
-**Example Usage:**
+**Example Usage (Production with GitHub Release):**
 ```yaml
 name: Deploy to Production
 
@@ -162,7 +164,7 @@ jobs:
     with:
       build_cmd: "npm run build"
       artifact_name: "production-build"
-      artifact_paths: "dist,wrangler.toml"
+      artifact_paths: "dist,wrangler.toml,package.json"
 
   deploy:
     needs: build
@@ -175,6 +177,8 @@ jobs:
       custom_domain: "example.com"
       slug: "my-app"
       artifact_name: "production-build"
+      create_github_release: true
+      release_name_template: "My App {version}"
       sentry_release: true
       sentry_org: "my-org"
       sentry_project: "my-project"
@@ -197,6 +201,9 @@ jobs:
 - `download_path` (optional): Artifact download directory (default: "./worker-artifact")
 - `max_wait_seconds` (optional): Max wait for certificate activation (default: 300)
 - `poll_interval_seconds` (optional): Certificate status check interval (default: 10)
+- `create_github_release` (optional): Create a GitHub release (default: false)
+- `package_json_path` (optional): Path to package.json for version extraction (default: "package.json")
+- `release_name_template` (optional): Template for release name with {version} placeholder (default: "Release {version}")
 - `sentry_release` (optional): Enable Sentry release tracking (default: false)
 - `sentry_org` (optional): Sentry organization slug (required if sentry_release is true)
 - `sentry_project` (optional): Sentry project slug (required if sentry_release is true)
