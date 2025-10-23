@@ -155,40 +155,30 @@ runs:
           echo "Built worker found at dist/index.js"
           echo "Updating wrangler config to use built file..."
 
-          # Use Node.js to properly parse JSONC, update main field, and write valid JSON
-          node -e "
-            const fs = require('fs');
-            const configPath = '$CONFIG_PATH';
+          # Use a simple targeted replacement approach
+          # Replace the main field value (handles both .ts and .js extensions)
+          # This preserves the JSONC format without needing to parse it
 
-            // Read the JSONC file
-            let content = fs.readFileSync(configPath, 'utf8');
+          # Create backup
+          cp "$CONFIG_PATH" "${CONFIG_PATH}.backup"
 
-            // Strip comments from JSONC
-            // Remove single-line comments
-            content = content.replace(/\/\/.*$/gm, '');
-            // Remove multi-line comments
-            content = content.replace(/\/\*[\s\S]*?\*\//g, '');
-            // Remove trailing commas (common in JSONC)
-            content = content.replace(/,(\s*[}\]])/g, '\$1');
+          # Replace "main": "src/index.ts" or similar with "main": "dist/index.js"
+          # Handle different quote styles and spacing
+          sed -i.tmp 's|"main"[[:space:]]*:[[:space:]]*"[^"]*"|"main": "dist/index.js"|g' "$CONFIG_PATH"
 
-            try {
-              // Parse the cleaned JSON
-              const config = JSON.parse(content);
+          # Clean up temp file
+          rm -f "${CONFIG_PATH}.tmp"
 
-              // Update the main field
-              config.main = 'dist/index.js';
+          # Verify the change was made
+          if grep -q '"main".*"dist/index.js"' "$CONFIG_PATH"; then
+            echo "✓ Updated main field to: dist/index.js"
+          else
+            echo "⚠️  Warning: Could not verify main field update"
+            echo "Restoring backup..."
+            mv "${CONFIG_PATH}.backup" "$CONFIG_PATH"
+          fi
 
-              // Remove \$schema field (points to node_modules which won't exist)
-              delete config['\$schema'];
-
-              // Write back as clean JSON
-              fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-              console.log('✓ Updated main field to: dist/index.js');
-            } catch (error) {
-              console.error('Failed to parse config:', error.message);
-              process.exit(1);
-            }
-          " || exit 1
+          rm -f "${CONFIG_PATH}.backup"
 
           echo ""
           echo "Updated configuration (first 20 lines):"
