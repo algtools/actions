@@ -3,14 +3,11 @@ description: 'Ensures a wildcard SSL certificate exists in Cloudflare ACM, creat
 author: 'Algenium Systems'
 
 inputs:
-  slug:
-    description: 'Project or application slug identifier'
+  domain:
+    description: 'Domain for the wildcard certificate (e.g., example.com for *.example.com)'
     required: true
   current_zone:
     description: 'Cloudflare zone ID for the domain'
-    required: true
-  custom_domain:
-    description: 'Custom domain for the wildcard certificate (e.g., example.com for *.example.com)'
     required: true
   cloudflare_api_token:
     description: 'Cloudflare API token with SSL/TLS certificates permissions'
@@ -45,18 +42,14 @@ runs:
       shell: bash
       run: |
         echo "::group::Validating inputs"
-        
+
         # Validate required inputs
-        if [ -z "${{ inputs.slug }}" ]; then
-          echo "::error::slug input is required"
+        if [ -z "${{ inputs.domain }}" ]; then
+          echo "::error::domain input is required"
           exit 1
         fi
         if [ -z "${{ inputs.current_zone }}" ]; then
           echo "::error::current_zone input is required"
-          exit 1
-        fi
-        if [ -z "${{ inputs.custom_domain }}" ]; then
-          echo "::error::custom_domain input is required"
           exit 1
         fi
         if [ -z "${{ inputs.cloudflare_api_token }}" ]; then
@@ -67,14 +60,13 @@ runs:
           echo "::error::cloudflare_account_id input is required"
           exit 1
         fi
-        
+
         echo "✓ All required inputs validated successfully"
         echo ""
         echo "Configuration:"
-        echo "  Slug: ${{ inputs.slug }}"
+        echo "  Domain: ${{ inputs.domain }}"
         echo "  Zone ID: $(echo "${{ inputs.current_zone }}" | head -c 8)***"
-        echo "  Custom Domain: ${{ inputs.custom_domain }}"
-        echo "  Wildcard Pattern: *.${{ inputs.custom_domain }}"
+        echo "  Wildcard Pattern: *.${{ inputs.domain }}"
         echo "  Max Wait: ${{ inputs.max_wait_seconds }}s"
         echo "  Poll Interval: ${{ inputs.poll_interval_seconds }}s"
         echo "  Account ID: $(echo "${{ inputs.cloudflare_account_id }}" | head -c 8)***"
@@ -88,28 +80,27 @@ runs:
         CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare_api_token }}
         CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare_account_id }}
         ZONE_ID: ${{ inputs.current_zone }}
-        CUSTOM_DOMAIN: ${{ inputs.custom_domain }}
-        SLUG: ${{ inputs.slug }}
+        DOMAIN: ${{ inputs.domain }}
         MAX_WAIT: ${{ inputs.max_wait_seconds }}
         POLL_INTERVAL: ${{ inputs.poll_interval_seconds }}
       run: |
         echo "::group::Checking for existing wildcard certificate"
-        
+
         # Mask sensitive values in logs
         echo "::add-mask::${{ inputs.cloudflare_api_token }}"
         echo "::add-mask::${{ inputs.cloudflare_account_id }}"
         echo "::add-mask::${{ inputs.current_zone }}"
-        
-        WILDCARD_DOMAIN="*.${CUSTOM_DOMAIN}"
+
+        WILDCARD_DOMAIN="*.${DOMAIN}"
         echo "Looking for certificate: ${WILDCARD_DOMAIN}"
         echo ""
-        
+
         # Query Cloudflare API for existing certificates
         # Using Cloudflare API v4: https://developers.cloudflare.com/api/operations/origin-ca-get-certificate
         RESPONSE=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/ssl/certificate_packs" \
           -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
           -H "Content-Type: application/json")
-        
+
         # Check for API errors
         SUCCESS=$(echo "$RESPONSE" | jq -r '.success // false')
         if [ "$SUCCESS" != "true" ]; then
@@ -117,17 +108,17 @@ runs:
           echo "::error::Failed to query Cloudflare API: ${ERROR_MSG}"
           exit 1
         fi
-        
+
         # Search for existing wildcard certificate
         CERT_ID=$(echo "$RESPONSE" | jq -r --arg domain "${WILDCARD_DOMAIN}" \
           '.result[] | select(.hosts[]? == $domain) | .id' | head -1)
-        
+
         CERT_CREATED="false"
-        
+
         if [ -n "$CERT_ID" ] && [ "$CERT_ID" != "null" ]; then
           echo "✓ Found existing wildcard certificate"
           echo "  Certificate ID: ${CERT_ID}"
-          
+
           # Get certificate status
           CERT_STATUS=$(echo "$RESPONSE" | jq -r --arg id "${CERT_ID}" \
             '.result[] | select(.id == $id) | .status' | head -1)
@@ -136,7 +127,7 @@ runs:
           echo "⚠️  No existing wildcard certificate found"
           echo ""
           echo "Creating new wildcard certificate..."
-          
+
           # Create new certificate
           # Note: This uses Universal SSL certificate packs API
           CREATE_RESPONSE=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/ssl/certificate_packs/order" \
@@ -145,14 +136,14 @@ runs:
             -d "{
               \"type\": \"advanced\",
               \"hosts\": [
-                \"${CUSTOM_DOMAIN}\",
+                \"${DOMAIN}\",
                 \"${WILDCARD_DOMAIN}\"
               ],
               \"validation_method\": \"txt\",
               \"validity_days\": 90,
               \"certificate_authority\": \"lets_encrypt\"
             }")
-          
+
           # Check creation success
           CREATE_SUCCESS=$(echo "$CREATE_RESPONSE" | jq -r '.success // false')
           if [ "$CREATE_SUCCESS" != "true" ]; then
@@ -163,18 +154,18 @@ runs:
             echo "$CREATE_RESPONSE" | jq '.'
             exit 1
           fi
-          
+
           CERT_ID=$(echo "$CREATE_RESPONSE" | jq -r '.result.id')
           CERT_STATUS=$(echo "$CREATE_RESPONSE" | jq -r '.result.status')
           CERT_CREATED="true"
-          
+
           echo "✓ Certificate created successfully"
           echo "  Certificate ID: ${CERT_ID}"
           echo "  Initial Status: ${CERT_STATUS}"
         fi
-        
+
         echo "::endgroup::"
-        
+
         # Wait for certificate to become active
         if [ "$CERT_STATUS" != "active" ]; then
           echo "::group::Waiting for certificate activation"
@@ -183,52 +174,52 @@ runs:
           echo "  Max Wait Time: ${MAX_WAIT}s"
           echo "  Poll Interval: ${POLL_INTERVAL}s"
           echo ""
-          
+
           ELAPSED=0
           while [ $ELAPSED -lt $MAX_WAIT ]; do
             sleep $POLL_INTERVAL
             ELAPSED=$((ELAPSED + POLL_INTERVAL))
-            
+
             # Query certificate status
             STATUS_RESPONSE=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/ssl/certificate_packs/${CERT_ID}" \
               -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
               -H "Content-Type: application/json")
-            
+
             STATUS_SUCCESS=$(echo "$STATUS_RESPONSE" | jq -r '.success // false')
             if [ "$STATUS_SUCCESS" != "true" ]; then
               echo "⚠️  Failed to query certificate status (attempt at ${ELAPSED}s)"
               continue
             fi
-            
+
             CERT_STATUS=$(echo "$STATUS_RESPONSE" | jq -r '.result.status')
             echo "[$ELAPSED/$MAX_WAIT s] Status: ${CERT_STATUS}"
-            
+
             if [ "$CERT_STATUS" = "active" ]; then
               echo ""
               echo "✓ Certificate is now ACTIVE"
               break
             fi
-            
+
             if [ "$CERT_STATUS" = "failed" ] || [ "$CERT_STATUS" = "expired" ]; then
               echo ""
               echo "::error::Certificate entered failed state: ${CERT_STATUS}"
               exit 1
             fi
           done
-          
+
           if [ "$CERT_STATUS" != "active" ]; then
             echo ""
             echo "::error::Certificate did not become active within ${MAX_WAIT} seconds"
             echo "Final status: ${CERT_STATUS}"
             exit 1
           fi
-          
+
           echo "::endgroup::"
         else
           echo ""
           echo "✓ Certificate is already ACTIVE"
         fi
-        
+
         # Set outputs
         echo "certificate_id=${CERT_ID}" >> $GITHUB_OUTPUT
         echo "certificate_status=${CERT_STATUS}" >> $GITHUB_OUTPUT
@@ -243,11 +234,10 @@ runs:
         echo "========================================"
         echo ""
         echo "Certificate Details:"
-        echo "  Domain: *.${{ inputs.custom_domain }}"
+        echo "  Domain: *.${{ inputs.domain }}"
         echo "  Certificate ID: ${{ steps.ensure-cert.outputs.certificate_id }}"
         echo "  Status: ${{ steps.ensure-cert.outputs.certificate_status }}"
         echo "  Created New: ${{ steps.ensure-cert.outputs.certificate_created }}"
-        echo "  Slug: ${{ inputs.slug }}"
         echo ""
         echo "Zone Details:"
         echo "  Zone ID: $(echo "${{ inputs.current_zone }}" | head -c 8)***"
@@ -257,11 +247,11 @@ runs:
         echo "  ✓ Certificate verification completed"
         echo "  ✓ Idempotent operation"
         echo ""
-        
+
         if [ "${{ steps.ensure-cert.outputs.certificate_created }}" = "true" ]; then
           echo "✓ New wildcard certificate created and activated"
         else
           echo "✓ Existing wildcard certificate verified"
         fi
-        
+
         echo "::endgroup::"

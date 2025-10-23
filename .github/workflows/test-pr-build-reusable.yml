@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - 'cursor/**'
+      - "cursor/**"
   pull_request:
     branches:
       - main
@@ -38,33 +38,33 @@ jobs:
           echo "Total Files: ${{ needs.test-basic.outputs.total_files }}"
           echo "Total Size: ${{ needs.test-basic.outputs.total_size }}"
           echo "Build Status: ${{ needs.test-basic.outputs.build_status }}"
-          
+
           # Verify required outputs are not empty
           if [ -z "${{ needs.test-basic.outputs.artifact_id }}" ]; then
             echo "Error: artifact_id output is empty"
             exit 1
           fi
-          
+
           if [ -z "${{ needs.test-basic.outputs.build_status }}" ]; then
             echo "Error: build_status output is empty"
             exit 1
           fi
-          
+
           if [ "${{ needs.test-basic.outputs.build_status }}" != "success" ]; then
             echo "Error: build_status is not 'success'"
             exit 1
           fi
-          
+
           if [ -z "${{ needs.test-basic.outputs.total_files }}" ]; then
             echo "Error: total_files output is empty"
             exit 1
           fi
-          
+
           if [ -z "${{ needs.test-basic.outputs.total_size }}" ]; then
             echo "Error: total_size output is empty"
             exit 1
           fi
-          
+
           echo "✓ All outputs validated successfully"
 
   test-with-custom-node-version:
@@ -110,23 +110,23 @@ jobs:
       - name: Verify deployment outputs are empty
         run: |
           echo "Testing deployment outputs when deploy_to_dev is false..."
-          
+
           # When deployment is disabled, these outputs should be empty
           WORKER_URL="${{ needs.test-deployment-disabled.outputs.worker_url }}"
           DEPLOYMENT_STATUS="${{ needs.test-deployment-disabled.outputs.deployment_status }}"
-          
+
           if [ -n "$WORKER_URL" ]; then
             echo "⚠️  worker_url should be empty when deployment is disabled"
           else
             echo "✓ worker_url is empty (expected)"
           fi
-          
+
           if [ -n "$DEPLOYMENT_STATUS" ]; then
             echo "⚠️  deployment_status should be empty when deployment is disabled"
           else
             echo "✓ deployment_status is empty (expected)"
           fi
-          
+
           echo ""
           echo "✓ Deployment outputs validation completed"
 
@@ -140,16 +140,16 @@ jobs:
       - name: Verify deployment validation logic
         run: |
           echo "Testing deployment input validation..."
-          
+
           # Check that validation step exists in workflow
           if ! grep -q "Validate deployment inputs" .github/workflows/pr-build-reusable.yml; then
             echo "❌ Missing deployment input validation"
             exit 1
           fi
           echo "✓ Deployment validation present"
-          
+
           # Check for required deployment checks
-          REQUIRED_CHECKS=("worker_name" "zone" "custom_domain" "slug" "cloudflare_api_token" "cloudflare_account_id")
+          REQUIRED_CHECKS=("worker_name" "zone" "custom_domain" "cloudflare_api_token" "cloudflare_account_id")
           for check in "${REQUIRED_CHECKS[@]}"; do
             if ! grep -q "$check" .github/workflows/pr-build-reusable.yml; then
               echo "❌ Missing validation for: $check"
@@ -157,7 +157,7 @@ jobs:
             fi
           done
           echo "✓ All required deployment input validations present"
-          
+
           echo ""
           echo "✓ Deployment validation logic verified"
 
@@ -171,27 +171,27 @@ jobs:
       - name: Verify SSL certificate action integration
         run: |
           echo "Verifying SSL certificate integration..."
-          
+
           # Check for ensure-wildcard-certificate action
           if ! grep -q "ensure-wildcard-certificate" .github/workflows/pr-build-reusable.yml; then
             echo "❌ Missing ensure-wildcard-certificate action"
             exit 1
           fi
           echo "✓ ensure-wildcard-certificate action present"
-          
+
           # Check certificate outputs
           if ! grep -q "certificate_id" .github/workflows/pr-build-reusable.yml; then
             echo "❌ Missing certificate_id output"
             exit 1
           fi
           echo "✓ certificate_id output present"
-          
+
           if ! grep -q "certificate_status" .github/workflows/pr-build-reusable.yml; then
             echo "❌ Missing certificate_status output"
             exit 1
           fi
           echo "✓ certificate_status output present"
-          
+
           echo ""
           echo "✓ SSL certificate integration verified"
 
@@ -205,34 +205,34 @@ jobs:
       - name: Verify worker deployment integration
         run: |
           echo "Verifying worker deployment integration..."
-          
+
           # Check for deploy-cloudflare-from-artifact action
           if ! grep -q "deploy-cloudflare-from-artifact" .github/workflows/pr-build-reusable.yml; then
             echo "❌ Missing deploy-cloudflare-from-artifact action"
             exit 1
           fi
           echo "✓ deploy-cloudflare-from-artifact action present"
-          
+
           # Check deployment outputs
           if ! grep -q "worker_url" .github/workflows/pr-build-reusable.yml; then
             echo "❌ Missing worker_url output"
             exit 1
           fi
           echo "✓ worker_url output present"
-          
+
           if ! grep -q "deployment_status" .github/workflows/pr-build-reusable.yml; then
             echo "❌ Missing deployment_status output"
             exit 1
           fi
           echo "✓ deployment_status output present"
-          
+
           # Check that deployment uses dev environment
           if ! grep -q "environment: dev" .github/workflows/pr-build-reusable.yml; then
             echo "❌ Missing dev environment configuration"
             exit 1
           fi
           echo "✓ Dev environment configured"
-          
+
           echo ""
           echo "✓ Worker deployment integration verified"
 
@@ -246,20 +246,20 @@ jobs:
       - name: Verify conditional deployment
         run: |
           echo "Verifying conditional deployment logic..."
-          
+
           # Check for conditional job execution
           if ! grep -q "if: inputs.deploy_to_dev == true" .github/workflows/pr-build-reusable.yml; then
             echo "❌ Missing conditional deployment logic"
             exit 1
           fi
           echo "✓ Conditional deployment logic present"
-          
+
           # Check that deploy job depends on build job
           if ! grep -q "needs: build" .github/workflows/pr-build-reusable.yml; then
             echo "❌ Deploy job should depend on build job"
             exit 1
           fi
           echo "✓ Job dependency correctly configured"
-          
+
           echo ""
           echo "✓ Conditional deployment logic verified"

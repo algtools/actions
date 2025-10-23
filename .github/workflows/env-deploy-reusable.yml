@@ -1,4 +1,4 @@
-name: 'Environment Deploy - Reusable Workflow'
+name: "Environment Deploy - Reusable Workflow"
 
 on:
   workflow_call:
@@ -8,92 +8,88 @@ on:
         required: true
         type: string
       wrangler_config:
-        description: 'Path to wrangler.toml configuration file (relative to artifact root)'
+        description: "Path to wrangler.toml configuration file (relative to artifact root)"
         required: true
         type: string
       zone:
-        description: 'Cloudflare zone ID for the domain'
+        description: "Cloudflare zone ID for the domain"
         required: true
         type: string
       worker_name:
-        description: 'Name of the Cloudflare Worker to deploy'
+        description: "Name of the Cloudflare Worker to deploy"
         required: true
         type: string
       artifact_name:
-        description: 'Name of the artifact containing the built worker code'
+        description: "Name of the artifact containing the built worker code"
         required: true
         type: string
       custom_domain:
-        description: 'Custom domain for wildcard certificate (e.g., example.com for *.example.com)'
-        required: true
-        type: string
-      slug:
-        description: 'Project or application slug identifier for certificate management'
+        description: "Domain for wildcard certificate (e.g., example.com for *.example.com)"
         required: true
         type: string
       wrangler_version:
         description: 'Version of Wrangler to use (e.g., "3.78.0" or "latest")'
         required: false
         type: string
-        default: 'latest'
+        default: "latest"
       download_path:
-        description: 'Directory path where the artifact will be downloaded'
+        description: "Directory path where the artifact will be downloaded"
         required: false
         type: string
-        default: './worker-artifact'
+        default: "./worker-artifact"
       max_wait_seconds:
-        description: 'Maximum time to wait for certificate activation (in seconds)'
+        description: "Maximum time to wait for certificate activation (in seconds)"
         required: false
         type: number
         default: 300
       poll_interval_seconds:
-        description: 'Interval between certificate status checks (in seconds)'
+        description: "Interval between certificate status checks (in seconds)"
         required: false
         type: number
         default: 10
       sentry_release:
-        description: 'Enable Sentry release tracking (true/false). Requires sentry_auth_token, sentry_org, and sentry_project.'
+        description: "Enable Sentry release tracking (true/false). Requires sentry_auth_token, sentry_org, and sentry_project."
         required: false
         type: boolean
         default: false
       sentry_org:
-        description: 'Sentry organization slug (required if sentry_release is true)'
+        description: "Sentry organization slug (required if sentry_release is true)"
         required: false
         type: string
-        default: ''
+        default: ""
       sentry_project:
-        description: 'Sentry project slug (required if sentry_release is true)'
+        description: "Sentry project slug (required if sentry_release is true)"
         required: false
         type: string
-        default: ''
+        default: ""
     secrets:
       cloudflare_api_token:
-        description: 'Cloudflare API token with Workers deployment and SSL certificate permissions'
+        description: "Cloudflare API token with Workers deployment and SSL certificate permissions"
         required: true
       cloudflare_account_id:
-        description: 'Cloudflare account ID'
+        description: "Cloudflare account ID"
         required: true
       sentry_auth_token:
-        description: 'Sentry authentication token (required if sentry_release is true)'
+        description: "Sentry authentication token (required if sentry_release is true)"
         required: false
     outputs:
       worker_url:
-        description: 'URL of the deployed Cloudflare Worker'
+        description: "URL of the deployed Cloudflare Worker"
         value: ${{ jobs.deploy.outputs.worker_url }}
       deployment_status:
-        description: 'Status of the deployment (success or failure)'
+        description: "Status of the deployment (success or failure)"
         value: ${{ jobs.deploy.outputs.deployment_status }}
       worker_version:
-        description: 'Version identifier of the deployed worker'
+        description: "Version identifier of the deployed worker"
         value: ${{ jobs.deploy.outputs.worker_version }}
       certificate_id:
-        description: 'ID of the wildcard SSL certificate'
+        description: "ID of the wildcard SSL certificate"
         value: ${{ jobs.deploy.outputs.certificate_id }}
       certificate_status:
-        description: 'Status of the SSL certificate'
+        description: "Status of the SSL certificate"
         value: ${{ jobs.deploy.outputs.certificate_status }}
       certificate_created:
-        description: 'Whether a new certificate was created (true/false)'
+        description: "Whether a new certificate was created (true/false)"
         value: ${{ jobs.deploy.outputs.certificate_created }}
 
 permissions:
@@ -112,12 +108,12 @@ jobs:
       certificate_id: ${{ steps.ensure-cert.outputs.certificate_id }}
       certificate_status: ${{ steps.ensure-cert.outputs.certificate_status }}
       certificate_created: ${{ steps.ensure-cert.outputs.certificate_created }}
-    
+
     steps:
       - name: Validate inputs
         run: |
           echo "::group::Validating workflow inputs"
-          
+
           # Validate required inputs
           if [ -z "${{ inputs.environment }}" ]; then
             echo "::error::environment input is required"
@@ -143,11 +139,7 @@ jobs:
             echo "::error::custom_domain input is required"
             exit 1
           fi
-          if [ -z "${{ inputs.slug }}" ]; then
-            echo "::error::slug input is required"
-            exit 1
-          fi
-          
+
           # Validate Sentry inputs if enabled
           if [ "${{ inputs.sentry_release }}" = "true" ]; then
             if [ -z "${{ inputs.sentry_org }}" ]; then
@@ -163,33 +155,31 @@ jobs:
               exit 1
             fi
           fi
-          
+
           echo "✓ All required inputs validated successfully"
           echo ""
           echo "Deployment Configuration:"
           echo "  Environment: ${{ inputs.environment }}"
           echo "  Worker: ${{ inputs.worker_name }}"
           echo "  Zone ID: $(echo "${{ inputs.zone }}" | head -c 8)***"
-          echo "  Custom Domain: ${{ inputs.custom_domain }}"
-          echo "  Slug: ${{ inputs.slug }}"
+          echo "  Domain: ${{ inputs.custom_domain }}"
           echo "  Artifact: ${{ inputs.artifact_name }}"
           echo "  Wrangler Config: ${{ inputs.wrangler_config }}"
           echo "  Wrangler Version: ${{ inputs.wrangler_version }}"
           echo "  Sentry Release: ${{ inputs.sentry_release }}"
           echo "::endgroup::"
-      
+
       - name: Ensure wildcard certificate
         id: ensure-cert
         uses: algtools/actions/.github/actions/ensure-wildcard-certificate@main
         with:
-          slug: ${{ inputs.slug }}
+          domain: ${{ inputs.custom_domain }}
           current_zone: ${{ inputs.zone }}
-          custom_domain: ${{ inputs.custom_domain }}
           cloudflare_api_token: ${{ secrets.cloudflare_api_token }}
           cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
           max_wait_seconds: ${{ inputs.max_wait_seconds }}
           poll_interval_seconds: ${{ inputs.poll_interval_seconds }}
-      
+
       - name: Deploy Cloudflare Worker from artifact
         id: deploy-worker
         uses: algtools/actions/.github/actions/deploy-cloudflare-from-artifact@main
@@ -202,8 +192,8 @@ jobs:
           download_path: ${{ inputs.download_path }}
           wrangler_version: ${{ inputs.wrangler_version }}
           deploy_environment: ${{ inputs.environment }}
-          dry_run: 'false'
-      
+          dry_run: "false"
+
       - name: Create Sentry release
         if: inputs.sentry_release == true
         env:
@@ -212,21 +202,21 @@ jobs:
           SENTRY_PROJECT: ${{ inputs.sentry_project }}
         run: |
           echo "::group::Creating Sentry release"
-          
+
           # Install Sentry CLI
           echo "Installing Sentry CLI..."
           curl -sL https://sentry.io/get-cli/ | bash
-          
+
           # Create release version (using git SHA or timestamp)
           RELEASE_VERSION="${{ github.sha }}"
           echo "Release version: $RELEASE_VERSION"
-          
+
           # Create Sentry release
           echo "Creating Sentry release..."
           sentry-cli releases new "$RELEASE_VERSION" \
             --org "$SENTRY_ORG" \
             --project "$SENTRY_PROJECT"
-          
+
           # Associate commits with the release (if in a git repo)
           if [ -d ".git" ]; then
             echo "Associating commits with release..."
@@ -234,27 +224,27 @@ jobs:
               --org "$SENTRY_ORG" \
               --project "$SENTRY_PROJECT" || echo "⚠️  Could not associate commits"
           fi
-          
+
           # Finalize the release
           echo "Finalizing Sentry release..."
           sentry-cli releases finalize "$RELEASE_VERSION" \
             --org "$SENTRY_ORG" \
             --project "$SENTRY_PROJECT"
-          
+
           # Create deployment
           echo "Creating Sentry deployment..."
           sentry-cli releases deploys "$RELEASE_VERSION" new \
             --env "${{ inputs.environment }}" \
             --org "$SENTRY_ORG" \
             --project "$SENTRY_PROJECT"
-          
+
           echo "✓ Sentry release created successfully"
           echo "  Version: $RELEASE_VERSION"
           echo "  Environment: ${{ inputs.environment }}"
           echo "  Organization: $SENTRY_ORG"
           echo "  Project: $SENTRY_PROJECT"
           echo "::endgroup::"
-      
+
       # PR Comment Integration (ALG-15)
       # Automatically posts deployment status to associated PRs
       # Skips gracefully if no PR is associated (e.g., direct branch pushes)
@@ -263,22 +253,22 @@ jobs:
         run: |
           # Check if this workflow run is associated with a pull request
           PR_NUMBER=""
-          
+
           # Try to get PR number from various GitHub context sources
           if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.event_name }}" = "pull_request_target" ]; then
             PR_NUMBER="${{ github.event.pull_request.number }}"
           elif [ -n "${{ github.event.issue.number }}" ]; then
             PR_NUMBER="${{ github.event.issue.number }}"
           fi
-          
+
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-          
+
           if [ -n "$PR_NUMBER" ]; then
             echo "✓ Detected PR #$PR_NUMBER"
           else
             echo "ℹ No PR associated with this workflow run"
           fi
-      
+
       # Post deployment summary comment to PR (only if PR exists)
       # Uses dedupe_key to update existing comments instead of creating duplicates
       - name: Comment on PR
@@ -286,23 +276,23 @@ jobs:
         uses: algtools/actions/.github/actions/comment-pr@main
         with:
           pr_number: ${{ steps.pr.outputs.pr_number }}
-          dedupe_key: 'env-deploy-${{ inputs.environment }}'
+          dedupe_key: "env-deploy-${{ inputs.environment }}"
           message: |
             ✅ **Deployment completed successfully**
-            
+
             **Environment:** `${{ inputs.environment }}`
             🌐 [Visit App](${{ steps.deploy-worker.outputs.worker_url }})
             🕒 `${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}`
             🧾 **Release:** `${{ inputs.sentry_release == true && github.sha || steps.deploy-worker.outputs.worker_version }}`
-            
+
             <details>
             <summary>Deployment Details</summary>
-            
+
             ### Worker Details
             - **Name**: `${{ inputs.worker_name }}`
             - **Version**: `${{ steps.deploy-worker.outputs.worker_version }}`
             - **Artifact**: `${{ inputs.artifact_name }}`
-            
+
             ### SSL Certificate
             - **Domain**: `*.${{ inputs.custom_domain }}`
             - **Certificate ID**: `${{ steps.ensure-cert.outputs.certificate_id }}`
@@ -310,7 +300,7 @@ jobs:
             - **Created New**: ${{ steps.ensure-cert.outputs.certificate_created }}
             ${{ inputs.sentry_release == true && format('\n### Sentry Release\n- **Organization**: `{0}`\n- **Project**: `{1}`\n- **Version**: `{2}`', inputs.sentry_org, inputs.sentry_project, github.sha) || '' }}
             </details>
-      
+
       - name: Deployment summary
         run: |
           {
@@ -334,9 +324,8 @@ jobs:
             echo ""
             echo "### Infrastructure"
             echo "- **Zone ID**: \`$(echo "${{ inputs.zone }}" | head -c 8)***\`"
-            echo "- **Slug**: \`${{ inputs.slug }}\`"
             echo ""
-            
+
             if [ "${{ inputs.sentry_release }}" = "true" ]; then
               echo "### Sentry Release"
               echo "- **Enabled**: ✅ Yes"
@@ -345,7 +334,7 @@ jobs:
               echo "- **Version**: \`${{ github.sha }}\`"
               echo ""
             fi
-            
+
             echo "### Security"
             echo "- ✅ Credentials protected and redacted from logs"
             echo "- ✅ Wildcard SSL certificate active"

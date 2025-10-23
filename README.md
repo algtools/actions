@@ -92,7 +92,6 @@ jobs:
       wrangler_config: "wrangler.toml"
       zone: "${{ vars.CLOUDFLARE_ZONE_ID }}"
       custom_domain: "dev.example.com"
-      slug: "my-app"
     secrets:
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -115,7 +114,6 @@ jobs:
 - `wrangler_config` (optional): Path to wrangler.toml (default: "wrangler.toml")
 - `zone` (optional): Cloudflare zone ID (required if deploy_to_dev is true)
 - `custom_domain` (optional): Domain for wildcard SSL (required if deploy_to_dev is true)
-- `slug` (optional): Project slug for certificate management (required if deploy_to_dev is true)
 - `wrangler_version` (optional): Wrangler version (default: "latest")
 - `max_wait_seconds` (optional): Max wait for certificate activation (default: 300)
 - `poll_interval_seconds` (optional): Certificate status check interval (default: 10)
@@ -165,7 +163,7 @@ jobs:
       build_cmd: "npm run build"
       artifact_name: "production-build"
       artifact_paths: "dist,wrangler.toml"
-  
+
   deploy:
     needs: build
     uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
@@ -192,7 +190,6 @@ jobs:
 - `wrangler_config` (required): Path to wrangler.toml (relative to artifact root)
 - `zone` (required): Cloudflare zone ID for the domain
 - `custom_domain` (required): Domain for wildcard certificate (e.g., "example.com" for "*.example.com")
-- `slug` (required): Project/application identifier for certificate management
 - `artifact_name` (required): Name of artifact containing built worker code
 
 **Optional Inputs:**
@@ -248,7 +245,7 @@ jobs:
       build_cmd: "npm run build"
       artifact_name: "app-build-${{ github.sha }}"
       artifact_paths: "dist,wrangler.toml"
-  
+
   deploy-dev:
     needs: build
     uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
@@ -258,12 +255,11 @@ jobs:
       wrangler_config: "wrangler.toml"
       zone: "${{ vars.CLOUDFLARE_ZONE_ID }}"
       custom_domain: "dev.example.com"
-      slug: "my-app-dev"
       artifact_name: "app-build-${{ github.sha }}"
     secrets:
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-  
+
   deploy-production:
     needs: deploy-dev
     uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
@@ -316,18 +312,17 @@ jobs:
       artifact_paths: "dist,wrangler.toml"
       working_directory: "."
       output_dir: "dist"
-      
+
       # Deployment configuration
       worker_name: "my-app-pr-${{ github.event.pull_request.number }}"
       wrangler_config: "wrangler.toml"
       zone: "${{ vars.CLOUDFLARE_ZONE_ID }}"
       custom_domain: "dev.example.com"
-      slug: "my-app"
-      
+
       # Preview URL configuration
       app_domain: "${{ vars.APP_DOMAIN }}"  # e.g., "my-app"
       dev_zone: "${{ vars.DEV_ZONE }}"      # e.g., "dev.example.com"
-      
+
       # Optional: Enable Chromatic
       enable_chromatic: true
       chromatic_project_token: "${{ secrets.CHROMATIC_PROJECT_TOKEN }}"
@@ -344,7 +339,6 @@ jobs:
 - `worker_name` (required): Cloudflare Worker name for preview
 - `zone` (required): Cloudflare zone ID
 - `custom_domain` (required): Domain for wildcard SSL certificate
-- `slug` (required): Project/application slug identifier
 - `app_domain` (required): Application domain prefix for preview URL
 - `dev_zone` (required): Development zone suffix for preview URLs
 
