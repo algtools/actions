@@ -1,4 +1,4 @@
-name: 'PR Build - Reusable Workflow'
+name: "PR Build - Reusable Workflow"
 
 on:
   workflow_call:
@@ -8,112 +8,107 @@ on:
         required: true
         type: string
       artifact_name:
-        description: 'Name of the artifact to upload'
+        description: "Name of the artifact to upload"
         required: true
         type: string
       artifact_paths:
-        description: 'Comma-separated list of file paths or directories to upload as artifacts'
+        description: "Comma-separated list of file paths or directories to upload as artifacts"
         required: true
         type: string
       node_version:
-        description: 'Node.js version to install. If not provided, reads from .nvmrc file.'
+        description: "Node.js version to install. If not provided, reads from .nvmrc file."
         required: false
         type: string
-        default: ''
+        default: ""
       working_directory:
-        description: 'Working directory for build commands'
+        description: "Working directory for build commands"
         required: false
         type: string
-        default: '.'
+        default: "."
       output_dir:
         description: 'Directory where build output/artifacts will be produced (e.g., "dist", "build")'
         required: false
         type: string
-        default: 'dist'
+        default: "dist"
       retention_days:
-        description: 'Number of days to retain the artifact (1-90 days, default is repository/org setting)'
+        description: "Number of days to retain the artifact (1-90 days, default is repository/org setting)"
         required: false
         type: number
         default: 30
       deploy_to_dev:
-        description: 'Enable deployment to Cloudflare Workers dev environment with SSL certificate'
+        description: "Enable deployment to Cloudflare Workers dev environment with SSL certificate"
         required: false
         type: boolean
         default: false
       worker_name:
-        description: 'Name of the Cloudflare Worker for dev deployment (required if deploy_to_dev is true)'
+        description: "Name of the Cloudflare Worker for dev deployment (required if deploy_to_dev is true)"
         required: false
         type: string
-        default: ''
+        default: ""
       wrangler_config:
-        description: 'Path to wrangler.toml configuration file relative to artifact root (required if deploy_to_dev is true)'
+        description: "Path to wrangler.toml configuration file relative to artifact root (required if deploy_to_dev is true)"
         required: false
         type: string
-        default: 'wrangler.toml'
+        default: "wrangler.toml"
       zone:
-        description: 'Cloudflare zone ID for the domain (required if deploy_to_dev is true)'
+        description: "Cloudflare zone ID for the domain (required if deploy_to_dev is true)"
         required: false
         type: string
-        default: ''
+        default: ""
       custom_domain:
-        description: 'Custom domain for wildcard certificate e.g., dev.example.com for *.dev.example.com (required if deploy_to_dev is true)'
+        description: "Domain for wildcard certificate e.g., dev.example.com for *.dev.example.com (required if deploy_to_dev is true)"
         required: false
         type: string
-        default: ''
-      slug:
-        description: 'Project/application slug identifier for certificate management (required if deploy_to_dev is true)'
-        required: false
-        type: string
-        default: ''
+        default: ""
       wrangler_version:
-        description: 'Version of Wrangler to use for deployment (default: latest)'
+        description: "Version of Wrangler to use for deployment (default: latest)"
         required: false
         type: string
-        default: 'latest'
+        default: "latest"
       max_wait_seconds:
-        description: 'Maximum time to wait for certificate activation in seconds (default: 300)'
+        description: "Maximum time to wait for certificate activation in seconds (default: 300)"
         required: false
         type: number
         default: 300
       poll_interval_seconds:
-        description: 'Interval between certificate status checks in seconds (default: 10)'
+        description: "Interval between certificate status checks in seconds (default: 10)"
         required: false
         type: number
         default: 10
     secrets:
       cloudflare_api_token:
-        description: 'Cloudflare API token with Workers deployment and SSL certificate permissions (required if deploy_to_dev is true)'
+        description: "Cloudflare API token with Workers deployment and SSL certificate permissions (required if deploy_to_dev is true)"
         required: false
       cloudflare_account_id:
-        description: 'Cloudflare account ID (required if deploy_to_dev is true)'
+        description: "Cloudflare account ID (required if deploy_to_dev is true)"
         required: false
     outputs:
       artifact_id:
-        description: 'GitHub artifact ID of the uploaded artifact'
+        description: "GitHub artifact ID of the uploaded artifact"
         value: ${{ jobs.build.outputs.artifact_id }}
       artifact_url:
-        description: 'URL to download the artifact'
+        description: "URL to download the artifact"
         value: ${{ jobs.build.outputs.artifact_url }}
       total_files:
-        description: 'Total number of files uploaded'
+        description: "Total number of files uploaded"
         value: ${{ jobs.build.outputs.total_files }}
       total_size:
-        description: 'Total size of uploaded files in bytes'
+        description: "Total size of uploaded files in bytes"
         value: ${{ jobs.build.outputs.total_size }}
       build_status:
-        description: 'Status of the build (success or failure)'
+        description: "Status of the build (success or failure)"
         value: ${{ jobs.build.outputs.build_status }}
       worker_url:
-        description: 'URL of the deployed Cloudflare Worker (only if deploy_to_dev is true)'
+        description: "URL of the deployed Cloudflare Worker (only if deploy_to_dev is true)"
         value: ${{ jobs.deploy.outputs.worker_url }}
       deployment_status:
-        description: 'Status of the deployment (only if deploy_to_dev is true)'
+        description: "Status of the deployment (only if deploy_to_dev is true)"
         value: ${{ jobs.deploy.outputs.deployment_status }}
       certificate_id:
-        description: 'ID of the wildcard SSL certificate (only if deploy_to_dev is true)'
+        description: "ID of the wildcard SSL certificate (only if deploy_to_dev is true)"
         value: ${{ jobs.deploy.outputs.certificate_id }}
       certificate_status:
-        description: 'Status of the SSL certificate (only if deploy_to_dev is true)'
+        description: "Status of the SSL certificate (only if deploy_to_dev is true)"
         value: ${{ jobs.deploy.outputs.certificate_status }}
 
 permissions:
@@ -129,11 +124,11 @@ jobs:
       total_files: ${{ steps.upload.outputs.total_files }}
       total_size: ${{ steps.upload.outputs.total_size }}
       build_status: ${{ steps.build.outputs.build_status }}
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js securely
         id: setup
         uses: algtools/actions/.github/actions/setup-node@main
@@ -141,7 +136,7 @@ jobs:
           node-version: ${{ inputs.node_version }}
           working-directory: ${{ inputs.working_directory }}
           cache-dependency-path: ${{ inputs.working_directory }}/package-lock.json
-      
+
       - name: Build without secrets
         id: build
         uses: algtools/actions/.github/actions/build-no-secrets@main
@@ -149,7 +144,7 @@ jobs:
           build_cmd: ${{ inputs.build_cmd }}
           working_dir: ${{ inputs.working_directory }}
           output_dir: ${{ inputs.output_dir }}
-      
+
       - name: Upload artifacts
         id: upload
         uses: algtools/actions/.github/actions/upload-artifacts@main
@@ -157,7 +152,7 @@ jobs:
           artifact_name: ${{ inputs.artifact_name }}
           artifact_paths: ${{ inputs.artifact_paths }}
           retention_days: ${{ inputs.retention_days }}
-      
+
       - name: Summary
         run: |
           {
@@ -189,12 +184,12 @@ jobs:
       deployment_status: ${{ steps.deploy-worker.outputs.deployment_status }}
       certificate_id: ${{ steps.ensure-cert.outputs.certificate_id }}
       certificate_status: ${{ steps.ensure-cert.outputs.certificate_status }}
-    
+
     steps:
       - name: Validate deployment inputs
         run: |
           echo "::group::Validating deployment configuration"
-          
+
           # Validate required inputs when deploy_to_dev is enabled
           if [ -z "${{ inputs.worker_name }}" ]; then
             echo "::error::worker_name is required when deploy_to_dev is enabled"
@@ -208,10 +203,6 @@ jobs:
             echo "::error::custom_domain is required when deploy_to_dev is enabled"
             exit 1
           fi
-          if [ -z "${{ inputs.slug }}" ]; then
-            echo "::error::slug is required when deploy_to_dev is enabled"
-            exit 1
-          fi
           if [ -z "${{ secrets.cloudflare_api_token }}" ]; then
             echo "::error::cloudflare_api_token secret is required when deploy_to_dev is enabled"
             exit 1
@@ -220,29 +211,27 @@ jobs:
             echo "::error::cloudflare_account_id secret is required when deploy_to_dev is enabled"
             exit 1
           fi
-          
+
           echo "✓ All required deployment inputs validated"
           echo ""
           echo "Deployment Configuration:"
           echo "  Worker: ${{ inputs.worker_name }}"
           echo "  Domain: *.${{ inputs.custom_domain }}"
           echo "  Zone: $(echo "${{ inputs.zone }}" | head -c 8)***"
-          echo "  Slug: ${{ inputs.slug }}"
           echo "  Artifact: ${{ inputs.artifact_name }}"
           echo "::endgroup::"
-      
+
       - name: Ensure wildcard SSL certificate
         id: ensure-cert
         uses: algtools/actions/.github/actions/ensure-wildcard-certificate@main
         with:
-          slug: ${{ inputs.slug }}
+          domain: ${{ inputs.custom_domain }}
           current_zone: ${{ inputs.zone }}
-          custom_domain: ${{ inputs.custom_domain }}
           cloudflare_api_token: ${{ secrets.cloudflare_api_token }}
           cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
           max_wait_seconds: ${{ inputs.max_wait_seconds }}
           poll_interval_seconds: ${{ inputs.poll_interval_seconds }}
-      
+
       - name: Deploy to Cloudflare Workers
         id: deploy-worker
         uses: algtools/actions/.github/actions/deploy-cloudflare-from-artifact@main
@@ -253,9 +242,9 @@ jobs:
           cloudflare_api_token: ${{ secrets.cloudflare_api_token }}
           cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
           wrangler_version: ${{ inputs.wrangler_version }}
-          deploy_environment: 'dev'
-          dry_run: 'false'
-      
+          deploy_environment: "dev"
+          dry_run: "false"
+
       - name: Deployment summary
         run: |
           {

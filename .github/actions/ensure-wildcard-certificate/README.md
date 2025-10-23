@@ -9,7 +9,7 @@ A composite GitHub Action that ensures a wildcard SSL certificate exists in Clou
 - ⏱️ **Status Monitoring**: Waits until certificate status is ACTIVE
 - 🔁 **Idempotent**: Safe to run multiple times - won't create duplicates
 - 🛡️ **Secure Logging**: Automatically redacts sensitive data from all logs
-- 📊 **Detailed Output**: Provides certificate ID, status, and creation information
+- 🎯 **Simplified Interface**: Single domain parameter for easy configuration
 
 ## Usage
 
@@ -19,12 +19,101 @@ A composite GitHub Action that ensures a wildcard SSL certificate exists in Clou
 - name: Ensure wildcard certificate exists
   uses: algtools/actions/.github/actions/ensure-wildcard-certificate@v1
   with:
-    slug: 'my-project'
+    domain: 'example.com'
     current_zone: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-    custom_domain: 'example.com'
     cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 ```
+
+### Subdomain Wildcard Scenarios
+
+The action supports creating wildcard certificates for subdomains, which is perfect for multi-tenant applications, environment-based deployments, and project-specific subdomains.
+
+#### Basic Subdomain Wildcard
+
+```yaml
+- name: Ensure subdomain wildcard certificate
+  uses: algtools/actions/.github/actions/ensure-wildcard-certificate@v1
+  with:
+    domain: 'template.algenium.dev'
+    current_zone: ${{ secrets.CLOUDFLARE_ZONE_ID_ALGENIUM_DEV }}
+    cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+**Result**: Certificate for `*.template.algenium.dev` covering:
+- `template.algenium.dev`
+- `bff-pr-1.template.algenium.dev`
+- `bff-pr-2.template.algenium.dev`
+- `api.template.algenium.dev`
+- Any other subdomain under `template.algenium.dev`
+
+#### Multi-Level Subdomain Wildcard
+
+```yaml
+- name: Ensure multi-level subdomain wildcard
+  uses: algtools/actions/.github/actions/ensure-wildcard-certificate@v1
+  with:
+    domain: 'app.staging.example.com'
+    current_zone: ${{ secrets.CLOUDFLARE_ZONE_ID_EXAMPLE_COM }}
+    cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+**Result**: Certificate for `*.app.staging.example.com` covering:
+- `app.staging.example.com`
+- `api.app.staging.example.com`
+- `web.app.staging.example.com`
+- `admin.app.staging.example.com`
+
+#### Real-World Use Cases
+
+**1. Multi-tenant SaaS Platform**
+```yaml
+# Each customer gets their own subdomain
+domain: 'customer1.myapp.com'
+# Zone ID: ZONE_FOR_MYAPP_COM
+# Certificate: *.customer1.myapp.com
+```
+
+**2. Environment-based Deployments**
+```yaml
+# Different environments on subdomains
+domain: 'staging.myapp.com'
+# Zone ID: ZONE_FOR_MYAPP_COM
+# Certificate: *.staging.myapp.com
+```
+
+**3. Geographic Distribution**
+```yaml
+# Regional subdomains
+domain: 'us-east.myapp.com'
+# Zone ID: ZONE_FOR_MYAPP_COM
+# Certificate: *.us-east.myapp.com
+```
+
+**4. Project-based Subdomains**
+```yaml
+# Different projects on subdomains
+domain: 'template.algenium.dev'
+# Zone ID: ZONE_FOR_ALGENIUM_DEV
+# Certificate: *.template.algenium.dev
+```
+
+#### Key Points for Subdomain Wildcards
+
+- **Zone ID**: Must be for the **parent domain** (e.g., `algenium.dev`), not the subdomain
+- **Domain Parameter**: Specify the **full subdomain** (e.g., `template.algenium.dev`)
+- **Validation**: Cloudflare automatically validates that the subdomain belongs to the parent zone
+- **Coverage**: Certificate covers both the base subdomain and all its wildcard subdomains
+
+#### Zone-Subdomain Relationship
+
+| Domain | Zone ID For | Certificate Covers |
+|--------|-------------|-------------------|
+| `template.algenium.dev` | `algenium.dev` | `*.template.algenium.dev` |
+| `api.janovix.ai` | `janovix.ai` | `*.api.janovix.ai` |
+| `app.staging.example.com` | `example.com` | `*.app.staging.example.com` |
 
 ### Complete Deployment Workflow
 
@@ -49,9 +138,8 @@ jobs:
         id: cert
         uses: algtools/actions/.github/actions/ensure-wildcard-certificate@v1
         with:
-          slug: 'my-app'
+          domain: 'myapp.com'
           current_zone: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          custom_domain: 'myapp.com'
           cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -96,9 +184,8 @@ jobs:
         if: github.event.inputs.environment == 'staging'
         uses: algtools/actions/.github/actions/ensure-wildcard-certificate@v1
         with:
-          slug: 'my-app-staging'
+          domain: 'staging.myapp.com'
           current_zone: ${{ secrets.CLOUDFLARE_ZONE_ID_STAGING }}
-          custom_domain: 'staging.myapp.com'
           cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -106,9 +193,8 @@ jobs:
         if: github.event.inputs.environment == 'production'
         uses: algtools/actions/.github/actions/ensure-wildcard-certificate@v1
         with:
-          slug: 'my-app-production'
+          domain: 'myapp.com'
           current_zone: ${{ secrets.CLOUDFLARE_ZONE_ID_PRODUCTION }}
-          custom_domain: 'myapp.com'
           cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           max_wait_seconds: '600'
@@ -120,9 +206,8 @@ jobs:
 - name: Ensure certificate with custom timeouts
   uses: algtools/actions/.github/actions/ensure-wildcard-certificate@v1
   with:
-    slug: 'my-project'
+    domain: 'example.com'
     current_zone: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-    custom_domain: 'example.com'
     cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     max_wait_seconds: '600'  # Wait up to 10 minutes
@@ -133,9 +218,8 @@ jobs:
 
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
-| `slug` | Project or application slug identifier | Yes | - |
+| `domain` | Domain for the wildcard certificate (e.g., `example.com` for `*.example.com`) | Yes | - |
 | `current_zone` | Cloudflare zone ID for the domain | Yes | - |
-| `custom_domain` | Custom domain for the wildcard certificate (e.g., `example.com` for `*.example.com`) | Yes | - |
 | `cloudflare_api_token` | Cloudflare API token with SSL/TLS certificates permissions | Yes | - |
 | `cloudflare_account_id` | Cloudflare account ID | Yes | - |
 | `max_wait_seconds` | Maximum time to wait for certificate activation (in seconds) | No | `300` |
@@ -143,14 +227,14 @@ jobs:
 
 ### Input Details
 
-#### `slug`
+#### `domain`
 
-A unique identifier for your project or application. This is used for tracking and logging purposes.
+The base domain for the wildcard certificate. The action will create a certificate for both `example.com` and `*.example.com`.
 
 **Examples:**
-- `'my-api'`
-- `'user-portal'`
-- `'payment-service'`
+- `'example.com'` → Creates cert for `example.com` and `*.example.com`
+- `'api.myapp.com'` → Creates cert for `api.myapp.com` and `*.api.myapp.com`
+- `'staging.example.com'` → Creates cert for `staging.example.com` and `*.staging.example.com`
 
 #### `current_zone`
 
@@ -162,15 +246,6 @@ The Cloudflare zone ID for your domain. This identifies which DNS zone the certi
 3. Find Zone ID in the right sidebar under "API" section
 
 **Example:** `'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6'`
-
-#### `custom_domain`
-
-The base domain for the wildcard certificate. The action will create a certificate for both `example.com` and `*.example.com`.
-
-**Examples:**
-- `'example.com'` → Creates cert for `example.com` and `*.example.com`
-- `'api.myapp.com'` → Creates cert for `api.myapp.com` and `*.api.myapp.com`
-- `'staging.example.com'` → Creates cert for `staging.example.com` and `*.staging.example.com`
 
 #### `cloudflare_api_token`
 
@@ -230,9 +305,8 @@ How often (in seconds) to check the certificate status while waiting for activat
   id: cert
   uses: algtools/actions/.github/actions/ensure-wildcard-certificate@v1
   with:
-    slug: 'my-app'
+    domain: 'example.com'
     current_zone: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-    custom_domain: 'example.com'
     cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -240,7 +314,7 @@ How often (in seconds) to check the certificate status while waiting for activat
   run: |
     echo "Certificate ID: ${{ steps.cert.outputs.certificate_id }}"
     echo "Status: ${{ steps.cert.outputs.certificate_status }}"
-    
+
     if [ "${{ steps.cert.outputs.certificate_created }}" == "true" ]; then
       echo "🎉 New certificate was created!"
     else
@@ -336,7 +410,6 @@ Certificate Details:
   Certificate ID: abc123def456
   Status: active
   Created New: true
-  Slug: my-project
 
 Zone Details:
   Zone ID: a1b2c3d4***
@@ -375,9 +448,8 @@ jobs:
       - name: Provision certificate
         uses: algtools/actions/.github/actions/ensure-wildcard-certificate@v1
         with:
-          slug: ${{ github.event.inputs.app_name }}
+          domain: ${{ github.event.inputs.domain }}
           current_zone: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          custom_domain: ${{ github.event.inputs.domain }}
           cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -405,9 +477,8 @@ jobs:
       - name: Verify certificate exists
         uses: algtools/actions/.github/actions/ensure-wildcard-certificate@v1
         with:
-          slug: 'production-app'
+          domain: 'myapp.com'
           current_zone: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          custom_domain: 'myapp.com'
           cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -435,9 +506,8 @@ jobs:
     steps:
       - uses: algtools/actions/.github/actions/ensure-wildcard-certificate@v1
         with:
-          slug: 'app-us-east'
+          domain: 'us.myapp.com'
           current_zone: ${{ secrets.CLOUDFLARE_ZONE_ID_US }}
-          custom_domain: 'us.myapp.com'
           cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -446,9 +516,8 @@ jobs:
     steps:
       - uses: algtools/actions/.github/actions/ensure-wildcard-certificate@v1
         with:
-          slug: 'app-eu-west'
+          domain: 'eu.myapp.com'
           current_zone: ${{ secrets.CLOUDFLARE_ZONE_ID_EU }}
-          custom_domain: 'eu.myapp.com'
           cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 ```
@@ -505,15 +574,15 @@ The action creates **Advanced certificates** with the following properties:
 **Solution:** Ensure the domain exactly matches:
 ```yaml
 # These are different certificates:
-custom_domain: 'example.com'      # Creates *.example.com
-custom_domain: 'www.example.com'  # Creates *.www.example.com
+domain: 'example.com'      # Creates *.example.com
+domain: 'www.example.com'  # Creates *.www.example.com
 ```
 
 ### API Authentication Failed
 
 **Error:** "Failed to query Cloudflare API: Authentication failed"
 
-**Solution:** 
+**Solution:**
 1. Verify API token has correct permissions
 2. Check token hasn't expired
 3. Ensure token is for correct Cloudflare account
@@ -534,9 +603,8 @@ custom_domain: 'www.example.com'  # Creates *.www.example.com
 - name: Debug certificate creation
   uses: algtools/actions/.github/actions/ensure-wildcard-certificate@v1
   with:
-    slug: 'debug-test'
+    domain: 'example.com'
     current_zone: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-    custom_domain: 'example.com'
     cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     max_wait_seconds: '60'  # Shorter timeout for debugging
@@ -568,7 +636,7 @@ custom_domain: 'www.example.com'  # Creates *.www.example.com
 ```yaml
 # Get zone ID from Cloudflare dashboard
 current_zone: ${{ secrets.CLOUDFLARE_ZONE_ID }}  # Must match domain
-custom_domain: 'example.com'  # Must be in this zone
+domain: 'example.com'  # Must be in this zone
 ```
 
 ## Security Best Practices
@@ -619,7 +687,7 @@ jobs:
     steps:
       - uses: algtools/actions/.github/actions/ensure-wildcard-certificate@v1
         with:
-          slug: 'prod-app'
+          domain: 'myapp.com'
           # ... other inputs
 ```
 
@@ -677,7 +745,9 @@ jobs:
   setup-ssl:
     steps:
       - uses: algtools/actions/.github/actions/ensure-wildcard-certificate@v1
-        # Sets up SSL certificate
+        with:
+          domain: 'example.com'
+          # Sets up SSL certificate
 
   deploy:
     needs: setup-ssl
