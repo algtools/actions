@@ -261,7 +261,7 @@ jobs:
             PR_NUMBER="${{ github.event.issue.number }}"
           fi
 
-          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
           if [ -n "$PR_NUMBER" ]; then
             echo "✓ Detected PR #$PR_NUMBER"

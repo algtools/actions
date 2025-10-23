@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - 'cursor/**'
+      - "cursor/**"
   pull_request:
     branches:
       - main
@@ -25,8 +25,8 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          node-version: '20'
-          working-directory: '.github/tests/chromatic-upload'
+          node-version: "20"
+          working-directory: ".github/tests/chromatic-upload"
 
       - name: Build mock Storybook
         run: |
@@ -37,8 +37,8 @@ jobs:
         id: upload
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'storybook-basic-test'
-          artifact_paths: '.github/tests/chromatic-upload/storybook-static'
+          artifact_name: "storybook-basic-test"
+          artifact_paths: ".github/tests/chromatic-upload/storybook-static"
 
       - name: Verify upload
         run: |
@@ -51,8 +51,8 @@ jobs:
         id: chromatic
         uses: ./.github/actions/chromatic-upload-from-artifact
         with:
-          artifact_name: 'storybook-basic-test'
-          project_token: 'mock-chromatic-token-for-testing'
+          artifact_name: "storybook-basic-test"
+          project_token: "mock-chromatic-token-for-testing"
         continue-on-error: true
 
       - name: Verify action structure
@@ -78,8 +78,8 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          node-version: '20'
-          working-directory: '.github/tests/chromatic-upload'
+          node-version: "20"
+          working-directory: ".github/tests/chromatic-upload"
 
       - name: Build mock Storybook
         run: |
@@ -98,8 +98,8 @@ jobs:
         id: upload
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'storybook-zipped-test'
-          artifact_paths: '.github/tests/chromatic-upload/storybook.zip'
+          artifact_name: "storybook-zipped-test"
+          artifact_paths: ".github/tests/chromatic-upload/storybook.zip"
 
       - name: Verify zip upload
         run: |
@@ -111,9 +111,9 @@ jobs:
         id: chromatic
         uses: ./.github/actions/chromatic-upload-from-artifact
         with:
-          artifact_name: 'storybook-zipped-test'
-          project_token: 'mock-chromatic-token-for-testing'
-          storybook_dir: '.out/storybook'
+          artifact_name: "storybook-zipped-test"
+          project_token: "mock-chromatic-token-for-testing"
+          storybook_dir: ".out/storybook"
         continue-on-error: true
 
       - name: Verify zip extraction
@@ -133,8 +133,8 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          node-version: '20'
-          working-directory: '.github/tests/chromatic-upload'
+          node-version: "20"
+          working-directory: ".github/tests/chromatic-upload"
 
       - name: Build mock Storybook
         run: |
@@ -144,17 +144,17 @@ jobs:
       - name: Upload Storybook artifact
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'storybook-custom-dirs-test'
-          artifact_paths: '.github/tests/chromatic-upload/storybook-static'
+          artifact_name: "storybook-custom-dirs-test"
+          artifact_paths: ".github/tests/chromatic-upload/storybook-static"
 
       - name: Upload to Chromatic with custom directories (mock)
         id: chromatic
         uses: ./.github/actions/chromatic-upload-from-artifact
         with:
-          artifact_name: 'storybook-custom-dirs-test'
-          project_token: 'mock-chromatic-token-for-testing'
-          working_dir: '.'
-          storybook_dir: 'custom-storybook-dir'
+          artifact_name: "storybook-custom-dirs-test"
+          project_token: "mock-chromatic-token-for-testing"
+          working_dir: "."
+          storybook_dir: "custom-storybook-dir"
         continue-on-error: true
 
       - name: Verify custom directories
@@ -170,7 +170,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        exit_zero: ['true', 'false']
+        exit_zero: ["true", "false"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -178,8 +178,8 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          node-version: '20'
-          working-directory: '.github/tests/chromatic-upload'
+          node-version: "20"
+          working-directory: ".github/tests/chromatic-upload"
 
       - name: Build mock Storybook
         run: |
@@ -189,15 +189,15 @@ jobs:
       - name: Upload Storybook artifact
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'storybook-exit-${{ matrix.exit_zero }}'
-          artifact_paths: '.github/tests/chromatic-upload/storybook-static'
+          artifact_name: "storybook-exit-${{ matrix.exit_zero }}"
+          artifact_paths: ".github/tests/chromatic-upload/storybook-static"
 
       - name: Upload to Chromatic with exit_zero=${{ matrix.exit_zero }} (mock)
         id: chromatic
         uses: ./.github/actions/chromatic-upload-from-artifact
         with:
-          artifact_name: 'storybook-exit-${{ matrix.exit_zero }}'
-          project_token: 'mock-chromatic-token-for-testing'
+          artifact_name: "storybook-exit-${{ matrix.exit_zero }}"
+          project_token: "mock-chromatic-token-for-testing"
           exit_zero_on_changes: ${{ matrix.exit_zero }}
         continue-on-error: true
 
@@ -223,15 +223,15 @@ jobs:
       - name: Upload dummy artifact
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'validation-test'
-          artifact_paths: 'test-validation'
+          artifact_name: "validation-test"
+          artifact_paths: "test-validation"
 
       - name: Test missing project_token (should fail)
         id: test-missing-token
         uses: ./.github/actions/chromatic-upload-from-artifact
         with:
-          artifact_name: 'validation-test'
-          project_token: ''
+          artifact_name: "validation-test"
+          project_token: ""
         continue-on-error: true
 
       - name: Verify validation caught missing token
@@ -247,8 +247,8 @@ jobs:
         id: test-missing-artifact
         uses: ./.github/actions/chromatic-upload-from-artifact
         with:
-          artifact_name: ''
-          project_token: 'mock-token'
+          artifact_name: ""
+          project_token: "mock-token"
         continue-on-error: true
 
       - name: Verify validation caught missing artifact_name
@@ -270,8 +270,8 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          node-version: '20'
-          working-directory: '.github/tests/chromatic-upload'
+          node-version: "20"
+          working-directory: ".github/tests/chromatic-upload"
 
       - name: Build mock Storybook
         run: |
@@ -281,41 +281,41 @@ jobs:
       - name: Upload Storybook artifact
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'storybook-validation-test'
-          artifact_paths: '.github/tests/chromatic-upload/storybook-static'
+          artifact_name: "storybook-validation-test"
+          artifact_paths: ".github/tests/chromatic-upload/storybook-static"
 
       - name: Test artifact download
         uses: actions/download-artifact@v4
         with:
-          name: 'storybook-validation-test'
-          path: './downloaded-storybook'
+          name: "storybook-validation-test"
+          path: "./downloaded-storybook"
 
       - name: Verify Storybook artifact contents
         run: |
           echo "Verifying downloaded Storybook artifact contents..."
-          
+
           if [ ! -f "./downloaded-storybook/index.html" ]; then
             echo "❌ Error: index.html not found in artifact"
             exit 1
           fi
           echo "✓ index.html found"
-          
+
           if [ ! -f "./downloaded-storybook/iframe.html" ]; then
             echo "❌ Error: iframe.html not found in artifact"
             exit 1
           fi
           echo "✓ iframe.html found"
-          
+
           if [ ! -f "./downloaded-storybook/project.json" ]; then
             echo "❌ Error: project.json not found in artifact"
             exit 1
           fi
           echo "✓ project.json found"
-          
+
           echo ""
           echo "Artifact contents:"
           ls -lah ./downloaded-storybook/
-          
+
           echo ""
           echo "✓ Storybook artifact validation successful"
 
@@ -329,19 +329,19 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          node-version: '20'
-          working-directory: '.github/tests/chromatic-upload'
+          node-version: "20"
+          working-directory: ".github/tests/chromatic-upload"
 
       - name: Build Storybook
         id: build
         run: |
           cd .github/tests/chromatic-upload
           npm run build-storybook
-          
+
           # Get artifact size
           ARTIFACT_SIZE=$(du -sb storybook-static | cut -f1)
-          echo "artifact_size=${ARTIFACT_SIZE}" >> $GITHUB_OUTPUT
-          
+          echo "artifact_size=${ARTIFACT_SIZE}" >> "$GITHUB_OUTPUT"
+
           echo "Storybook build completed:"
           echo "  Size: ${ARTIFACT_SIZE} bytes"
 
@@ -349,17 +349,17 @@ jobs:
         id: upload
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'complete-workflow-storybook-${{ github.run_id }}'
-          artifact_paths: '.github/tests/chromatic-upload/storybook-static'
-          retention_days: '7'
+          artifact_name: "complete-workflow-storybook-${{ github.run_id }}"
+          artifact_paths: ".github/tests/chromatic-upload/storybook-static"
+          retention_days: "7"
 
       - name: Upload to Chromatic (mock)
         id: chromatic
         uses: ./.github/actions/chromatic-upload-from-artifact
         with:
-          artifact_name: 'complete-workflow-storybook-${{ github.run_id }}'
-          project_token: 'mock-chromatic-token-for-testing'
-          exit_zero_on_changes: 'true'
+          artifact_name: "complete-workflow-storybook-${{ github.run_id }}"
+          project_token: "mock-chromatic-token-for-testing"
+          exit_zero_on_changes: "true"
         continue-on-error: true
 
       - name: Display complete workflow summary
@@ -395,8 +395,8 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          node-version: '20'
-          working-directory: '.github/tests/chromatic-upload'
+          node-version: "20"
+          working-directory: ".github/tests/chromatic-upload"
 
       - name: Build mock Storybook
         run: |
@@ -406,15 +406,15 @@ jobs:
       - name: Upload Storybook artifact
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'security-test-storybook'
-          artifact_paths: '.github/tests/chromatic-upload/storybook-static'
+          artifact_name: "security-test-storybook"
+          artifact_paths: ".github/tests/chromatic-upload/storybook-static"
 
       - name: Upload with sensitive data (mock)
         id: chromatic
         uses: ./.github/actions/chromatic-upload-from-artifact
         with:
-          artifact_name: 'security-test-storybook'
-          project_token: 'super-secret-chromatic-token-12345'
+          artifact_name: "security-test-storybook"
+          project_token: "super-secret-chromatic-token-12345"
         continue-on-error: true
 
       - name: Verify token masking
@@ -440,8 +440,8 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          node-version: '20'
-          working-directory: '.github/tests/chromatic-upload'
+          node-version: "20"
+          working-directory: ".github/tests/chromatic-upload"
 
       - name: Build mock Storybook
         shell: bash
@@ -452,15 +452,15 @@ jobs:
       - name: Upload Storybook artifact
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'storybook-${{ matrix.os }}'
-          artifact_paths: '.github/tests/chromatic-upload/storybook-static'
+          artifact_name: "storybook-${{ matrix.os }}"
+          artifact_paths: ".github/tests/chromatic-upload/storybook-static"
 
       - name: Upload to Chromatic on ${{ matrix.os }} (mock)
         id: chromatic
         uses: ./.github/actions/chromatic-upload-from-artifact
         with:
-          artifact_name: 'storybook-${{ matrix.os }}'
-          project_token: 'mock-chromatic-token'
+          artifact_name: "storybook-${{ matrix.os }}"
+          project_token: "mock-chromatic-token"
         continue-on-error: true
 
       - name: Verify upload on ${{ matrix.os }}
