@@ -62,6 +62,21 @@ on:
         required: false
         type: string
         default: ""
+      create_github_release:
+        description: "Create a GitHub release (typically true for production)"
+        required: false
+        type: boolean
+        default: false
+      package_json_path:
+        description: "Path to package.json for version extraction (relative to artifact root)"
+        required: false
+        type: string
+        default: "package.json"
+      release_name_template:
+        description: "Template for release name (use {version} placeholder)"
+        required: false
+        type: string
+        default: "Release {version}"
     secrets:
       cloudflare_api_token:
         description: "Cloudflare API token with Workers deployment and SSL certificate permissions"
@@ -91,10 +106,20 @@ on:
       certificate_created:
         description: "Whether a new certificate was created (true/false)"
         value: ${{ jobs.deploy.outputs.certificate_created }}
+      release_created:
+        description: "Whether a GitHub release was created"
+        value: ${{ jobs.release.outputs.created }}
+      release_tag:
+        description: "Tag name of the created release"
+        value: ${{ jobs.release.outputs.tag }}
+      release_version:
+        description: "Version of the created release"
+        value: ${{ jobs.release.outputs.version }}
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
+  deployments: write
 
 jobs:
   deploy:
@@ -343,4 +368,165 @@ jobs:
             echo "---"
             echo ""
             echo "**Deployment completed successfully at $(date -u '+%Y-%m-%d %H:%M:%S UTC')**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    name: Create GitHub Release
+    needs: deploy
+    if: inputs.create_github_release == true && inputs.environment == 'production'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      created: ${{ steps.create_release.outcome == 'success' }}
+      tag: ${{ steps.get_version.outputs.tag }}
+      version: ${{ steps.get_version.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download artifact for version info
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ./release-artifact
+
+      - name: Get version from package.json
+        id: get_version
+        run: |
+          if [ -f "./release-artifact/${{ inputs.package_json_path }}" ]; then
+            VERSION=$(node -p "require('./release-artifact/${{ inputs.package_json_path }}').version")
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "✓ Version extracted: ${VERSION}"
+          else
+            echo "::warning::package.json not found at ./release-artifact/${{ inputs.package_json_path }}, using timestamp"
+            VERSION=$(date -u '+%Y.%m.%d-%H%M%S')
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "✓ Using timestamp version: ${VERSION}"
+          fi
+
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          if git rev-parse "${{ steps.get_version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Tag ${{ steps.get_version.outputs.tag }} already exists, skipping release creation"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "✓ Tag ${{ steps.get_version.outputs.tag }} does not exist, will create release"
+          fi
+
+      - name: Generate release notes
+        if: steps.check_tag.outputs.exists == 'false'
+        id: release_notes
+        run: |
+          echo "::group::Generating release notes"
+
+          # Get the previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found, using all commits"
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges | head -20)
+          else
+            echo "Previous tag: $PREV_TAG"
+            COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          fi
+
+          # Create release notes
+          cat << 'EOFNOTES' > release_notes.md
+          ## 🚀 Production Deployment
+
+          **Version**: ${{ steps.get_version.outputs.version }}
+          **Deployed**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          **Commit**: `${{ github.sha }}`
+          **Environment**: `${{ inputs.environment }}`
+
+          ### 🔗 Deployment Links
+          - 🌐 **Application**: ${{ needs.deploy.outputs.worker_url }}
+          - 📚 **API Docs**: ${{ needs.deploy.outputs.worker_url }}/docs
+          - 💚 **Health Check**: ${{ needs.deploy.outputs.worker_url }}/health
+
+          ### 📝 Changes Since Last Release
+          EOFNOTES
+
+          if [ -n "$COMMITS" ]; then
+            echo "$COMMITS" >> release_notes.md
+          else
+            echo "- Initial release" >> release_notes.md
+          fi
+
+          cat << 'EOFNOTES' >> release_notes.md
+
+          ### 🔧 Deployment Details
+          - **Worker Name**: `${{ inputs.worker_name }}`
+          - **Domain**: `${{ inputs.custom_domain }}`
+          - **Artifact**: `${{ inputs.artifact_name }}`
+          - **Worker Version**: `${{ needs.deploy.outputs.worker_version }}`
+          EOFNOTES
+
+          if [ "${{ inputs.sentry_release }}" = "true" ]; then
+            cat << 'EOFNOTES' >> release_notes.md
+
+          ### 📊 Monitoring
+          - **Sentry Release**: `${{ github.sha }}`
+          - **Sentry Org**: `${{ inputs.sentry_org }}`
+          - **Sentry Project**: `${{ inputs.sentry_project }}`
+          EOFNOTES
+          fi
+
+          echo "✓ Release notes generated"
+          echo "::endgroup::"
+
+      - name: Create GitHub Release
+        if: steps.check_tag.outputs.exists == 'false'
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_version.outputs.tag }}
+          name: ${{ format(inputs.release_name_template, steps.get_version.outputs.version) }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release Summary
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          {
+            echo "## 📦 GitHub Release Created"
+            echo ""
+            echo "### Release Details"
+            echo "- **Tag**: \`${{ steps.get_version.outputs.tag }}\`"
+            echo "- **Version**: \`${{ steps.get_version.outputs.version }}\`"
+            echo "- **Name**: ${{ format(inputs.release_name_template, steps.get_version.outputs.version) }}"
+            echo "- **Release URL**: https://github.com/${{ github.repository }}/releases/tag/${{ steps.get_version.outputs.tag }}"
+            echo ""
+            echo "### Deployment Info"
+            echo "- **Environment**: ${{ inputs.environment }}"
+            echo "- **Worker**: ${{ inputs.worker_name }}"
+            echo "- **URL**: ${{ needs.deploy.outputs.worker_url }}"
+            echo ""
+            echo "✅ Release published successfully"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Skipped Summary
+        if: steps.check_tag.outputs.exists == 'true'
+        run: |
+          {
+            echo "## ⚠️ Release Creation Skipped"
+            echo ""
+            echo "Tag \`${{ steps.get_version.outputs.tag }}\` already exists."
+            echo ""
+            echo "To create a new release:"
+            echo "1. Update the version in package.json"
+            echo "2. Commit and push to main"
+            echo "3. Re-run the deployment"
           } >> "$GITHUB_STEP_SUMMARY"
