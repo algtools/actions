@@ -178,7 +178,7 @@ jobs:
       slug: "my-app"
       artifact_name: "production-build"
       create_github_release: true
-      release_name_template: "My App {version}"
+      release_name_template: "My App {0}"
       sentry_release: true
       sentry_org: "my-org"
       sentry_project: "my-project"
@@ -203,7 +203,7 @@ jobs:
 - `poll_interval_seconds` (optional): Certificate status check interval (default: 10)
 - `create_github_release` (optional): Create a GitHub release (default: false)
 - `package_json_path` (optional): Path to package.json for version extraction (default: "package.json")
-- `release_name_template` (optional): Template for release name with {version} placeholder (default: "Release {version}")
+- `release_name_template` (optional): Template for release name with {0} as version placeholder (default: "Release {0}")
 - `sentry_release` (optional): Enable Sentry release tracking (default: false)
 - `sentry_org` (optional): Sentry organization slug (required if sentry_release is true)
 - `sentry_project` (optional): Sentry project slug (required if sentry_release is true)

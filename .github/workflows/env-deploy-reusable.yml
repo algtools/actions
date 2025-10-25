@@ -73,10 +73,10 @@ on:
         type: string
         default: "package.json"
       release_name_template:
-        description: "Template for release name (use {version} placeholder)"
+        description: "Template for release name (use {0} as version placeholder)"
         required: false
         type: string
-        default: "Release {version}"
+        default: "Release {0}"
     secrets:
       cloudflare_api_token:
         description: "Cloudflare API token with Workers deployment and SSL certificate permissions"
@@ -125,7 +125,9 @@ jobs:
   deploy:
     name: Deploy to ${{ inputs.environment }}
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment:
+      name: ${{ inputs.environment }}
+      url: https://${{ inputs.custom_domain }}
     outputs:
       worker_url: ${{ steps.deploy-worker.outputs.worker_url }}
       deployment_status: ${{ steps.deploy-worker.outputs.deployment_status }}
