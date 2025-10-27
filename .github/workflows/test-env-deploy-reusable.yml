@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - "cursor/**"
+      - 'cursor/**'
   pull_request:
     branches:
       - main
@@ -134,7 +134,7 @@ jobs:
           echo "✓ PR comment step present"
 
             # Check for dedupe_key parameter
-            if ! grep -q 'dedupe_key: "env-deploy-' .github/workflows/env-deploy-reusable.yml; then
+            if ! grep -q "dedupe_key: 'env-deploy-" .github/workflows/env-deploy-reusable.yml; then
               echo "❌ Missing dedupe_key parameter"
               exit 1
             fi
@@ -217,22 +217,22 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          node-version: "20"
-          working-directory: ".github/tests/deploy-cloudflare"
-          cache-dependency-path: ".github/tests/deploy-cloudflare/package-lock.json"
+          node-version: '20'
+          working-directory: '.github/tests/deploy-cloudflare'
+          cache-dependency-path: '.github/tests/deploy-cloudflare/package-lock.json'
 
       - name: Build test worker
         uses: ./.github/actions/build-no-secrets
         with:
-          build_cmd: "npm run build"
-          working_dir: ".github/tests/deploy-cloudflare"
-          output_dir: "dist"
+          build_cmd: 'npm run build'
+          working_dir: '.github/tests/deploy-cloudflare'
+          output_dir: 'dist'
 
       - name: Upload worker artifact
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: "test-env-deploy-worker-${{ github.run_id }}"
-          artifact_paths: ".github/tests/deploy-cloudflare/dist"
+          artifact_name: 'test-env-deploy-worker-${{ github.run_id }}'
+          artifact_paths: '.github/tests/deploy-cloudflare/dist'
           retention_days: 1
 
       - name: Build summary
