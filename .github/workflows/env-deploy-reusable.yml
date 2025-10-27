@@ -1,4 +1,4 @@
-name: "Environment Deploy - Reusable Workflow"
+name: 'Environment Deploy - Reusable Workflow'
 
 on:
   workflow_call:
@@ -8,112 +8,115 @@ on:
         required: true
         type: string
       wrangler_config:
-        description: "Path to wrangler.toml configuration file (relative to artifact root)"
+        description: 'Path to wrangler.toml configuration file (relative to artifact root)'
         required: true
         type: string
       zone:
-        description: "Cloudflare zone ID for the domain"
+        description: 'Cloudflare zone ID for the domain'
         required: true
         type: string
       worker_name:
-        description: "Name of the Cloudflare Worker to deploy"
+        description: 'Name of the Cloudflare Worker to deploy'
         required: true
         type: string
       artifact_name:
-        description: "Name of the artifact containing the built worker code"
+        description: 'Name of the artifact containing the built worker code'
         required: true
         type: string
       custom_domain:
-        description: "Domain for wildcard certificate (e.g., example.com for *.example.com)"
+        description: 'Domain for wildcard certificate (e.g., example.com for *.example.com)'
         required: true
         type: string
       wrangler_version:
         description: 'Version of Wrangler to use (e.g., "3.78.0" or "latest")'
         required: false
         type: string
-        default: "latest"
+        default: 'latest'
       download_path:
-        description: "Directory path where the artifact will be downloaded"
+        description: 'Directory path where the artifact will be downloaded'
         required: false
         type: string
-        default: "./worker-artifact"
+        default: './worker-artifact'
       max_wait_seconds:
-        description: "Maximum time to wait for certificate activation (in seconds)"
+        description: 'Maximum time to wait for certificate activation (in seconds)'
         required: false
         type: number
         default: 300
       poll_interval_seconds:
-        description: "Interval between certificate status checks (in seconds)"
+        description: 'Interval between certificate status checks (in seconds)'
         required: false
         type: number
         default: 10
       sentry_release:
-        description: "Enable Sentry release tracking (true/false). Requires sentry_auth_token, sentry_org, and sentry_project."
+        description: 'Enable Sentry release tracking (true/false). Requires sentry_auth_token, sentry_org, and sentry_project.'
         required: false
         type: boolean
         default: false
       sentry_org:
-        description: "Sentry organization slug (required if sentry_release is true)"
+        description: 'Sentry organization slug (required if sentry_release is true)'
         required: false
         type: string
-        default: ""
+        default: ''
       sentry_project:
-        description: "Sentry project slug (required if sentry_release is true)"
+        description: 'Sentry project slug (required if sentry_release is true)'
         required: false
         type: string
-        default: ""
+        default: ''
       create_github_release:
-        description: "Create a GitHub release (typically true for production)"
+        description: 'Create a GitHub release (typically true for production)'
         required: false
         type: boolean
         default: false
       package_json_path:
-        description: "Path to package.json for version extraction (relative to artifact root)"
+        description: 'Path to package.json for version extraction (relative to artifact root)'
         required: false
         type: string
-        default: "package.json"
+        default: 'package.json'
       release_name_template:
-        description: "Template for release name (use {0} as version placeholder)"
+        description: 'Template for release name (use {0} as version placeholder)'
         required: false
         type: string
-        default: "Release {0}"
+        default: 'Release {0}'
     secrets:
       cloudflare_api_token:
-        description: "Cloudflare API token with Workers deployment and SSL certificate permissions"
+        description: 'Cloudflare API token with Workers deployment and SSL certificate permissions'
         required: true
       cloudflare_account_id:
-        description: "Cloudflare account ID"
+        description: 'Cloudflare account ID'
         required: true
       sentry_auth_token:
-        description: "Sentry authentication token (required if sentry_release is true)"
+        description: 'Sentry authentication token (required if sentry_release is true)'
         required: false
     outputs:
       worker_url:
-        description: "URL of the deployed Cloudflare Worker"
+        description: 'URL of the deployed Cloudflare Worker'
         value: ${{ jobs.deploy.outputs.worker_url }}
       deployment_status:
-        description: "Status of the deployment (success or failure)"
+        description: 'Status of the deployment (success or failure)'
         value: ${{ jobs.deploy.outputs.deployment_status }}
       worker_version:
-        description: "Version identifier of the deployed worker"
+        description: 'Version identifier of the deployed worker'
         value: ${{ jobs.deploy.outputs.worker_version }}
       certificate_id:
-        description: "ID of the wildcard SSL certificate"
+        description: 'ID of the wildcard SSL certificate'
         value: ${{ jobs.deploy.outputs.certificate_id }}
       certificate_status:
-        description: "Status of the SSL certificate"
+        description: 'Status of the SSL certificate'
         value: ${{ jobs.deploy.outputs.certificate_status }}
       certificate_created:
-        description: "Whether a new certificate was created (true/false)"
+        description: 'Whether a new certificate was created (true/false)'
         value: ${{ jobs.deploy.outputs.certificate_created }}
+      wildcard_domain:
+        description: 'Domain used for wildcard SSL certificate'
+        value: ${{ jobs.deploy.outputs.wildcard_domain }}
       release_created:
-        description: "Whether a GitHub release was created"
+        description: 'Whether a GitHub release was created'
         value: ${{ jobs.release.outputs.created }}
       release_tag:
-        description: "Tag name of the created release"
+        description: 'Tag name of the created release'
         value: ${{ jobs.release.outputs.tag }}
       release_version:
-        description: "Version of the created release"
+        description: 'Version of the created release'
         value: ${{ jobs.release.outputs.version }}
 
 permissions:
@@ -135,6 +138,7 @@ jobs:
       certificate_id: ${{ steps.ensure-cert.outputs.certificate_id }}
       certificate_status: ${{ steps.ensure-cert.outputs.certificate_status }}
       certificate_created: ${{ steps.ensure-cert.outputs.certificate_created }}
+      wildcard_domain: ${{ steps.wildcard-domain.outputs.wildcard_domain }}
 
     steps:
       - name: Validate inputs
@@ -196,11 +200,25 @@ jobs:
           echo "  Sentry Release: ${{ inputs.sentry_release }}"
           echo "::endgroup::"
 
+      - name: Extract wildcard domain
+        id: wildcard-domain
+        run: |
+          # Extract parent domain for wildcard certificate
+          # e.g., "bff-template.algtools.algenium.dev" -> "algtools.algenium.dev"
+          CUSTOM_DOMAIN="${{ inputs.custom_domain }}"
+          WILDCARD_DOMAIN="${CUSTOM_DOMAIN#*.}"
+
+          echo "Custom domain: ${CUSTOM_DOMAIN}"
+          echo "Wildcard domain: ${WILDCARD_DOMAIN}"
+          echo "Wildcard pattern: *.${WILDCARD_DOMAIN}"
+
+          echo "wildcard_domain=${WILDCARD_DOMAIN}" >> $GITHUB_OUTPUT
+
       - name: Ensure wildcard certificate
         id: ensure-cert
         uses: algtools/actions/.github/actions/ensure-wildcard-certificate@main
         with:
-          domain: ${{ inputs.custom_domain }}
+          domain: ${{ steps.wildcard-domain.outputs.wildcard_domain }}
           current_zone: ${{ inputs.zone }}
           cloudflare_api_token: ${{ secrets.cloudflare_api_token }}
           cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
@@ -219,7 +237,7 @@ jobs:
           download_path: ${{ inputs.download_path }}
           wrangler_version: ${{ inputs.wrangler_version }}
           deploy_environment: ${{ inputs.environment }}
-          dry_run: "false"
+          dry_run: 'false'
 
       - name: Create Sentry release
         if: inputs.sentry_release == true
@@ -303,7 +321,7 @@ jobs:
         uses: algtools/actions/.github/actions/comment-pr@main
         with:
           pr_number: ${{ steps.pr.outputs.pr_number }}
-          dedupe_key: "env-deploy-${{ inputs.environment }}"
+          dedupe_key: 'env-deploy-${{ inputs.environment }}'
           message: |
             ✅ **Deployment completed successfully**
 
@@ -321,7 +339,7 @@ jobs:
             - **Artifact**: `${{ inputs.artifact_name }}`
 
             ### SSL Certificate
-            - **Domain**: `*.${{ inputs.custom_domain }}`
+            - **Domain**: `*.${{ steps.wildcard-domain.outputs.wildcard_domain }}`
             - **Certificate ID**: `${{ steps.ensure-cert.outputs.certificate_id }}`
             - **Status**: ${{ steps.ensure-cert.outputs.certificate_status }}
             - **Created New**: ${{ steps.ensure-cert.outputs.certificate_created }}
@@ -344,7 +362,7 @@ jobs:
             echo "- **Artifact**: \`${{ inputs.artifact_name }}\`"
             echo ""
             echo "### SSL Certificate"
-            echo "- **Domain**: \`*.${{ inputs.custom_domain }}\`"
+            echo "- **Domain**: \`*.${{ steps.wildcard-domain.outputs.wildcard_domain }}\`"
             echo "- **Certificate ID**: \`${{ steps.ensure-cert.outputs.certificate_id }}\`"
             echo "- **Status**: ${{ steps.ensure-cert.outputs.certificate_status }}"
             echo "- **Created New**: ${{ steps.ensure-cert.outputs.certificate_created }}"
@@ -468,6 +486,7 @@ jobs:
           ### 🔧 Deployment Details
           - **Worker Name**: `${{ inputs.worker_name }}`
           - **Domain**: `${{ inputs.custom_domain }}`
+          - **Wildcard Certificate**: `*.${{ needs.deploy.outputs.wildcard_domain }}`
           - **Artifact**: `${{ inputs.artifact_name }}`
           - **Worker Version**: `${{ needs.deploy.outputs.worker_version }}`
           EOFNOTES
