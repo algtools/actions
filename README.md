@@ -878,6 +878,122 @@ jobs:
       input-param: value
 ```
 
+## Releases and Versioning
+
+This repository uses [semantic-release](https://github.com/semantic-release/semantic-release) to automatically manage versioning and releases based on [Conventional Commits](https://www.conventionalcommits.org/).
+
+### Versioning Strategy
+
+The repository follows **Semantic Versioning** (SemVer) and maintains both specific version tags and major version tags for convenience:
+
+- **Specific Version Tags**: `v1.2.3`, `v1.2.4`, `v2.0.0`
+- **Major Version Tags**: `v1`, `v2`, `v3` (automatically updated to latest in that major version)
+
+### How Releases Work
+
+1. **Automatic Releases**: When changes are pushed to the `main` branch, semantic-release automatically:
+   - Analyzes commit messages to determine the version bump
+   - Updates the version in `package.json`
+   - Generates a `CHANGELOG.md` with release notes
+   - Creates a GitHub release with the new version tag
+   - Updates the major version tag (e.g., `v1` → latest `v1.x.x`)
+
+2. **Version Bumps**: Based on Conventional Commits:
+   - `fix:` → Patch release (1.0.0 → 1.0.1)
+   - `feat:` → Minor release (1.0.0 → 1.1.0)
+   - `BREAKING CHANGE:` or `feat!:` → Major release (1.0.0 → 2.0.0)
+   - `docs:`, `chore:`, `style:`, etc. → No release
+
+### Referencing Actions
+
+You can reference actions and workflows using either specific versions or major version tags:
+
+**Major Version Tag (Recommended for stability):**
+```yaml
+- uses: algtools/actions/.github/actions/setup-node@v1
+```
+This automatically gets bug fixes and new features within v1.x.x.
+
+**Specific Version (Recommended for reproducibility):**
+```yaml
+- uses: algtools/actions/.github/actions/setup-node@v1.2.3
+```
+This pins to an exact version.
+
+**Main Branch (Not recommended for production):**
+```yaml
+- uses: algtools/actions/.github/actions/setup-node@main
+```
+This uses the latest code but may include breaking changes.
+
+### Contributing Changes
+
+When creating pull requests, ensure your PR title follows Conventional Commits format:
+
+**Format:**
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer]
+```
+
+**Examples:**
+```
+feat(setup-node): add support for Bun package manager
+fix(deploy-cloudflare): resolve artifact download timeout
+docs: update README with new examples
+chore: update dependencies
+```
+
+**Valid Types:**
+- `feat`: New feature (triggers minor release)
+- `fix`: Bug fix (triggers patch release)
+- `docs`: Documentation changes (no release)
+- `style`: Code style changes (no release)
+- `refactor`: Code refactoring (no release)
+- `perf`: Performance improvements (triggers patch release)
+- `test`: Test additions or changes (no release)
+- `build`: Build system changes (no release)
+- `ci`: CI/CD changes (no release)
+- `chore`: Other changes (no release)
+- `revert`: Revert a previous commit (triggers appropriate release)
+
+**Breaking Changes:**
+
+For breaking changes, use `!` after the type or add `BREAKING CHANGE:` in the footer:
+
+```
+feat!: redesign action API
+
+BREAKING CHANGE: The input parameter `node_version` is now required.
+```
+
+This will trigger a major version release (e.g., 1.x.x → 2.0.0).
+
+### Commit Message Validation
+
+This repository enforces Conventional Commits format at two levels:
+
+1. **Local Git Hooks (Husky + Commitlint)**: When you make a commit locally, commitlint automatically validates your commit message format. If it doesn't follow Conventional Commits, the commit will be rejected.
+
+2. **PR Validation**: All commits in pull requests are validated in CI to ensure they follow the format. The validation checks all commits between the base and head of your PR.
+
+3. **PR Title Validation**: Pull request titles are also validated to follow Conventional Commits format.
+
+If validation fails, you'll need to fix your commit messages before merging.
+
+**Setting up local validation:**
+
+After cloning the repository, run:
+```powershell
+cd actions
+pnpm install
+```
+
+The `prepare` script will automatically set up Husky hooks. After this, all your commits will be validated automatically.
+
 ## Development
 
 ### Prerequisites
@@ -932,6 +1048,9 @@ actionlint
 This repository uses the following CI workflows:
 
 - **ci-lint.yml**: Validates all GitHub Actions workflows using actionlint
+- **validate-commits.yml**: Validates all commit messages in PRs follow Conventional Commits format
+- **lint-pr.yml**: Validates PR titles follow Conventional Commits format
+- **release.yml**: Automatically creates releases when changes are pushed to main
 
 ## Security
 
