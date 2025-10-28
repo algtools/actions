@@ -984,6 +984,14 @@ This repository enforces Conventional Commits format at two levels:
 
 If validation fails, you'll need to fix your commit messages before merging.
 
+### Workflow Validation
+
+This repository also validates GitHub Actions workflow files before commit:
+
+1. **Pre-commit Hook**: When you commit changes to workflow files, actionlint automatically validates them for syntax errors, best practices, and shellcheck issues.
+
+2. **CI Validation**: All workflows are validated in CI using actionlint to catch any issues that might have been missed locally.
+
 **Setting up local validation:**
 
 After cloning the repository, run:
@@ -992,15 +1000,43 @@ cd actions
 pnpm install
 ```
 
-The `prepare` script will automatically set up Husky hooks. After this, all your commits will be validated automatically.
+The `prepare` script will automatically set up Husky hooks. After this:
+- All commits will validate commit messages
+- Commits with workflow changes will run actionlint validation
+
+**Installing actionlint (recommended):**
+
+For workflow validation to work locally, install actionlint:
+
+```powershell
+# Using Go
+go install github.com/rhysd/actionlint/cmd/actionlint@latest
+
+# On macOS with Homebrew
+brew install actionlint
+
+# On Windows with Chocolatey
+choco install actionlint
+```
+
+Without actionlint installed, the pre-commit hook will skip workflow validation with a warning, but CI will still catch issues.
+
+**Manual workflow validation:**
+
+You can manually validate workflows at any time:
+```powershell
+pnpm run lint:workflows
+```
 
 ## Development
 
 ### Prerequisites
 
 - Git
+- Node.js (v20 or later)
+- pnpm (v9 or later)
+- actionlint (recommended, for workflow validation)
 - GitHub CLI (optional, for testing)
-- actionlint (for workflow validation)
 
 ### Test Configuration
 

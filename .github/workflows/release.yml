@@ -46,7 +46,9 @@ jobs:
       - name: Release Summary
         if: success()
         run: |
-          echo "## Release Successful ✓" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "The release process completed successfully." >> $GITHUB_STEP_SUMMARY
-          echo "Check the [Releases page](https://github.com/${{ github.repository }}/releases) for details." >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Release Successful ✓"
+            echo ""
+            echo "The release process completed successfully."
+            echo "Check the [Releases page](https://github.com/${{ github.repository }}/releases) for details."
+          } >> "$GITHUB_STEP_SUMMARY"
