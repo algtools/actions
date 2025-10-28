@@ -1,0 +1,82 @@
+name: 'Template Release - Reusable'
+
+on:
+  workflow_call:
+    inputs:
+      template_name:
+        description: 'Name of the template (e.g., bff-template)'
+        required: true
+        type: string
+      working_directory:
+        description: 'Directory containing the template'
+        required: false
+        type: string
+        default: '.'
+      branch:
+        description: 'Branch being released (dev/qa/main)'
+        required: true
+        type: string
+      retention_days:
+        description: 'Artifact retention days'
+        required: false
+        type: number
+        default: 30
+    secrets:
+      github_token:
+        required: true
+    outputs:
+      version:
+        description: 'Version that was released'
+        value: ${{ jobs.release.outputs.version }}
+      tarball_url:
+        description: 'URL to download tarball'
+        value: ${{ jobs.release.outputs.tarball_url }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+      tarball_url: ${{ steps.upload.outputs.artifact-url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.github_token }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump Version
+        id: bump
+        uses: algtools/actions/.github/actions/bump-version@main
+        with:
+          github_token: ${{ secrets.github_token }}
+          working_directory: ${{ inputs.working_directory }}
+
+      - name: Get Current Version
+        id: get-version
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Current version: ${VERSION}"
+
+      - name: Package Template
+        id: package
+        uses: algtools/actions/.github/actions/package-template@main
+        with:
+          working_directory: ${{ inputs.working_directory }}
+          template_name: ${{ inputs.template_name }}
+          version: ${{ steps.get-version.outputs.version }}
+
+      - name: Upload Tarball Artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.tarball_name }}
+          path: ${{ inputs.working_directory }}/${{ steps.package.outputs.tarball_path }}
+          retention-days: ${{ inputs.retention_days }}

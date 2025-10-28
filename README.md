@@ -34,6 +34,30 @@ Creates and finalizes a Sentry release and registers a deployment for the target
 ### [comment-pr](/.github/actions/comment-pr)
 Posts or updates comments on Pull Requests with deployment info (e.g., preview URLs, environment details, Chromatic links). Avoids duplicating the same message across retries by using a dedupe key.
 
+### [package-template](/.github/actions/package-template)
+Wraps, tokenizes, and packages a template into a tarball. Automates the template build process by running `template:wrap`, `template:tokenize`, and `template:pack` scripts in sequence. Used as part of the automated template release system.
+
+**Inputs:**
+- `working_directory` (required): Directory containing the template
+- `template_name` (required): Name of the template (e.g., bff-template)
+- `version` (required): Version to package
+
+**Outputs:**
+- `tarball_path`: Path to generated tarball
+- `tarball_name`: Name of generated tarball
+
+### [bump-version](/.github/actions/bump-version)
+Automatically bumps version using semantic-release based on conventional commits. Analyzes commit messages to determine the appropriate version bump (major/minor/patch) and updates package.json, creates changelog, and tags the release.
+
+**Inputs:**
+- `github_token` (required): GitHub token for authentication
+- `working_directory` (optional): Directory containing package.json (default: ".")
+- `dry_run` (optional): Run in dry-run mode (default: "false")
+
+**Outputs:**
+- `new_version`: New version number
+- `new_release_published`: Whether a new release was published
+
 ## Available Reusable Workflows
 
 ### [pr-build-reusable.yml](/.github/workflows/pr-build-reusable.yml)
@@ -281,6 +305,187 @@ jobs:
     secrets:
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+---
+
+### [template-release-reusable.yml](/.github/workflows/template-release-reusable.yml)
+A reusable workflow for automating template versioning, packaging, and releases. Uses semantic-release to automatically determine version bumps based on conventional commits, packages the template with checksums and tokens, and creates GitHub releases with the tarball as an asset.
+
+**Features:**
+- Automatic semantic versioning based on conventional commits
+- Branch-based prerelease channels (dev, qa, main)
+- Template packaging with wrapping and tokenization
+- GitHub release creation with tarball artifacts
+- Artifact upload for downstream use
+- Cumulative commit analysis (multiple fixes = one patch bump)
+- Priority-based version determination (BREAKING > feat > fix)
+
+**Version Flow:**
+- **dev branch**: `1.0.1-dev.1` → `1.0.1-dev.2` → `1.0.1-dev.3`
+- **qa branch**: `1.0.1-rc.1` → `1.0.1-rc.2`
+- **main branch**: `1.0.1` (final release)
+
+**Example Usage:**
+```yaml
+name: Release Template
+
+on:
+  push:
+    branches:
+      - main
+      - qa
+      - dev
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  build:
+    uses: algtools/actions/.github/workflows/pr-build-reusable.yml@main
+    with:
+      build_cmd: "pnpm run lint && pnpm run test && pnpm run build"
+      artifact_name: "bff-build-${{ github.sha }}"
+      artifact_paths: "dist,wrangler.jsonc,package.json"
+
+  release-template:
+    needs: build
+    uses: algtools/actions/.github/workflows/template-release-reusable.yml@main
+    with:
+      template_name: "bff-template"
+      working_directory: "."
+      branch: ${{ github.ref_name }}
+      retention_days: ${{ github.ref_name == 'main' && 90 || github.ref_name == 'qa' && 60 || 30 }}
+    secrets:
+      github_token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+**Required Inputs:**
+- `template_name` (required): Name of the template (e.g., bff-template)
+- `working_directory` (required): Directory containing the template (default: ".")
+- `branch` (required): Branch being released (dev/qa/main)
+
+**Optional Inputs:**
+- `retention_days` (optional): Artifact retention days (default: 30)
+
+**Required Secrets:**
+- `github_token`: GitHub token with write permissions for releases
+
+**Outputs:**
+- `version`: Version that was released
+- `tarball_url`: URL to download tarball
+
+**Semantic Versioning Rules:**
+- `feat:` → minor bump (1.0.0 → 1.1.0)
+- `fix:` → patch bump (1.0.0 → 1.0.1)
+- `BREAKING CHANGE:` or `feat!:` → major bump (1.0.0 → 2.0.0)
+- Multiple commits of same type = ONE version bump
+- Priority: BREAKING > feat > fix > docs/chore (no bump)
+
+**Configuration (.releaserc.json):**
+
+The template must have a `.releaserc.json` file in its root:
+
+```json
+{
+  "branches": [
+    "+([0-9])?(.{+([0-9]),x}).x",
+    "main",
+    {
+      "name": "qa",
+      "prerelease": "rc"
+    },
+    {
+      "name": "dev",
+      "prerelease": "dev"
+    }
+  ],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    ["@semantic-release/changelog", { "changelogFile": "CHANGELOG.md" }],
+    ["@semantic-release/npm", { "npmPublish": false }],
+    ["@semantic-release/exec", { "prepareCmd": "pnpm run template:pack" }],
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          {
+            "path": "template-dist/${template_name}-v${nextRelease.version}.tgz",
+            "label": "Template Package v${nextRelease.version}"
+          }
+        ]
+      }
+    ],
+    [
+      "@semantic-release/git",
+      {
+        "assets": ["package.json", "CHANGELOG.md"],
+        "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+      }
+    ]
+  ]
+}
+```
+
+**Required Template Scripts:**
+
+The template must have these npm scripts in package.json:
+
+```json
+{
+  "scripts": {
+    "template:wrap": "tsx scripts/templateWrap.ts",
+    "template:tokenize": "tsx scripts/templateTokenize.ts",
+    "template:pack": "tsx scripts/template-pack.ts"
+  }
+}
+```
+
+**Required Dependencies:**
+
+The template must have these devDependencies:
+
+```json
+{
+  "devDependencies": {
+    "semantic-release": "^24.0.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/exec": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.0"
+  }
+}
+```
+
+**Commit Message Format:**
+
+All commits must follow Conventional Commits:
+
+```bash
+# Feature (minor bump)
+git commit -m "feat(api): add new caching endpoint"
+
+# Bug fix (patch bump)
+git commit -m "fix(auth): resolve token validation"
+
+# Breaking change (major bump)
+git commit -m "feat!: redesign authentication
+BREAKING CHANGE: authentication now requires OAuth2"
+```
+
+**Manual Override:**
+
+To force a specific version bump:
+
+```bash
+# Force major version
+git commit --allow-empty -m "feat!: BREAKING CHANGE: force major"
+
+# Force minor version
+git commit --allow-empty -m "feat: force minor version"
 ```
 
 ---

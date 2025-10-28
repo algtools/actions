@@ -1,0 +1,57 @@
+name: 'Package Template'
+description: 'Wraps, tokenizes, and packages a template into a tarball'
+inputs:
+  working_directory:
+    description: 'Directory containing the template'
+    required: true
+  template_name:
+    description: 'Name of the template (e.g., bff-template)'
+    required: true
+  version:
+    description: 'Version to package'
+    required: true
+outputs:
+  tarball_path:
+    description: 'Path to generated tarball'
+    value: ${{ steps.pack.outputs.tarball_path }}
+  tarball_name:
+    description: 'Name of generated tarball'
+    value: ${{ steps.pack.outputs.tarball_name }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 9
+
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: pnpm install --frozen-lockfile
+
+    - name: Wrap template files
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: pnpm run template:wrap
+
+    - name: Tokenize template
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: pnpm run template:tokenize
+
+    - name: Pack template
+      id: pack
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: |
+        pnpm run template:pack
+        TARBALL_NAME="${{ inputs.template_name }}-v${{ inputs.version }}.tgz"
+        TARBALL_PATH="template-dist/${TARBALL_NAME}"
+        echo "tarball_path=${TARBALL_PATH}" >> $GITHUB_OUTPUT
+        echo "tarball_name=${TARBALL_NAME}" >> $GITHUB_OUTPUT
