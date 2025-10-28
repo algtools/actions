@@ -212,7 +212,7 @@ jobs:
           echo "Wildcard domain: ${WILDCARD_DOMAIN}"
           echo "Wildcard pattern: *.${WILDCARD_DOMAIN}"
 
-          echo "wildcard_domain=${WILDCARD_DOMAIN}" >> $GITHUB_OUTPUT
+          echo "wildcard_domain=${WILDCARD_DOMAIN}" >> "$GITHUB_OUTPUT"
 
       - name: Ensure wildcard certificate
         id: ensure-cert

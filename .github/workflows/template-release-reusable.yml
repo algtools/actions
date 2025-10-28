@@ -62,7 +62,7 @@ jobs:
         working-directory: ${{ inputs.working_directory }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Current version: ${VERSION}"
 
       - name: Package Template
