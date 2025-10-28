@@ -32,6 +32,11 @@ runs:
       with:
         version: 9
 
+    - name: Install project dependencies
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: pnpm install --frozen-lockfile
+
     - name: Install semantic-release
       shell: bash
       run: |
