@@ -1,4 +1,4 @@
-name: "Preview Deploy - Reusable Workflow"
+name: 'Preview Deploy - Reusable Workflow'
 # Reusable workflow for deploying PR previews to Cloudflare Workers
 # Automatically posts/updates a comment on the PR with deployment info
 
@@ -11,56 +11,56 @@ on:
         required: true
         type: string
       artifact_name:
-        description: "Name of the artifact to upload"
+        description: 'Name of the artifact to upload'
         required: true
         type: string
       artifact_paths:
-        description: "Comma-separated list of file paths or directories to upload as artifacts"
+        description: 'Comma-separated list of file paths or directories to upload as artifacts'
         required: true
         type: string
       node_version:
-        description: "Node.js version to install. If not provided, reads from .nvmrc file."
+        description: 'Node.js version to install. If not provided, reads from .nvmrc file.'
         required: false
         type: string
-        default: ""
+        default: ''
       working_directory:
-        description: "Working directory for build commands"
+        description: 'Working directory for build commands'
         required: false
         type: string
-        default: "."
+        default: '.'
       output_dir:
         description: 'Directory where build output/artifacts will be produced (e.g., "dist", "build")'
         required: false
         type: string
-        default: "dist"
+        default: 'dist'
 
       # Deployment configuration
       worker_name:
-        description: "Name of the Cloudflare Worker for preview deployment"
+        description: 'Name of the Cloudflare Worker for preview deployment'
         required: true
         type: string
       wrangler_config:
-        description: "Path to wrangler.toml configuration file relative to artifact root"
+        description: 'Path to wrangler.toml configuration file relative to artifact root'
         required: false
         type: string
-        default: "wrangler.toml"
+        default: 'wrangler.toml'
       zone:
-        description: "Cloudflare zone ID for the domain"
+        description: 'Cloudflare zone ID for the domain'
         required: true
         type: string
       custom_domain:
-        description: "Domain for wildcard certificate e.g., dev.example.com for *.dev.example.com"
+        description: 'Domain for wildcard certificate e.g., dev.example.com for *.dev.example.com'
         required: true
         type: string
       wrangler_version:
-        description: "Version of Wrangler to use for deployment (default: latest)"
+        description: 'Version of Wrangler to use for deployment (default: latest)'
         required: false
         type: string
-        default: "latest"
+        default: 'latest'
 
       # Preview URL configuration
       app_domain:
-        description: "Application domain prefix (used to construct preview URL: {app_domain}-pr-{num}.{dev_zone})"
+        description: 'Application domain prefix (used to construct preview URL: {app_domain}-pr-{num}.{dev_zone})'
         required: true
         type: string
       dev_zone:
@@ -70,110 +70,110 @@ on:
 
       # Chromatic configuration (optional)
       enable_chromatic:
-        description: "Enable Chromatic visual testing upload"
+        description: 'Enable Chromatic visual testing upload'
         required: false
         type: boolean
         default: false
       chromatic_project_token:
-        description: "Chromatic project token (required if enable_chromatic is true)"
+        description: 'Chromatic project token (required if enable_chromatic is true)'
         required: false
         type: string
-        default: ""
+        default: ''
       storybook_build_dir:
-        description: "Directory containing Storybook build (required if enable_chromatic is true)"
+        description: 'Directory containing Storybook build (required if enable_chromatic is true)'
         required: false
         type: string
-        default: "storybook-static"
+        default: 'storybook-static'
 
       # API Documentation configuration (optional)
       enable_api_docs:
-        description: "Enable API documentation generation"
+        description: 'Enable API documentation generation'
         required: false
         type: boolean
         default: false
       api_docs_type:
-        description: "Type of API documentation to generate (scalar, redoc, swagger-ui)"
+        description: 'Type of API documentation to generate (scalar, redoc, swagger-ui)'
         required: false
         type: string
-        default: "scalar"
+        default: 'scalar'
       api_docs_output_dir:
-        description: "Directory where API documentation will be generated"
+        description: 'Directory where API documentation will be generated'
         required: false
         type: string
-        default: "api-docs"
+        default: 'api-docs'
 
       # Miscellaneous
       retention_days:
-        description: "Number of days to retain the artifact (1-90 days, default is repository/org setting)"
+        description: 'Number of days to retain the artifact (1-90 days, default is repository/org setting)'
         required: false
         type: number
         default: 30
       max_wait_seconds:
-        description: "Maximum time to wait for certificate activation in seconds (default: 300)"
+        description: 'Maximum time to wait for certificate activation in seconds (default: 300)'
         required: false
         type: number
         default: 300
       poll_interval_seconds:
-        description: "Interval between certificate status checks in seconds (default: 10)"
+        description: 'Interval between certificate status checks in seconds (default: 10)'
         required: false
         type: number
         default: 10
 
     secrets:
       cloudflare_api_token:
-        description: "Cloudflare API token with Workers deployment and SSL certificate permissions"
+        description: 'Cloudflare API token with Workers deployment and SSL certificate permissions'
         required: true
       cloudflare_account_id:
-        description: "Cloudflare account ID"
+        description: 'Cloudflare account ID'
         required: true
 
     outputs:
       # Build outputs
       artifact_id:
-        description: "GitHub artifact ID of the uploaded artifact"
+        description: 'GitHub artifact ID of the uploaded artifact'
         value: ${{ jobs.build.outputs.artifact_id }}
       artifact_url:
-        description: "URL to download the artifact"
+        description: 'URL to download the artifact'
         value: ${{ jobs.build.outputs.artifact_url }}
       build_status:
-        description: "Status of the build (success or failure)"
+        description: 'Status of the build (success or failure)'
         value: ${{ jobs.build.outputs.build_status }}
 
       # Deploy outputs
       worker_url:
-        description: "URL of the deployed Cloudflare Worker"
+        description: 'URL of the deployed Cloudflare Worker'
         value: ${{ jobs.deploy.outputs.worker_url }}
       deployment_status:
-        description: "Status of the deployment"
+        description: 'Status of the deployment'
         value: ${{ jobs.deploy.outputs.deployment_status }}
       certificate_id:
-        description: "ID of the wildcard SSL certificate"
+        description: 'ID of the wildcard SSL certificate'
         value: ${{ jobs.deploy.outputs.certificate_id }}
 
       # Preview outputs
       preview_url:
-        description: "Public preview URL for the PR"
+        description: 'Public preview URL for the PR'
         value: ${{ jobs.deploy.outputs.preview_url }}
 
       # Chromatic outputs
       chromatic_url:
-        description: "URL to Chromatic visual testing results (if enabled)"
+        description: 'URL to Chromatic visual testing results (if enabled)'
         value: ${{ jobs.chromatic.outputs.chromatic_url }}
 
       # API Documentation outputs
       api_docs_url:
-        description: "URL to API documentation (if enabled)"
+        description: 'URL to API documentation (if enabled)'
         value: ${{ jobs.api-docs.outputs.api_docs_url }}
       api_docs_status:
-        description: "Status of API documentation generation"
+        description: 'Status of API documentation generation'
         value: ${{ jobs.api-docs.outputs.api_docs_status }}
 
       # Comment outputs
       comment_id:
-        description: "ID of the PR comment"
+        description: 'ID of the PR comment'
         value: ${{ jobs.comment.outputs.comment_id }}
       comment_url:
-        description: "URL of the PR comment"
+        description: 'URL of the PR comment'
         value: ${{ jobs.comment.outputs.comment_url }}
 
 permissions:
@@ -223,7 +223,7 @@ jobs:
     name: Deploy Preview
     needs: build
     runs-on: ubuntu-latest
-    environment: dev
+    environment: 'preview-${{ github.event.pull_request.number }}'
     outputs:
       worker_url: ${{ steps.deploy-worker.outputs.worker_url }}
       deployment_status: ${{ steps.deploy-worker.outputs.deployment_status }}
@@ -299,8 +299,8 @@ jobs:
           cloudflare_api_token: ${{ secrets.cloudflare_api_token }}
           cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
           wrangler_version: ${{ inputs.wrangler_version }}
-          deploy_environment: "dev"
-          dry_run: "false"
+          deploy_environment: 'preview-${{ github.event.pull_request.number }}'
+          dry_run: 'false'
 
       - name: Construct preview URL
         id: preview-url
@@ -540,7 +540,7 @@ jobs:
       - name: Upload API Documentation Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: "api-docs-${{ inputs.artifact_name }}"
+          name: 'api-docs-${{ inputs.artifact_name }}'
           path: api-docs
           retention-days: 7
 
@@ -573,42 +573,52 @@ jobs:
 
             **Deployment Details:**
             - Worker: `${{ inputs.worker_name }}`
-            - Environment: `dev`
+            - Environment: `preview-${{ needs.deploy.outputs.pr_number }}`
             - Commit: `${{ github.sha }}`
-          dedupe_key: "preview-deploy"
+          dedupe_key: 'preview-deploy'
+      - name: Comment on PR
+        uses: algtools/actions/.github/actions/comment-pr@main
+        with:
+          pr_number: ${{ needs.deploy.outputs.pr_number }}
+          dedupe_key: 'pr-preview-deployment'
+          message: |
+            ## 🚀 Preview Environment Deployed
 
-      - name: Summary
+            Your preview environment is ready!
+
+            ### 🔗 Links
+            - 🌐 **Preview URL**: ${{ needs.deploy.outputs.preview_url }}
+            - 📚 **API Docs**: ${{ needs.deploy.outputs.preview_url }}/docs
+            - 📋 **OpenAPI Spec**: ${{ needs.deploy.outputs.preview_url }}/openapi.json
+            - 💚 **Health Check**: ${{ needs.deploy.outputs.preview_url }}/health
+
+            ### ℹ️ Details
+            - **Worker**: `${{ inputs.worker_name }}`
+            - **Environment**: `preview-${{ needs.deploy.outputs.pr_number }}`
+            - **Commit**: `${{ github.event.pull_request.head.sha }}`
+            - **Deployed**: <t:${{ github.event.pull_request.updated_at }}:R>
+
+            <details>
+            <summary>Deployment Info</summary>
+
+            - **Artifact**: `pr-preview-${{ github.event.pull_request.number }}`
+            - **Build Status**: ✅ Success
+            - **Deployment Status**: ${{ needs.deploy.outputs.deployment_status }}
+
+            </details>
+
+            > This environment will be automatically cleaned up when the PR is closed or merged.
+
+      - name: Deployment Summary
         run: |
           {
-            echo "## 🚀 Preview Deployment Complete"
+            echo "## 🚀 PR Preview Deployment"
             echo ""
-            echo "### Preview URL"
-            echo "🌐 **[${{ needs.deploy.outputs.preview_url }}](${{ needs.deploy.outputs.preview_url }})**"
-            echo ""
-
-            if [ "${{ inputs.enable_chromatic }}" = "true" ] && [ -n "${{ needs.chromatic.outputs.chromatic_url }}" ]; then
-              echo "### Chromatic"
-              echo "🧩 **[View Visual Tests](${{ needs.chromatic.outputs.chromatic_url }})**"
-              echo ""
-            fi
-
-            if [ "${{ inputs.enable_api_docs }}" = "true" ] && [ -n "${{ needs.api-docs.outputs.api_docs_url }}" ]; then
-              echo "### API Documentation"
-              echo "📚 **[View API Docs](${{ needs.api-docs.outputs.api_docs_url }})**"
-              echo "- **Type**: ${{ inputs.api_docs_type }}"
-              echo "- **Status**: ${{ needs.api-docs.outputs.api_docs_status }}"
-              echo ""
-            fi
-
-            echo "### Deployment Info"
+            echo "### Preview Environment"
+            echo "- **URL**: ${{ needs.deploy.outputs.preview_url }}"
+            echo "- **API Docs**: ${{ needs.deploy.outputs.preview_url }}/docs"
             echo "- **Worker**: \`${{ inputs.worker_name }}\`"
-            echo "- **PR**: #${{ needs.deploy.outputs.pr_number }}"
             echo "- **Status**: ${{ needs.deploy.outputs.deployment_status }}"
-            echo "- **Certificate**: ${{ needs.deploy.outputs.certificate_id }}"
             echo ""
-            echo "### PR Comment"
-            echo "- **Action**: ${{ steps.comment-pr.outputs.action }}"
-            echo "- **URL**: ${{ steps.comment-pr.outputs.comment_url }}"
-            echo ""
-            echo "✓ Preview deployment completed successfully"
+            echo "✅ Preview environment deployed successfully"
           } >> "$GITHUB_STEP_SUMMARY"
