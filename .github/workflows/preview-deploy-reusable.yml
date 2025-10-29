@@ -35,8 +35,12 @@ on:
         default: 'dist'
 
       # Deployment configuration
-      worker_name:
-        description: 'Name of the Cloudflare Worker for preview deployment'
+      slug:
+        description: 'Project slug (e.g., "template", "bff-template")'
+        required: true
+        type: string
+      app_name:
+        description: 'Application name (e.g., "api", "web")'
         required: true
         type: string
       wrangler_config:
@@ -232,6 +236,7 @@ jobs:
       certificate_id: ${{ steps.ensure-cert.outputs.certificate_id }}
       preview_url: ${{ steps.preview-url.outputs.url }}
       pr_number: ${{ steps.resolve-pr.outputs.number }}
+      worker_name: ${{ steps.worker-name.outputs.name }}
 
     steps:
       - name: Resolve PR number
@@ -289,6 +294,22 @@ jobs:
           echo "Preview domain: ${PREVIEW_DOMAIN}"
           echo "::endgroup::"
 
+      - name: Construct worker name
+        id: worker-name
+        run: |
+          echo "::group::Constructing worker name"
+
+          PR_NUMBER="${{ steps.resolve-pr.outputs.number }}"
+          SLUG="${{ inputs.slug }}"
+          APP_NAME="${{ inputs.app_name }}"
+
+          # Construct worker name: <slug>-<app_name>-preview-<pr-number>
+          WORKER_NAME="${SLUG}-${APP_NAME}-preview-${PR_NUMBER}"
+
+          echo "Worker name: ${WORKER_NAME}"
+          echo "name=${WORKER_NAME}" >> "$GITHUB_OUTPUT"
+          echo "::endgroup::"
+
       - name: Ensure wildcard SSL certificate
         id: ensure-cert
         uses: algtools/actions/.github/actions/ensure-wildcard-certificate@main
@@ -305,7 +326,7 @@ jobs:
         uses: algtools/actions/.github/actions/deploy-cloudflare-from-artifact@main
         with:
           artifact_name: ${{ inputs.artifact_name }}
-          worker_name: ${{ inputs.worker_name }}
+          worker_name: ${{ steps.worker-name.outputs.name }}
           wrangler_config: ${{ inputs.wrangler_config }}
           cloudflare_api_token: ${{ secrets.cloudflare_api_token }}
           cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
@@ -589,7 +610,7 @@ jobs:
             - 💚 **Health Check**: ${{ needs.deploy.outputs.preview_url }}/health
 
             ### ℹ️ Details
-            - **Worker**: `${{ inputs.worker_name }}`
+            - **Worker**: `${{ needs.deploy.outputs.worker_name }}`
             - **Environment**: `preview-${{ needs.deploy.outputs.pr_number }}`
             - **Commit**: `${{ github.event.pull_request.head.sha }}`
             - **Deployed**: <t:${{ github.event.pull_request.updated_at }}:R>
@@ -613,7 +634,7 @@ jobs:
             echo "### Preview Environment"
             echo "- **URL**: ${{ needs.deploy.outputs.preview_url }}"
             echo "- **API Docs**: ${{ needs.deploy.outputs.preview_url }}/docs"
-            echo "- **Worker**: \`${{ inputs.worker_name }}\`"
+            echo "- **Worker**: \`${{ needs.deploy.outputs.worker_name }}\`"
             echo "- **Status**: ${{ needs.deploy.outputs.deployment_status }}"
             echo ""
             echo "✅ Preview environment deployed successfully"
