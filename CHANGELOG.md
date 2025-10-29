@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/algtools/actions/compare/v1.0.0...v1.1.0) (2025-10-29)
+
+
+### Features
+
+* improved preview deployment workflow ([6c99f11](https://github.com/algtools/actions/commit/6c99f11a59bf34f044633123626fe58e7c0743ff))
+
 # 1.0.0 (2025-10-28)
 
 
