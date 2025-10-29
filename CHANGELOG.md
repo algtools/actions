@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/algtools/actions/compare/v1.1.0...v1.1.1) (2025-10-29)
+
+
+### Bug Fixes
+
+* update preview deployment environment to a static value ([5520555](https://github.com/algtools/actions/commit/5520555655a68bd0717bfdeb96102ee7a687f5a9))
+
 # [1.1.0](https://github.com/algtools/actions/compare/v1.0.0...v1.1.0) (2025-10-29)
 
 
