@@ -558,24 +558,6 @@ jobs:
       comment_url: ${{ steps.comment-pr.outputs.comment_url }}
 
     steps:
-      - name: Post or update PR comment
-        id: comment-pr
-        uses: algtools/actions/.github/actions/comment-pr@main
-        with:
-          pr_number: ${{ needs.deploy.outputs.pr_number }}
-          message: |
-            ✅ **Preview deployed successfully!**
-            🌐 [Open Preview](${{ needs.deploy.outputs.preview_url }})${{ inputs.enable_chromatic == true && needs.chromatic.outputs.chromatic_url != '' && format('
-            🧩 [Chromatic Visuals]({0})', needs.chromatic.outputs.chromatic_url) || '' }}${{ inputs.enable_api_docs == true && needs.api-docs.outputs.api_docs_url != '' && format('
-            📚 [API Documentation]({0})', needs.api-docs.outputs.api_docs_url) || '' }}
-
-            ---
-
-            **Deployment Details:**
-            - Worker: `${{ inputs.worker_name }}`
-            - Environment: `preview`
-            - Commit: `${{ github.sha }}`
-          dedupe_key: 'preview-deploy'
       - name: Comment on PR
         uses: algtools/actions/.github/actions/comment-pr@main
         with:
