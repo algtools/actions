@@ -1,3 +1,10 @@
+## [1.1.3](https://github.com/algtools/actions/compare/v1.1.2...v1.1.3) (2025-10-29)
+
+
+### Bug Fixes
+
+* update deployment workflows to include dynamic worker name ([cba55fe](https://github.com/algtools/actions/commit/cba55feb24f65cdd618962e7f2d11df3fb8247e2))
+
 ## [1.1.2](https://github.com/algtools/actions/compare/v1.1.1...v1.1.2) (2025-10-29)
 
 
