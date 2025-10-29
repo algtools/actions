@@ -320,7 +320,6 @@ jobs:
         run: |
           echo "::group::Constructing preview URL"
 
-          PR_NUM="${{ steps.resolve-pr.outputs.number }}"
           APP_DOMAIN="${{ inputs.app_domain }}"
           DEV_ZONE="${{ inputs.dev_zone }}"
 
@@ -573,6 +572,7 @@ jobs:
 
     steps:
       - name: Comment on PR
+        id: comment-pr
         uses: algtools/actions/.github/actions/comment-pr@main
         with:
           pr_number: ${{ needs.deploy.outputs.pr_number }}
