@@ -1,3 +1,10 @@
+## [1.1.2](https://github.com/algtools/actions/compare/v1.1.1...v1.1.2) (2025-10-29)
+
+
+### Bug Fixes
+
+* add ID to PR comment step in preview deployment workflow ([f781c94](https://github.com/algtools/actions/commit/f781c94e9f6b6b74144fe0e61e4671cd1dfd09d9))
+
 ## [1.1.1](https://github.com/algtools/actions/compare/v1.1.0...v1.1.1) (2025-10-29)
 
 
