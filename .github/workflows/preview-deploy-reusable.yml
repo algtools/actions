@@ -223,7 +223,9 @@ jobs:
     name: Deploy Preview
     needs: build
     runs-on: ubuntu-latest
-    environment: 'preview-${{ github.event.pull_request.number }}'
+    environment:
+      name: 'preview-${{ github.event.pull_request.number }}'
+      url: 'https://${{ inputs.app_domain }}.${{ inputs.dev_zone }}'
     outputs:
       worker_url: ${{ steps.deploy-worker.outputs.worker_url }}
       deployment_status: ${{ steps.deploy-worker.outputs.deployment_status }}
@@ -278,6 +280,15 @@ jobs:
           echo "number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
           echo "::endgroup::"
 
+      - name: Construct preview domain
+        id: preview-domain
+        run: |
+          echo "::group::Constructing preview domain"
+          PREVIEW_DOMAIN="${{ inputs.app_domain }}.${{ inputs.dev_zone }}"
+          echo "domain=${PREVIEW_DOMAIN}" >> "$GITHUB_OUTPUT"
+          echo "Preview domain: ${PREVIEW_DOMAIN}"
+          echo "::endgroup::"
+
       - name: Ensure wildcard SSL certificate
         id: ensure-cert
         uses: algtools/actions/.github/actions/ensure-wildcard-certificate@main
@@ -300,6 +311,8 @@ jobs:
           cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
           wrangler_version: ${{ inputs.wrangler_version }}
           deploy_environment: 'preview'
+          custom_domain: ${{ steps.preview-domain.outputs.domain }}
+          zone_id: ${{ inputs.zone }}
           dry_run: 'false'
 
       - name: Construct preview URL
@@ -311,8 +324,9 @@ jobs:
           APP_DOMAIN="${{ inputs.app_domain }}"
           DEV_ZONE="${{ inputs.dev_zone }}"
 
-          # Construct URL: {app_domain}-pr-{num}.{dev_zone}
-          PREVIEW_URL="https://${APP_DOMAIN}-pr-${PR_NUM}.${DEV_ZONE}"
+          # Construct URL: https://{app_domain}.{dev_zone}
+          # Note: app_domain already contains <alias>-<pr-number>.<slug>
+          PREVIEW_URL="https://${APP_DOMAIN}.${DEV_ZONE}"
 
           echo "Preview URL: ${PREVIEW_URL}"
           echo "url=${PREVIEW_URL}" >> "$GITHUB_OUTPUT"
