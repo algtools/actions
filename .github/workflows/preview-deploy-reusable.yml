@@ -299,7 +299,7 @@ jobs:
           cloudflare_api_token: ${{ secrets.cloudflare_api_token }}
           cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
           wrangler_version: ${{ inputs.wrangler_version }}
-          deploy_environment: 'preview-${{ github.event.pull_request.number }}'
+          deploy_environment: 'preview'
           dry_run: 'false'
 
       - name: Construct preview URL
@@ -573,7 +573,7 @@ jobs:
 
             **Deployment Details:**
             - Worker: `${{ inputs.worker_name }}`
-            - Environment: `preview-${{ needs.deploy.outputs.pr_number }}`
+            - Environment: `preview`
             - Commit: `${{ github.sha }}`
           dedupe_key: 'preview-deploy'
       - name: Comment on PR
