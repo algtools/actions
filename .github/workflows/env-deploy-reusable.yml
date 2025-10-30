@@ -15,8 +15,12 @@ on:
         description: 'Cloudflare zone ID for the domain'
         required: true
         type: string
-      worker_name:
-        description: 'Name of the Cloudflare Worker to deploy'
+      slug:
+        description: 'Project slug (e.g., "template", "bff-template")'
+        required: true
+        type: string
+      app_name:
+        description: 'Application name (e.g., "api", "web")'
         required: true
         type: string
       artifact_name:
@@ -139,6 +143,7 @@ jobs:
       certificate_status: ${{ steps.ensure-cert.outputs.certificate_status }}
       certificate_created: ${{ steps.ensure-cert.outputs.certificate_created }}
       wildcard_domain: ${{ steps.wildcard-domain.outputs.wildcard_domain }}
+      worker_name: ${{ steps.worker-name.outputs.name }}
 
     steps:
       - name: Validate inputs
@@ -158,8 +163,12 @@ jobs:
             echo "::error::zone input is required"
             exit 1
           fi
-          if [ -z "${{ inputs.worker_name }}" ]; then
-            echo "::error::worker_name input is required"
+          if [ -z "${{ inputs.slug }}" ]; then
+            echo "::error::slug input is required"
+            exit 1
+          fi
+          if [ -z "${{ inputs.app_name }}" ]; then
+            echo "::error::app_name input is required"
             exit 1
           fi
           if [ -z "${{ inputs.artifact_name }}" ]; then
@@ -191,7 +200,6 @@ jobs:
           echo ""
           echo "Deployment Configuration:"
           echo "  Environment: ${{ inputs.environment }}"
-          echo "  Worker: ${{ inputs.worker_name }}"
           echo "  Zone ID: $(echo "${{ inputs.zone }}" | head -c 8)***"
           echo "  Domain: ${{ inputs.custom_domain }}"
           echo "  Artifact: ${{ inputs.artifact_name }}"
@@ -214,6 +222,36 @@ jobs:
 
           echo "wildcard_domain=${WILDCARD_DOMAIN}" >> "$GITHUB_OUTPUT"
 
+      - name: Construct worker name
+        id: worker-name
+        run: |
+          echo "::group::Constructing worker name"
+
+          ENV="${{ inputs.environment }}"
+          SLUG="${{ inputs.slug }}"
+          APP_NAME="${{ inputs.app_name }}"
+
+          # Construct worker name based on environment
+          case "$ENV" in
+            dev)
+              WORKER_NAME="${SLUG}-${APP_NAME}-dev"
+              ;;
+            qa)
+              WORKER_NAME="${SLUG}-${APP_NAME}-qa"
+              ;;
+            main|production)
+              WORKER_NAME="${SLUG}-${APP_NAME}-prod"
+              ;;
+            *)
+              WORKER_NAME="${SLUG}-${APP_NAME}-${ENV}"
+              ;;
+          esac
+
+          echo "Environment: ${ENV}"
+          echo "Worker name: ${WORKER_NAME}"
+          echo "name=${WORKER_NAME}" >> "$GITHUB_OUTPUT"
+          echo "::endgroup::"
+
       - name: Ensure wildcard certificate
         id: ensure-cert
         uses: algtools/actions/.github/actions/ensure-wildcard-certificate@main
@@ -230,7 +268,7 @@ jobs:
         uses: algtools/actions/.github/actions/deploy-cloudflare-from-artifact@main
         with:
           artifact_name: ${{ inputs.artifact_name }}
-          worker_name: ${{ inputs.worker_name }}
+          worker_name: ${{ steps.worker-name.outputs.name }}
           wrangler_config: ${{ inputs.wrangler_config }}
           cloudflare_api_token: ${{ secrets.cloudflare_api_token }}
           cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
@@ -334,7 +372,7 @@ jobs:
             <summary>Deployment Details</summary>
 
             ### Worker Details
-            - **Name**: `${{ inputs.worker_name }}`
+            - **Name**: `${{ steps.worker-name.outputs.name }}`
             - **Version**: `${{ steps.deploy-worker.outputs.worker_version }}`
             - **Artifact**: `${{ inputs.artifact_name }}`
 
@@ -356,7 +394,7 @@ jobs:
             echo "- **Status**: ✅ ${{ steps.deploy-worker.outputs.deployment_status }}"
             echo ""
             echo "### Worker Details"
-            echo "- **Name**: \`${{ inputs.worker_name }}\`"
+            echo "- **Name**: \`${{ steps.worker-name.outputs.name }}\`"
             echo "- **URL**: ${{ steps.deploy-worker.outputs.worker_url }}"
             echo "- **Version**: \`${{ steps.deploy-worker.outputs.worker_version }}\`"
             echo "- **Artifact**: \`${{ inputs.artifact_name }}\`"
@@ -484,7 +522,7 @@ jobs:
           cat << 'EOFNOTES' >> release_notes.md
 
           ### 🔧 Deployment Details
-          - **Worker Name**: `${{ inputs.worker_name }}`
+          - **Worker Name**: `${{ needs.deploy.outputs.worker_name }}`
           - **Domain**: `${{ inputs.custom_domain }}`
           - **Wildcard Certificate**: `*.${{ needs.deploy.outputs.wildcard_domain }}`
           - **Artifact**: `${{ inputs.artifact_name }}`
@@ -532,7 +570,7 @@ jobs:
             echo ""
             echo "### Deployment Info"
             echo "- **Environment**: ${{ inputs.environment }}"
-            echo "- **Worker**: ${{ inputs.worker_name }}"
+            echo "- **Worker**: ${{ needs.deploy.outputs.worker_name }}"
             echo "- **URL**: ${{ needs.deploy.outputs.worker_url }}"
             echo ""
             echo "✅ Release published successfully"
