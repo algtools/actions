@@ -55,3 +55,11 @@ runs:
         TARBALL_PATH="template-dist/${TARBALL_NAME}"
         echo "tarball_path=${TARBALL_PATH}" >> $GITHUB_OUTPUT
         echo "tarball_name=${TARBALL_NAME}" >> $GITHUB_OUTPUT
+
+    - name: Format generated files
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: |
+        echo "🎨 Formatting generated files..."
+        pnpm run format || true
+        echo "✅ Formatting complete"
