@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/algtools/actions/compare/v1.1.4...v1.2.0) (2025-10-31)
+
+
+### Features
+
+* add auto accept changes input to chromatic upload action ([59a4fa7](https://github.com/algtools/actions/commit/59a4fa7543b5e4815804e93e93244e6b7279293d))
+
 ## [1.1.4](https://github.com/algtools/actions/compare/v1.1.3...v1.1.4) (2025-10-31)
 
 ## [1.1.3](https://github.com/algtools/actions/compare/v1.1.2...v1.1.3) (2025-10-29)
