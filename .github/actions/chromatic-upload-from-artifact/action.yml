@@ -25,6 +25,10 @@ inputs:
     description: 'Directory path where the artifact will be downloaded'
     required: false
     default: './storybook-artifact'
+  auto_accept_changes:
+    description: 'Automatically accept all changes (useful for baseline branches)'
+    required: false
+    default: 'false'
 
 outputs:
   chromatic_url:
@@ -41,7 +45,7 @@ runs:
       shell: bash
       run: |
         echo "::group::Validating inputs"
-        
+
         # Validate required inputs
         if [ -z "${{ inputs.artifact_name }}" ]; then
           echo "::error::artifact_name input is required"
@@ -51,7 +55,7 @@ runs:
           echo "::error::project_token input is required"
           exit 1
         fi
-        
+
         echo "✓ All required inputs validated successfully"
         echo ""
         echo "Configuration:"
@@ -73,17 +77,17 @@ runs:
       shell: bash
       run: |
         echo "::group::Verifying artifact contents"
-        
+
         DOWNLOAD_PATH="${{ inputs.download_path }}"
-        
+
         if [ ! -d "$DOWNLOAD_PATH" ]; then
           echo "::error::Download path '$DOWNLOAD_PATH' does not exist"
           exit 1
         fi
-        
+
         echo "✓ Artifact downloaded to: $DOWNLOAD_PATH"
         echo ""
-        
+
         # List artifact contents
         echo "Artifact contents:"
         find "$DOWNLOAD_PATH" -type f | head -20 | while read -r file; do
@@ -91,15 +95,15 @@ runs:
           BASENAME=$(basename "$file")
           echo "  - $BASENAME ($SIZE bytes)"
         done
-        
+
         FILE_COUNT=$(find "$DOWNLOAD_PATH" -type f | wc -l | xargs)
         if [ "$FILE_COUNT" -gt 20 ]; then
           echo "  ... and $((FILE_COUNT - 20)) more files"
         fi
-        
+
         echo ""
         echo "✓ Total files in artifact: $FILE_COUNT"
-        
+
         echo "::endgroup::"
 
     - name: Extract and prepare Storybook
@@ -107,54 +111,54 @@ runs:
       working-directory: ${{ inputs.working_dir }}
       run: |
         echo "::group::Preparing Storybook directory"
-        
+
         DOWNLOAD_PATH="${{ inputs.download_path }}"
         STORYBOOK_DIR="${{ inputs.storybook_dir }}"
-        
+
         # Create storybook directory if it doesn't exist
         mkdir -p "$STORYBOOK_DIR"
-        
+
         # Check if artifact contains a zip file
         ZIP_FILE=$(find "$DOWNLOAD_PATH" -name "*.zip" -type f | head -1)
-        
+
         if [ -n "$ZIP_FILE" ]; then
           echo "📦 Found zip file: $(basename "$ZIP_FILE")"
           echo "Extracting to: $STORYBOOK_DIR"
-          
+
           # Extract zip file
           unzip -q "$ZIP_FILE" -d "$STORYBOOK_DIR"
-          
+
           echo "✓ Extraction complete"
         else
           echo "📁 No zip file found, copying files directly"
-          
+
           # Copy all files from download path to storybook directory
           cp -r "$DOWNLOAD_PATH"/* "$STORYBOOK_DIR/" 2>/dev/null || true
-          
+
           echo "✓ Files copied to $STORYBOOK_DIR"
         fi
-        
+
         # Verify storybook directory has content
         STORYBOOK_FILES=$(find "$STORYBOOK_DIR" -type f | wc -l | xargs)
-        
+
         if [ "$STORYBOOK_FILES" -eq 0 ]; then
           echo "::error::No files found in Storybook directory: $STORYBOOK_DIR"
           exit 1
         fi
-        
+
         echo ""
         echo "Storybook directory contents (first 10 files):"
         find "$STORYBOOK_DIR" -type f | head -10 | while read -r file; do
           echo "  - ${file#$STORYBOOK_DIR/}"
         done
-        
+
         if [ "$STORYBOOK_FILES" -gt 10 ]; then
           echo "  ... and $((STORYBOOK_FILES - 10)) more files"
         fi
-        
+
         echo ""
         echo "✓ Storybook prepared successfully ($STORYBOOK_FILES files)"
-        
+
         echo "::endgroup::"
 
     - name: Upload to Chromatic
@@ -165,43 +169,52 @@ runs:
         CHROMATIC_PROJECT_TOKEN: ${{ inputs.project_token }}
       run: |
         echo "::group::Uploading to Chromatic"
-        
+
         # Mask sensitive values in logs
         echo "::add-mask::${{ inputs.project_token }}"
-        
+
         STORYBOOK_DIR="${{ inputs.storybook_dir }}"
         EXIT_ZERO="${{ inputs.exit_zero_on_changes }}"
-        
+        AUTO_ACCEPT="${{ inputs.auto_accept_changes }}"
+
         echo "Preparing Chromatic upload..."
         echo "  Storybook directory: $STORYBOOK_DIR"
         echo "  Exit zero on changes: $EXIT_ZERO"
+        echo "  Auto accept changes: $AUTO_ACCEPT"
         echo ""
-        
+
         # Build chromatic command
         CHROMATIC_CMD="npx chromatic --project-token=\$CHROMATIC_PROJECT_TOKEN --storybook-build-dir=\"$STORYBOOK_DIR\""
-        
+
         if [ "$EXIT_ZERO" = "true" ]; then
           CHROMATIC_CMD="$CHROMATIC_CMD --exit-zero-on-changes"
         fi
-        
+
+        if [ "$AUTO_ACCEPT" = "true" ]; then
+          CHROMATIC_CMD="$CHROMATIC_CMD --auto-accept-changes"
+        fi
+
         echo "Executing Chromatic upload..."
         echo "Command: npx chromatic --project-token=[REDACTED] --storybook-build-dir=\"$STORYBOOK_DIR\""
         if [ "$EXIT_ZERO" = "true" ]; then
           echo "  --exit-zero-on-changes"
         fi
+        if [ "$AUTO_ACCEPT" = "true" ]; then
+          echo "  --auto-accept-changes"
+        fi
         echo ""
-        
+
         # Execute chromatic and capture output
         set +e
         CHROMATIC_OUTPUT=$(eval $CHROMATIC_CMD 2>&1)
         CHROMATIC_EXIT=$?
         set -e
-        
+
         # Filter sensitive information from output
         FILTERED_OUTPUT=$(echo "$CHROMATIC_OUTPUT" | grep -v "${{ inputs.project_token }}" | grep -v "project-token" || echo "$CHROMATIC_OUTPUT")
-        
+
         echo "$FILTERED_OUTPUT"
-        
+
         # Check if chromatic failed (and we're not exiting zero on changes)
         if [ "$CHROMATIC_EXIT" -ne 0 ] && [ "$EXIT_ZERO" != "true" ]; then
           echo ""
@@ -210,23 +223,23 @@ runs:
           echo "chromatic_url=" >> $GITHUB_OUTPUT
           exit 1
         fi
-        
+
         echo ""
         echo "✓ Chromatic upload completed successfully"
-        
+
         # Extract Chromatic build URL from output
         # Chromatic typically outputs URLs in formats like:
         # - "View your Chromatic build at https://www.chromatic.com/build?appId=..."
         # - "Build URL: https://www.chromatic.com/build?appId=..."
         # - "https://www.chromatic.com/build?appId=..." (direct URL)
-        
+
         CHROMATIC_URL=$(echo "$FILTERED_OUTPUT" | grep -oP 'https://[a-zA-Z0-9\-\.]+chromatic\.com/[^\s]+' | head -1 || echo "")
-        
+
         # Also try to find it with the word "build"
         if [ -z "$CHROMATIC_URL" ]; then
           CHROMATIC_URL=$(echo "$FILTERED_OUTPUT" | grep -i "build" | grep -oP 'https://[^\s]+' | grep "chromatic" | head -1 || echo "")
         fi
-        
+
         if [ -z "$CHROMATIC_URL" ]; then
           echo "⚠️  Could not extract Chromatic build URL from output"
           echo "Please check the output above for the build link"
@@ -234,11 +247,11 @@ runs:
         else
           echo "📍 Chromatic build URL: $CHROMATIC_URL"
         fi
-        
+
         # Set outputs
         echo "chromatic_url=$CHROMATIC_URL" >> $GITHUB_OUTPUT
         echo "status=success" >> $GITHUB_OUTPUT
-        
+
         echo "::endgroup::"
 
     - name: Upload summary
@@ -263,11 +276,11 @@ runs:
         echo "  ✓ Upload from verified artifact"
         echo "  ✓ No secrets exposed"
         echo ""
-        
+
         if [ "${{ steps.upload.outputs.status }}" = "success" ]; then
           echo "✓ Upload completed successfully"
         else
           echo "❌ Upload failed"
         fi
-        
+
         echo "::endgroup::"
