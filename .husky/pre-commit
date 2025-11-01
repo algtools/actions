@@ -1,24 +1,12 @@
-#!/bin/sh
-# Run actionlint on workflow files before commit
+#!/usr/bin/env sh
 
-echo "🔍 Running actionlint on workflow files..."
+echo "Running pre-commit checks..."
 
-# Check if actionlint is available
-if ! command -v actionlint >/dev/null 2>&1; then
-  echo "⚠️  actionlint not found. Install it to validate workflows locally:"
-  echo "   brew install actionlint          # macOS"
-  echo "   go install github.com/rhysd/actionlint/cmd/actionlint@latest"
-  echo ""
-  echo "Skipping workflow validation..."
-  exit 0
-fi
+# Run lint-staged for formatted files
+npx lint-staged
 
-# Run actionlint on workflow files
-if ! actionlint .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null; then
-  echo ""
-  echo "❌ Workflow validation failed!"
-  echo "Fix the errors above before committing."
-  exit 1
-fi
+# Run actionlint on all workflow files
+echo "🔍 Validating workflow files..."
+pnpm run lint:workflows
 
-echo "✅ Workflow validation passed!"
+echo "✅ All pre-commit checks passed!"
