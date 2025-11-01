@@ -222,6 +222,7 @@ jobs:
           artifact_name: ${{ inputs.artifact_name }}
           artifact_paths: ${{ inputs.artifact_paths }}
           retention_days: ${{ inputs.retention_days }}
+          include_hidden_files: 'true'
 
   deploy:
     name: Deploy Preview
