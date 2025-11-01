@@ -311,6 +311,15 @@ jobs:
           echo "name=${WORKER_NAME}" >> "$GITHUB_OUTPUT"
           echo "::endgroup::"
 
+      - name: Create GitHub Deployment (pending)
+        id: create-deployment-pending
+        uses: algtools/actions/.github/actions/update-deployment-status@main
+        with:
+          environment: 'preview-${{ steps.resolve-pr.outputs.number }}'
+          state: 'pending'
+          description: 'PR preview deployment pending'
+          github_token: ${{ github.token }}
+
       - name: Ensure wildcard SSL certificate
         id: ensure-cert
         uses: algtools/actions/.github/actions/ensure-wildcard-certificate@main
@@ -321,6 +330,14 @@ jobs:
           cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
           max_wait_seconds: ${{ inputs.max_wait_seconds }}
           poll_interval_seconds: ${{ inputs.poll_interval_seconds }}
+
+      - name: Update GitHub Deployment (in progress)
+        uses: algtools/actions/.github/actions/update-deployment-status@main
+        with:
+          environment: 'preview-${{ steps.resolve-pr.outputs.number }}'
+          state: 'in_progress'
+          description: 'Deploying PR preview'
+          github_token: ${{ github.token }}
 
       - name: Deploy to Cloudflare Workers
         id: deploy-worker
@@ -352,6 +369,25 @@ jobs:
           echo "Preview URL: ${PREVIEW_URL}"
           echo "url=${PREVIEW_URL}" >> "$GITHUB_OUTPUT"
           echo "::endgroup::"
+
+      - name: Update GitHub Deployment (success)
+        uses: algtools/actions/.github/actions/update-deployment-status@main
+        with:
+          environment: 'preview-${{ steps.resolve-pr.outputs.number }}'
+          state: 'success'
+          deployment_url: ${{ steps.preview-url.outputs.url }}
+          description: 'PR preview deployed'
+          github_token: ${{ github.token }}
+          auto_inactive: 'false'
+
+      - name: Update GitHub Deployment (failure)
+        if: failure()
+        uses: algtools/actions/.github/actions/update-deployment-status@main
+        with:
+          environment: 'preview-${{ steps.resolve-pr.outputs.number }}'
+          state: 'failure'
+          description: 'PR preview deployment failed'
+          github_token: ${{ github.token }}
 
   chromatic:
     name: Upload to Chromatic

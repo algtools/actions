@@ -1,0 +1,367 @@
+name: "Build, Test, and Artifact - Reusable Workflow"
+
+on:
+  workflow_call:
+    inputs:
+      # Test configuration
+      test_cmd:
+        description: 'Test command to execute (e.g., "npm test", "pnpm test")'
+        required: true
+        type: string
+      enable_coverage:
+        description: 'Enable test coverage reports'
+        required: false
+        type: boolean
+        default: false
+      coverage_cmd:
+        description: 'Coverage command to execute'
+        required: false
+        type: string
+        default: ''
+
+      # Lint configuration
+      lint_cmd:
+        description: 'Lint command to execute (can include multiple commands separated by &&)'
+        required: true
+        type: string
+
+      # Type check configuration
+      type_check_cmd:
+        description: 'Type check command to execute (e.g., "tsc --noEmit")'
+        required: true
+        type: string
+
+      # Build configuration
+      build_cmd:
+        description: 'Build command to execute (e.g., "npm run build", "pnpm build")'
+        required: true
+        type: string
+      node_version:
+        description: 'Node.js version to install. If not provided, reads from .nvmrc file.'
+        required: false
+        type: string
+        default: ""
+      working_directory:
+        description: 'Working directory for all commands'
+        required: false
+        type: string
+        default: "."
+      output_dir:
+        description: 'Directory where build output/artifacts will be produced (e.g., "dist", "build")'
+        required: false
+        type: string
+        default: "dist"
+
+      # Artifact configuration
+      artifact_name:
+        description: "Name of the artifact to upload"
+        required: true
+        type: string
+      artifact_paths:
+        description: "Comma-separated list of file paths or directories to upload as artifacts"
+        required: true
+        type: string
+      retention_days:
+        description: "Number of days to retain the artifact (1-90 days, default is repository/org setting)"
+        required: false
+        type: number
+        default: 30
+
+      # Optional: Storybook build
+      enable_storybook:
+        description: 'Enable Storybook build (creates separate job)'
+        required: false
+        type: boolean
+        default: false
+      storybook_cmd:
+        description: 'Storybook build command (e.g., "pnpm build:storybook && pnpm copy:storybook")'
+        required: false
+        type: string
+        default: ''
+      storybook_output_dir:
+        description: 'Directory where Storybook output is produced'
+        required: false
+        type: string
+        default: 'storybook-static'
+
+      # Optional: API documentation
+      enable_api_docs:
+        description: 'Enable API documentation generation (part of build job)'
+        required: false
+        type: boolean
+        default: false
+      api_docs_cmd:
+        description: 'API docs command (e.g., "pnpm openapi:export")'
+        required: false
+        type: string
+        default: ''
+
+    outputs:
+      # Test outputs
+      test_status:
+        description: "Status of the tests"
+        value: ${{ jobs.test.outputs.test_status }}
+
+      # Build outputs
+      build_status:
+        description: "Status of the build"
+        value: ${{ jobs.build.outputs.build_status }}
+
+      # Artifact outputs
+      artifact_id:
+        description: "GitHub artifact ID"
+        value: ${{ jobs.upload-artifact.outputs.artifact_id }}
+      artifact_url:
+        description: "Download URL for the artifact"
+        value: ${{ jobs.upload-artifact.outputs.artifact_url }}
+      total_files:
+        description: "Number of files uploaded"
+        value: ${{ jobs.upload-artifact.outputs.total_files }}
+      total_size:
+        description: "Total size in bytes"
+        value: ${{ jobs.upload-artifact.outputs.total_size }}
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  # Job 1: Run tests with NODE_ENV=test
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    outputs:
+      test_status: ${{ steps.test.outputs.test_status }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        id: setup
+        uses: algtools/actions/.github/actions/setup-node@main
+        with:
+          node-version: ${{ inputs.node_version }}
+          working-directory: ${{ inputs.working_directory }}
+          github-token: ${{ github.token }}
+
+      - name: Run tests
+        id: test
+        uses: algtools/actions/.github/actions/test-project@main
+        with:
+          test_cmd: ${{ inputs.test_cmd }}
+          working_dir: ${{ inputs.working_directory }}
+          coverage: ${{ inputs.enable_coverage }}
+          coverage_cmd: ${{ inputs.coverage_cmd }}
+
+      - name: Upload coverage reports
+        if: inputs.enable_coverage == true
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.sha }}
+          path: ${{ inputs.working_directory }}/coverage
+          retention-days: 7
+          if-no-files-found: warn
+
+  # Job 2: Lint and format check
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: algtools/actions/.github/actions/setup-node@main
+        with:
+          node-version: ${{ inputs.node_version }}
+          working-directory: ${{ inputs.working_directory }}
+          github-token: ${{ github.token }}
+
+      - name: Run lint
+        working-directory: ${{ inputs.working_directory }}
+        run: ${{ inputs.lint_cmd }}
+
+  # Job 3: Type checking
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: algtools/actions/.github/actions/setup-node@main
+        with:
+          node-version: ${{ inputs.node_version }}
+          working-directory: ${{ inputs.working_directory }}
+          github-token: ${{ github.token }}
+
+      - name: Run type check
+        working-directory: ${{ inputs.working_directory }}
+        run: ${{ inputs.type_check_cmd }}
+
+  # Job 4: Build primary artifact (depends on test, lint, type-check passing)
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [test, lint, type-check]
+    outputs:
+      build_status: ${{ steps.build.outputs.build_status }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: algtools/actions/.github/actions/setup-node@main
+        with:
+          node-version: ${{ inputs.node_version }}
+          working-directory: ${{ inputs.working_directory }}
+          github-token: ${{ github.token }}
+
+      - name: Build project
+        id: build
+        uses: algtools/actions/.github/actions/build-no-secrets@main
+        with:
+          build_cmd: ${{ inputs.build_cmd }}
+          working_dir: ${{ inputs.working_directory }}
+          output_dir: ${{ inputs.output_dir }}
+          node_env: 'production'
+
+      - name: Generate API documentation
+        if: inputs.enable_api_docs == true
+        working-directory: ${{ inputs.working_directory }}
+        run: ${{ inputs.api_docs_cmd }}
+
+      - name: Summary
+        run: |
+          {
+            echo "## Build Summary"
+            echo ""
+            echo "### Status"
+            echo "- **Build**: ✅ Success"
+            if [ "${{ inputs.enable_api_docs }}" = "true" ]; then
+              echo "- **API Docs**: ✅ Generated"
+            fi
+            echo ""
+            echo "### Configuration"
+            echo "- **Working Directory**: ${{ inputs.working_directory }}"
+            echo "- **Output Directory**: ${{ inputs.output_dir }}"
+            echo "- **Node Version**: ${{ steps.setup.outputs.node-version || 'default' }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Job 5: Build Storybook (optional, parallel with main build)
+  build-storybook:
+    name: Build Storybook
+    if: inputs.enable_storybook == true
+    runs-on: ubuntu-latest
+    needs: [test, lint, type-check]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: algtools/actions/.github/actions/setup-node@main
+        with:
+          node-version: ${{ inputs.node_version }}
+          working-directory: ${{ inputs.working_directory }}
+          github-token: ${{ github.token }}
+
+      - name: Build Storybook
+        working-directory: ${{ inputs.working_directory }}
+        env:
+          NODE_ENV: production
+          CI: true
+          NODE_OPTIONS: '--max_old_space_size=4096'
+        run: ${{ inputs.storybook_cmd }}
+
+      - name: Verify Storybook output
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          if [ ! -d "${{ inputs.storybook_output_dir }}" ]; then
+            echo "::error::Storybook output directory '${{ inputs.storybook_output_dir }}' was not created"
+            exit 1
+          fi
+          echo "✓ Storybook built successfully"
+          ls -lah "${{ inputs.storybook_output_dir }}" || true
+
+      - name: Summary
+        run: |
+          {
+            echo "## Storybook Build Summary"
+            echo ""
+            echo "- **Status**: ✅ Success"
+            echo "- **Output Directory**: ${{ inputs.storybook_output_dir }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Job 6: Upload all artifacts
+  upload-artifact:
+    name: Upload Artifacts
+    runs-on: ubuntu-latest
+    needs: [build]
+    # Also depend on storybook if it's enabled
+    if: |
+      always() &&
+      needs.build.result == 'success' &&
+      (inputs.enable_storybook == false || needs.build-storybook.result == 'success')
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact_id }}
+      artifact_url: ${{ steps.upload.outputs.artifact_url }}
+      total_files: ${{ steps.upload.outputs.total_files }}
+      total_size: ${{ steps.upload.outputs.total_size }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: algtools/actions/.github/actions/setup-node@main
+        with:
+          node-version: ${{ inputs.node_version }}
+          working-directory: ${{ inputs.working_directory }}
+          github-token: ${{ github.token }}
+
+      # Rebuild to ensure we have all artifacts (since jobs run on different runners)
+      - name: Rebuild artifacts
+        uses: algtools/actions/.github/actions/build-no-secrets@main
+        with:
+          build_cmd: ${{ inputs.build_cmd }}
+          working_dir: ${{ inputs.working_directory }}
+          output_dir: ${{ inputs.output_dir }}
+          node_env: 'production'
+
+      - name: Regenerate API documentation
+        if: inputs.enable_api_docs == true
+        working-directory: ${{ inputs.working_directory }}
+        run: ${{ inputs.api_docs_cmd }}
+
+      - name: Rebuild Storybook
+        if: inputs.enable_storybook == true
+        working-directory: ${{ inputs.working_directory }}
+        env:
+          NODE_ENV: production
+          CI: true
+          NODE_OPTIONS: '--max_old_space_size=4096'
+        run: ${{ inputs.storybook_cmd }}
+
+      - name: Upload artifacts
+        id: upload
+        uses: algtools/actions/.github/actions/upload-artifacts@main
+        with:
+          artifact_name: ${{ inputs.artifact_name }}
+          artifact_paths: ${{ inputs.artifact_paths }}
+          retention_days: ${{ inputs.retention_days }}
+          include_hidden_files: 'true'
+
+      - name: Summary
+        run: |
+          {
+            echo "## Artifact Upload Summary"
+            echo ""
+            echo "### Artifact Details"
+            echo "- **Name**: ${{ inputs.artifact_name }}"
+            echo "- **ID**: ${{ steps.upload.outputs.artifact_id }}"
+            echo "- **Total Files**: ${{ steps.upload.outputs.total_files }}"
+            echo "- **Total Size**: ${{ steps.upload.outputs.total_size }} bytes"
+            echo "- **Retention**: ${{ inputs.retention_days }} days"
+            echo ""
+            echo "✓ All artifacts uploaded successfully"
+          } >> "$GITHUB_STEP_SUMMARY"

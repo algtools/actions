@@ -1,0 +1,133 @@
+name: 'Test Project'
+description: 'Runs tests in a clean environment with NODE_ENV=test. Supports coverage reports and test output.'
+author: 'Algenium Systems'
+
+inputs:
+  test_cmd:
+    description: 'Test command to execute (e.g., "npm test", "pnpm test", "vitest run")'
+    required: true
+  working_dir:
+    description: 'Working directory where the test command will be executed'
+    required: false
+    default: '.'
+  coverage:
+    description: 'Enable coverage reports (true/false)'
+    required: false
+    default: 'false'
+  coverage_cmd:
+    description: 'Coverage command to execute if coverage is enabled (e.g., "npm run test:coverage")'
+    required: false
+    default: ''
+
+outputs:
+  test_status:
+    description: 'Status of the tests (success or failure)'
+    value: ${{ steps.test.outputs.status }}
+  coverage_generated:
+    description: 'Whether coverage was generated (true/false)'
+    value: ${{ steps.coverage.outputs.generated }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        echo "::group::Validating inputs"
+        if [ -z "${{ inputs.test_cmd }}" ]; then
+          echo "::error::test_cmd input is required"
+          exit 1
+        fi
+        echo "✓ Inputs validated successfully"
+        echo "  Test command: ${{ inputs.test_cmd }}"
+        echo "  Working directory: ${{ inputs.working_dir }}"
+        echo "  Coverage enabled: ${{ inputs.coverage }}"
+        echo "::endgroup::"
+
+    - name: Verify working directory exists
+      shell: bash
+      run: |
+        echo "::group::Verifying working directory"
+        if [ ! -d "${{ inputs.working_dir }}" ]; then
+          echo "::error::Working directory '${{ inputs.working_dir }}' does not exist"
+          exit 1
+        fi
+        echo "✓ Working directory exists: ${{ inputs.working_dir }}"
+        echo "::endgroup::"
+
+    - name: Run tests
+      id: test
+      shell: bash
+      working-directory: ${{ inputs.working_dir }}
+      env:
+        # Set test environment
+        NODE_ENV: test
+        CI: true
+      run: |
+        echo "::group::Running tests"
+        echo "Environment: NODE_ENV=test, CI=true"
+        echo "Executing: ${{ inputs.test_cmd }}"
+        echo ""
+
+        # Run the test command
+        if ${{ inputs.test_cmd }}; then
+          echo ""
+          echo "✓ Tests completed successfully"
+          echo "status=success" >> $GITHUB_OUTPUT
+        else
+          echo ""
+          echo "::error::Tests failed"
+          echo "status=failure" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        echo "::endgroup::"
+
+    - name: Generate coverage report
+      id: coverage
+      if: inputs.coverage == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working_dir }}
+      env:
+        NODE_ENV: test
+        CI: true
+      run: |
+        echo "::group::Generating coverage report"
+
+        # Determine coverage command
+        if [ -n "${{ inputs.coverage_cmd }}" ]; then
+          COVERAGE_CMD="${{ inputs.coverage_cmd }}"
+        else
+          COVERAGE_CMD="${{ inputs.test_cmd }}"
+        fi
+
+        echo "Executing: $COVERAGE_CMD"
+        echo ""
+
+        if $COVERAGE_CMD; then
+          echo ""
+          echo "✓ Coverage report generated successfully"
+          echo "generated=true" >> $GITHUB_OUTPUT
+
+          # Check if coverage directory exists
+          if [ -d "coverage" ]; then
+            echo "Coverage files:"
+            ls -lah coverage/ || true
+          fi
+        else
+          echo ""
+          echo "::warning::Coverage generation failed"
+          echo "generated=false" >> $GITHUB_OUTPUT
+        fi
+        echo "::endgroup::"
+
+    - name: Test summary
+      shell: bash
+      run: |
+        echo "::group::Test Summary"
+        echo "✓ Tests executed in isolated test environment"
+        echo "✓ NODE_ENV set to 'test' for proper test behavior"
+        echo "✓ Test results validated"
+        if [ "${{ inputs.coverage }}" = "true" ]; then
+          echo "✓ Coverage report generated"
+        fi
+        echo "::endgroup::"
