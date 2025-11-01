@@ -104,9 +104,13 @@ runs:
 
             # List some files in the directory
             echo "  Contents (first 5 files):"
-            find "$path" -type f | head -5 | while read -r file; do
-              echo "    - $(basename "$file")"
-            done
+            # Use a safer approach that doesn't cause broken pipe errors
+            SAMPLE_FILES=$(find "$path" -type f -print 2>/dev/null | head -5 || true)
+            if [ -n "$SAMPLE_FILES" ]; then
+              echo "$SAMPLE_FILES" | while read -r file; do
+                echo "    - $(basename "$file")"
+              done
+            fi
             if [ "$FILE_COUNT" -gt 5 ]; then
               echo "    ... and $((FILE_COUNT - 5)) more files"
             fi
