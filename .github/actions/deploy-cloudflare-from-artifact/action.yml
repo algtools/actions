@@ -132,11 +132,11 @@ runs:
         FILE_COUNT=0
         SHOWN_COUNT=0
         while IFS= read -r file; do
-          ((FILE_COUNT++))
+          FILE_COUNT=$((FILE_COUNT + 1))
           if [ $SHOWN_COUNT -lt 20 ]; then
             SIZE=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null || echo "0")
             echo "  - $(basename "$file") ($SIZE bytes)"
-            ((SHOWN_COUNT++))
+            SHOWN_COUNT=$((SHOWN_COUNT + 1))
           fi
         done < <(find "$DOWNLOAD_PATH" -type f 2>/dev/null)
 
