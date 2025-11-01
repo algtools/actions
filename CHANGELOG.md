@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/algtools/actions/compare/v1.4.0...v1.5.0) (2025-11-01)
+
+
+### Features
+
+* add new GitHub actions for testing, deployment status updates, and reusable workflows ([f89095a](https://github.com/algtools/actions/commit/f89095a5e74ad3cd59916a1aa048e4ec9084f727))
+
 # [1.4.0](https://github.com/algtools/actions/compare/v1.3.0...v1.4.0) (2025-11-01)
 
 
