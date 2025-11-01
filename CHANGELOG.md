@@ -1,3 +1,10 @@
+## [1.2.4](https://github.com/algtools/actions/compare/v1.2.3...v1.2.4) (2025-11-01)
+
+
+### Bug Fixes
+
+* update file counting logic in deploy action for clarity and consistency ([4d636ac](https://github.com/algtools/actions/commit/4d636ace0ec9cdfc8ed0a4998ee4815e5f4d3901))
+
 ## [1.2.3](https://github.com/algtools/actions/compare/v1.2.2...v1.2.3) (2025-11-01)
 
 
