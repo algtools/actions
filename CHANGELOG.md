@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/algtools/actions/compare/v1.3.0...v1.4.0) (2025-11-01)
+
+
+### Features
+
+* enable inclusion of hidden files in artifact uploads ([acf298d](https://github.com/algtools/actions/commit/acf298d7a9c583926a1c0124d37f8c0212a47521))
+
 # [1.3.0](https://github.com/algtools/actions/compare/v1.2.5...v1.3.0) (2025-11-01)
 
 
