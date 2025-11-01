@@ -17,7 +17,7 @@ A composite GitHub Action that sets up Node.js securely with caching and audit c
 ```yaml
 steps:
   - uses: actions/checkout@v4
-  
+
   - name: Setup Node.js
     uses: algtools/actions/.github/actions/setup-node@v1
 ```
@@ -29,7 +29,7 @@ This will read the Node.js version from the `.nvmrc` file in your repository roo
 ```yaml
 steps:
   - uses: actions/checkout@v4
-  
+
   - name: Setup Node.js
     uses: algtools/actions/.github/actions/setup-node@v1
     with:
@@ -41,7 +41,7 @@ steps:
 ```yaml
 steps:
   - uses: actions/checkout@v4
-  
+
   - name: Setup Node.js
     uses: algtools/actions/.github/actions/setup-node@v1
     with:
@@ -55,7 +55,7 @@ steps:
 ```yaml
 steps:
   - uses: actions/checkout@v4
-  
+
   - name: Setup Node.js
     uses: algtools/actions/.github/actions/setup-node@v1
     with:
@@ -64,19 +64,19 @@ steps:
 
 ## Inputs
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `node-version` | Node.js version to install. If not provided, reads from `.nvmrc` file. | No | `''` |
-| `cache-dependency-path` | Path to `package-lock.json` for cache key computation | No | `'package-lock.json'` |
-| `working-directory` | Working directory for npm commands | No | `'.'` |
-| `skip-audit` | Skip npm audit step | No | `'false'` |
+| Input                   | Description                                                            | Required | Default               |
+| ----------------------- | ---------------------------------------------------------------------- | -------- | --------------------- |
+| `node-version`          | Node.js version to install. If not provided, reads from `.nvmrc` file. | No       | `''`                  |
+| `cache-dependency-path` | Path to `package-lock.json` for cache key computation                  | No       | `'package-lock.json'` |
+| `working-directory`     | Working directory for npm commands                                     | No       | `'.'`                 |
+| `skip-audit`            | Skip npm audit step                                                    | No       | `'false'`             |
 
 ## Outputs
 
-| Output | Description |
-|--------|-------------|
-| `node-version` | The Node.js version that was installed |
-| `cache-hit` | Whether dependencies were restored from cache (`'true'` or `'false'`) |
+| Output         | Description                                                           |
+| -------------- | --------------------------------------------------------------------- |
+| `node-version` | The Node.js version that was installed                                |
+| `cache-hit`    | Whether dependencies were restored from cache (`'true'` or `'false'`) |
 
 ## Required Permissions
 
@@ -84,7 +84,7 @@ This action requires the following permissions when used in a workflow:
 
 ```yaml
 permissions:
-  contents: read  # Required to checkout repository
+  contents: read # Required to checkout repository
 ```
 
 ## How It Works
@@ -105,12 +105,14 @@ permissions:
 ## Cache Strategy
 
 The action caches:
+
 - `~/.npm`: npm's cache directory
 - `node_modules`: Installed dependencies
 
 **Cache Key**: `npm-{os}-{hash of package-lock.json}`
 
 This ensures that:
+
 - Dependencies are reused across builds with the same `package-lock.json`
 - Different OS builds maintain separate caches
 - Cache is invalidated when dependencies change
@@ -202,12 +204,14 @@ jobs:
 ### .nvmrc file not found
 
 If you see the error "No .nvmrc file found and no node-version input provided", either:
+
 - Add a `.nvmrc` file to your repository with the desired Node.js version
 - Provide the `node-version` input explicitly
 
 ### Cache not working
 
 Ensure that:
+
 - Your repository has a `package-lock.json` file
 - The `cache-dependency-path` points to the correct location
 - You're not using different `working-directory` values between builds
@@ -215,6 +219,7 @@ Ensure that:
 ### npm audit warnings
 
 The `npm audit` step is non-blocking by design. If you see warnings:
+
 - Review the reported vulnerabilities
 - Update dependencies using `npm audit fix`
 - Consider pinning specific versions if needed

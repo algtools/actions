@@ -1,42 +1,42 @@
-name: 'Comment PR'
-description: 'Posts or updates a comment on a Pull Request with deployment info, avoiding duplicates using a dedupe key'
-author: 'Algenium Systems'
+name: "Comment PR"
+description: "Posts or updates a comment on a Pull Request with deployment info, avoiding duplicates using a dedupe key"
+author: "Algenium Systems"
 
 inputs:
   pr_number:
-    description: 'Target PR number'
+    description: "Target PR number"
     required: true
   message:
-    description: 'Markdown body to post in the comment'
+    description: "Markdown body to post in the comment"
     required: true
   dedupe_key:
-    description: 'Optional short key used to detect/update an existing comment (e.g., preview-url, deploy-summary)'
+    description: "Optional short key used to detect/update an existing comment (e.g., preview-url, deploy-summary)"
     required: false
-    default: ''
+    default: ""
   github_token:
-    description: 'GitHub token for API access (defaults to github.token)'
+    description: "GitHub token for API access (defaults to github.token)"
     required: false
     default: ${{ github.token }}
 
 outputs:
   comment_id:
-    description: 'ID of the created or updated comment'
+    description: "ID of the created or updated comment"
     value: ${{ steps.manage-comment.outputs.comment_id }}
   comment_url:
-    description: 'URL of the created or updated comment'
+    description: "URL of the created or updated comment"
     value: ${{ steps.manage-comment.outputs.comment_url }}
   action:
-    description: 'Action taken (created or updated)'
+    description: "Action taken (created or updated)"
     value: ${{ steps.manage-comment.outputs.action }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Validate inputs
       shell: bash
       run: |
         echo "::group::Validating inputs"
-        
+
         # Validate required inputs
         if [ -z "${{ inputs.pr_number }}" ]; then
           echo "::error::pr_number input is required"
@@ -50,13 +50,13 @@ runs:
           echo "::error::github_token input is required"
           exit 1
         fi
-        
+
         # Validate PR number is a positive integer
         if ! [[ "${{ inputs.pr_number }}" =~ ^[0-9]+$ ]]; then
           echo "::error::pr_number must be a positive integer, got: ${{ inputs.pr_number }}"
           exit 1
         fi
-        
+
         echo "✓ All required inputs validated successfully"
         echo ""
         echo "Configuration:"
@@ -77,18 +77,18 @@ runs:
         COMMENT_BODY: ${{ inputs.message }}
       run: |
         echo "::group::Managing PR comment"
-        
+
         # Mask the GitHub token
         echo "::add-mask::${{ inputs.github_token }}"
-        
+
         # Get repository information
         REPO="${{ github.repository }}"
-        
+
         echo "Repository: $REPO"
         echo "PR Number: $PR_NUMBER"
         echo "Dedupe Key: ${DEDUPE_KEY:-'(none)'}"
         echo ""
-        
+
         # Prepare comment body with dedupe marker if dedupe_key is provided
         if [ -n "$DEDUPE_KEY" ]; then
           # Add invisible HTML comment as dedupe marker
@@ -97,7 +97,7 @@ runs:
         else
           FULL_COMMENT_BODY="$COMMENT_BODY"
         fi
-        
+
         # Function to retry API calls with exponential backoff
         retry_with_backoff() {
           local max_attempts=3
@@ -121,7 +121,7 @@ runs:
           echo "::error::Failed after $max_attempts attempts"
           return $exitCode
         }
-        
+
         # Check if PR exists
         echo "Verifying PR #$PR_NUMBER exists..."
         if ! retry_with_backoff gh api "/repos/$REPO/pulls/$PR_NUMBER" > /dev/null 2>&1; then
@@ -130,7 +130,7 @@ runs:
         fi
         echo "✓ PR #$PR_NUMBER exists"
         echo ""
-        
+
         # If dedupe_key is provided, search for existing comment
         EXISTING_COMMENT_ID=""
         if [ -n "$DEDUPE_KEY" ]; then
@@ -157,7 +157,7 @@ runs:
           fi
           echo ""
         fi
-        
+
         # Create or update comment
         if [ -n "$EXISTING_COMMENT_ID" ]; then
           echo "Updating existing comment #$EXISTING_COMMENT_ID..."
@@ -186,18 +186,18 @@ runs:
           
           echo "✓ Comment created successfully"
         fi
-        
+
         echo ""
         echo "Comment Details:"
         echo "  ID: $COMMENT_ID"
         echo "  URL: $COMMENT_URL"
         echo "  Action: $ACTION"
-        
+
         # Set outputs
         echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
         echo "comment_url=$COMMENT_URL" >> $GITHUB_OUTPUT
         echo "action=$ACTION" >> $GITHUB_OUTPUT
-        
+
         echo "::endgroup::"
 
     - name: Comment summary
@@ -222,7 +222,7 @@ runs:
         echo ""
         echo "✓ PR comment workflow completed successfully"
         echo "::endgroup::"
-        
+
         # Add to job summary
         {
           echo "## 💬 PR Comment ${{ steps.manage-comment.outputs.action == 'created' && 'Created' || 'Updated' }}"

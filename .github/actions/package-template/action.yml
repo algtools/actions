@@ -1,29 +1,29 @@
-name: 'Package Template'
-description: 'Wraps, tokenizes, and packages a template into a tarball'
+name: "Package Template"
+description: "Wraps, tokenizes, and packages a template into a tarball"
 inputs:
   working_directory:
-    description: 'Directory containing the template'
+    description: "Directory containing the template"
     required: true
   template_name:
-    description: 'Name of the template (e.g., bff-template)'
+    description: "Name of the template (e.g., bff-template)"
     required: true
   version:
-    description: 'Version to package'
+    description: "Version to package"
     required: true
 outputs:
   tarball_path:
-    description: 'Path to generated tarball'
+    description: "Path to generated tarball"
     value: ${{ steps.pack.outputs.tarball_path }}
   tarball_name:
-    description: 'Name of generated tarball'
+    description: "Name of generated tarball"
     value: ${{ steps.pack.outputs.tarball_name }}
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: "20"
 
     - name: Install pnpm
       uses: pnpm/action-setup@v2

@@ -1,50 +1,50 @@
-name: 'Setup Node.js Securely'
-description: 'Sets up Node.js environment with caching and security audit checks'
-author: 'Algenium Systems'
+name: "Setup Node.js Securely"
+description: "Sets up Node.js environment with caching and security audit checks"
+author: "Algenium Systems"
 
 inputs:
   node-version:
-    description: 'Node.js version to install. If not provided, reads from .nvmrc file.'
+    description: "Node.js version to install. If not provided, reads from .nvmrc file."
     required: false
-    default: ''
+    default: ""
   package-manager:
-    description: 'Package manager to use: npm, pnpm, or yarn (default: auto-detect)'
+    description: "Package manager to use: npm, pnpm, or yarn (default: auto-detect)"
     required: false
-    default: 'auto'
+    default: "auto"
   cache-dependency-path:
-    description: 'Path to lockfile for cache key computation (package-lock.json, pnpm-lock.yaml, or yarn.lock)'
+    description: "Path to lockfile for cache key computation (package-lock.json, pnpm-lock.yaml, or yarn.lock)"
     required: false
-    default: ''
+    default: ""
   working-directory:
-    description: 'Working directory for package manager commands'
+    description: "Working directory for package manager commands"
     required: false
-    default: '.'
+    default: "."
   skip-install:
-    description: 'Skip dependency installation (default: false)'
+    description: "Skip dependency installation (default: false)"
     required: false
-    default: 'false'
+    default: "false"
   skip-audit:
-    description: 'Skip security audit step (default: false)'
+    description: "Skip security audit step (default: false)"
     required: false
-    default: 'false'
+    default: "false"
   github-token:
-    description: 'GitHub token for authenticating with GitHub Package Registry (required for @algtools packages)'
+    description: "GitHub token for authenticating with GitHub Package Registry (required for @algtools packages)"
     required: false
-    default: ''
+    default: ""
 
 outputs:
   node-version:
-    description: 'The Node.js version that was installed'
+    description: "The Node.js version that was installed"
     value: ${{ steps.node-version.outputs.version }}
   package-manager:
-    description: 'The detected or configured package manager'
+    description: "The detected or configured package manager"
     value: ${{ steps.detect-pm.outputs.package-manager }}
   cache-hit:
-    description: 'Whether dependencies were restored from cache'
+    description: "Whether dependencies were restored from cache"
     value: ${{ steps.setup-node.outputs.cache-hit }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Read Node.js version from .nvmrc
       id: nvmrc

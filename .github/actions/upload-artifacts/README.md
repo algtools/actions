@@ -108,13 +108,13 @@ A composite GitHub Action that uploads build artifacts to GitHub Actions storage
 
 ## Inputs
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `artifact_name` | Name of the artifact to upload | Yes | - |
-| `artifact_paths` | Comma-separated list of file paths or directories to upload | Yes | - |
-| `retention_days` | Number of days to retain the artifact (1-90 days) | No | Repository/org default |
-| `if_no_files_found` | Behavior if no files are found: `warn`, `error`, or `ignore` | No | `warn` |
-| `compression_level` | Compression level (0-9): 0 for no compression, 9 for maximum | No | `6` |
+| Input               | Description                                                  | Required | Default                |
+| ------------------- | ------------------------------------------------------------ | -------- | ---------------------- |
+| `artifact_name`     | Name of the artifact to upload                               | Yes      | -                      |
+| `artifact_paths`    | Comma-separated list of file paths or directories to upload  | Yes      | -                      |
+| `retention_days`    | Number of days to retain the artifact (1-90 days)            | No       | Repository/org default |
+| `if_no_files_found` | Behavior if no files are found: `warn`, `error`, or `ignore` | No       | `warn`                 |
+| `compression_level` | Compression level (0-9): 0 for no compression, 9 for maximum | No       | `6`                    |
 
 ### Input Details
 
@@ -123,6 +123,7 @@ A composite GitHub Action that uploads build artifacts to GitHub Actions storage
 The name that will be used for the uploaded artifact. This name will appear in the GitHub Actions UI and can be used to download the artifact later.
 
 **Examples:**
+
 - `'build-output'`
 - `'release-v1.0.0'`
 - `'build-${{ github.sha }}'`
@@ -130,11 +131,13 @@ The name that will be used for the uploaded artifact. This name will appear in t
 #### `artifact_paths`
 
 A comma-separated list of paths to files or directories to include in the artifact. Paths can be:
+
 - **Files**: Individual files to upload
 - **Directories**: Entire directories (recursively uploaded)
 - **Mixed**: Combination of files and directories
 
 **Examples:**
+
 ```yaml
 # Single path
 artifact_paths: 'dist'
@@ -157,6 +160,7 @@ How long GitHub should keep the artifact before automatically deleting it. Must 
 #### `if_no_files_found`
 
 Controls what happens if no files match the specified paths:
+
 - `warn` (default): Issue a warning but continue
 - `error`: Fail the action
 - `ignore`: Silently continue
@@ -164,18 +168,19 @@ Controls what happens if no files match the specified paths:
 #### `compression_level`
 
 Controls the compression applied to the artifact:
+
 - `0`: No compression (fastest, larger size)
 - `6`: Default compression (balanced)
 - `9`: Maximum compression (slowest, smallest size)
 
 ## Outputs
 
-| Output | Description |
-|--------|-------------|
-| `artifact_id` | GitHub artifact ID of the uploaded artifact |
-| `artifact_url` | URL to download the artifact |
-| `total_files` | Total number of files uploaded |
-| `total_size` | Total size of uploaded files in bytes |
+| Output         | Description                                 |
+| -------------- | ------------------------------------------- |
+| `artifact_id`  | GitHub artifact ID of the uploaded artifact |
+| `artifact_url` | URL to download the artifact                |
+| `total_files`  | Total number of files uploaded              |
+| `total_size`   | Total size of uploaded files in bytes       |
 
 ### Using Outputs
 
@@ -202,6 +207,7 @@ This action provides comprehensive logging during the upload process:
 ### Pre-Upload Analysis
 
 For each path, the action logs:
+
 - Whether it's a file or directory
 - Size information (human-readable format)
 - File count (for directories)
@@ -210,6 +216,7 @@ For each path, the action logs:
 ### Upload Summary
 
 After upload completes:
+
 - Total number of files uploaded
 - Total size of all files
 - Artifact ID and download URL
@@ -345,7 +352,7 @@ Create comprehensive release artifacts:
 ```yaml
 permissions:
   contents: read
-  actions: write  # Required for uploading artifacts
+  actions: write # Required for uploading artifacts
 ```
 
 ## Compatibility
@@ -357,33 +364,37 @@ permissions:
 ## Best Practices
 
 1. **Use Descriptive Names**: Include version, commit SHA, or run ID in artifact names for easy identification:
+
    ```yaml
    artifact_name: 'build-${{ github.sha }}'
    ```
 
 2. **Set Appropriate Retention**: Use shorter retention for temporary artifacts, longer for releases:
+
    ```yaml
    retention_days: '7'   # For PR builds
    retention_days: '90'  # For releases
    ```
 
 3. **Validate Before Upload**: Ensure build artifacts exist before uploading:
+
    ```yaml
    - name: Build
      uses: algtools/actions/.github/actions/build-no-secrets@v1
      with:
        build_cmd: 'npm run build'
        output_dir: 'dist'
-   
+
    - name: Upload
      uses: algtools/actions/.github/actions/upload-artifacts@v1
      with:
        artifact_name: 'build'
        artifact_paths: 'dist'
-       if_no_files_found: 'error'  # Fail if nothing to upload
+       if_no_files_found: 'error' # Fail if nothing to upload
    ```
 
 4. **Use Outputs for Downstream Jobs**: Pass artifact information to other jobs:
+
    ```yaml
    - name: Upload
      id: upload
@@ -391,7 +402,7 @@ permissions:
      with:
        artifact_name: 'build'
        artifact_paths: 'dist'
-   
+
    - name: Notify
      run: |
        echo "Uploaded ${{ steps.upload.outputs.total_files }} files"
@@ -399,10 +410,11 @@ permissions:
    ```
 
 5. **Optimize Large Uploads**: For large artifacts, adjust compression:
+
    ```yaml
    # Faster upload, larger size
    compression_level: '0'
-   
+
    # Slower upload, smaller size
    compression_level: '9'
    ```
@@ -412,6 +424,7 @@ permissions:
 ### No files found warning
 
 If you see "No files found to upload", check:
+
 1. The path exists after your build step
 2. The path is relative to the repository root
 3. Your build command actually produces output
@@ -457,6 +470,7 @@ artifact_paths: |
 ### Artifact size too large
 
 GitHub has a 10 GB limit per artifact. If you hit this:
+
 1. Split into multiple artifacts
 2. Increase compression level
 3. Exclude unnecessary files
@@ -481,15 +495,15 @@ GitHub has a 10 GB limit per artifact. If you hit this:
 
 This action wraps `actions/upload-artifact@v4` with additional features:
 
-| Feature | `actions/upload-artifact@v4` | This Action |
-|---------|------------------------------|-------------|
-| Basic upload | ✅ | ✅ |
-| Pre-upload analysis | ❌ | ✅ |
-| Detailed logging | ❌ | ✅ |
-| File count output | ❌ | ✅ |
-| Total size output | ❌ | ✅ |
-| Path validation | ❌ | ✅ |
-| Summary reports | ❌ | ✅ |
+| Feature             | `actions/upload-artifact@v4` | This Action |
+| ------------------- | ---------------------------- | ----------- |
+| Basic upload        | ✅                           | ✅          |
+| Pre-upload analysis | ❌                           | ✅          |
+| Detailed logging    | ❌                           | ✅          |
+| File count output   | ❌                           | ✅          |
+| Total size output   | ❌                           | ✅          |
+| Path validation     | ❌                           | ✅          |
+| Summary reports     | ❌                           | ✅          |
 
 ## Related Actions
 

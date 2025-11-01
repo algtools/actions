@@ -1,42 +1,42 @@
-name: 'Ensure Wildcard Certificate'
-description: 'Ensures a wildcard SSL certificate exists in Cloudflare ACM, creates one if missing, and waits until active'
-author: 'Algenium Systems'
+name: "Ensure Wildcard Certificate"
+description: "Ensures a wildcard SSL certificate exists in Cloudflare ACM, creates one if missing, and waits until active"
+author: "Algenium Systems"
 
 inputs:
   domain:
-    description: 'Domain for the wildcard certificate (e.g., example.com for *.example.com)'
+    description: "Domain for the wildcard certificate (e.g., example.com for *.example.com)"
     required: true
   current_zone:
-    description: 'Cloudflare zone ID for the domain'
+    description: "Cloudflare zone ID for the domain"
     required: true
   cloudflare_api_token:
-    description: 'Cloudflare API token with SSL/TLS certificates permissions'
+    description: "Cloudflare API token with SSL/TLS certificates permissions"
     required: true
   cloudflare_account_id:
-    description: 'Cloudflare account ID'
+    description: "Cloudflare account ID"
     required: true
   max_wait_seconds:
-    description: 'Maximum time to wait for certificate activation (in seconds)'
+    description: "Maximum time to wait for certificate activation (in seconds)"
     required: false
-    default: '300'
+    default: "300"
   poll_interval_seconds:
-    description: 'Interval between status checks (in seconds)'
+    description: "Interval between status checks (in seconds)"
     required: false
-    default: '10'
+    default: "10"
 
 outputs:
   certificate_id:
-    description: 'ID of the wildcard certificate (existing or newly created)'
+    description: "ID of the wildcard certificate (existing or newly created)"
     value: ${{ steps.ensure-cert.outputs.certificate_id }}
   certificate_status:
-    description: 'Final status of the certificate'
+    description: "Final status of the certificate"
     value: ${{ steps.ensure-cert.outputs.certificate_status }}
   certificate_created:
-    description: 'Whether a new certificate was created (true/false)'
+    description: "Whether a new certificate was created (true/false)"
     value: ${{ steps.ensure-cert.outputs.certificate_created }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Validate inputs
       shell: bash

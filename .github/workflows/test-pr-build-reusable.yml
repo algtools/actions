@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - 'cursor/**'
+      - "cursor/**"
   pull_request:
     branches:
       - main
@@ -19,11 +19,11 @@ jobs:
     name: Test Basic PR Build
     uses: ./.github/workflows/pr-build-reusable.yml
     with:
-      build_cmd: 'npm run build'
-      artifact_name: 'test-build-basic'
-      artifact_paths: '.github/tests/build-no-secrets/dist'
-      working_directory: '.github/tests/build-no-secrets'
-      output_dir: 'dist'
+      build_cmd: "npm run build"
+      artifact_name: "test-build-basic"
+      artifact_paths: ".github/tests/build-no-secrets/dist"
+      working_directory: ".github/tests/build-no-secrets"
+      output_dir: "dist"
       retention_days: 1
 
   verify-outputs:
@@ -72,34 +72,34 @@ jobs:
     name: Test with Custom Node Version
     uses: ./.github/workflows/pr-build-reusable.yml
     with:
-      build_cmd: 'npm run build'
-      artifact_name: 'test-build-custom-node'
-      artifact_paths: '.github/tests/build-no-secrets/dist'
-      working_directory: '.github/tests/build-no-secrets'
-      output_dir: 'dist'
-      node_version: '20'
+      build_cmd: "npm run build"
+      artifact_name: "test-build-custom-node"
+      artifact_paths: ".github/tests/build-no-secrets/dist"
+      working_directory: ".github/tests/build-no-secrets"
+      output_dir: "dist"
+      node_version: "20"
       retention_days: 1
 
   test-multiple-paths:
     name: Test Multiple Artifact Paths
     uses: ./.github/workflows/pr-build-reusable.yml
     with:
-      build_cmd: 'npm run build'
-      artifact_name: 'test-build-multiple-paths'
-      artifact_paths: '.github/tests/build-no-secrets/dist, .github/tests/build-no-secrets/package.json'
-      working_directory: '.github/tests/build-no-secrets'
-      output_dir: 'dist'
+      build_cmd: "npm run build"
+      artifact_name: "test-build-multiple-paths"
+      artifact_paths: ".github/tests/build-no-secrets/dist, .github/tests/build-no-secrets/package.json"
+      working_directory: ".github/tests/build-no-secrets"
+      output_dir: "dist"
       retention_days: 1
 
   test-deployment-disabled:
     name: Test with Deployment Disabled (Default)
     uses: ./.github/workflows/pr-build-reusable.yml
     with:
-      build_cmd: 'npm run build'
-      artifact_name: 'test-build-no-deploy'
-      artifact_paths: '.github/tests/build-no-secrets/dist'
-      working_directory: '.github/tests/build-no-secrets'
-      output_dir: 'dist'
+      build_cmd: "npm run build"
+      artifact_name: "test-build-no-deploy"
+      artifact_paths: ".github/tests/build-no-secrets/dist"
+      working_directory: ".github/tests/build-no-secrets"
+      output_dir: "dist"
       retention_days: 1
       deploy_to_dev: false
 

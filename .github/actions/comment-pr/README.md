@@ -23,7 +23,7 @@ A GitHub Action that posts or updates comments on Pull Requests with deployment 
     pr_number: ${{ github.event.pull_request.number }}
     message: |
       ## 🚀 Deployment Complete
-      
+
       Your changes have been deployed successfully!
 ```
 
@@ -36,11 +36,11 @@ A GitHub Action that posts or updates comments on Pull Requests with deployment 
     pr_number: ${{ github.event.pull_request.number }}
     message: |
       ## 🔗 Preview Deployment
-      
+
       **Environment:** `dev-pr-${{ github.event.pull_request.number }}`
       **Preview URL:** https://pr-${{ github.event.pull_request.number }}.preview.example.com
       **Status:** ✅ Deployed
-      
+
       Last updated: ${{ github.event.head_commit.timestamp }}
     dedupe_key: preview-url
 ```
@@ -54,9 +54,9 @@ A GitHub Action that posts or updates comments on Pull Requests with deployment 
     pr_number: ${{ github.event.pull_request.number }}
     message: |
       ## 📚 Storybook Preview
-      
+
       **Chromatic Build:** https://chromatic.com/build?appId=${{ env.CHROMATIC_APP_ID }}&number=${{ steps.chromatic.outputs.buildNumber }}
-      
+
       Review visual changes and approve snapshots.
     dedupe_key: chromatic-build
 ```
@@ -70,13 +70,13 @@ A GitHub Action that posts or updates comments on Pull Requests with deployment 
     pr_number: ${{ github.event.pull_request.number }}
     message: |
       ## 🌍 Multi-Environment Deployment
-      
+
       | Environment | Status | URL |
       |-------------|--------|-----|
       | Dev | ✅ Deployed | [View](https://dev.example.com) |
       | QA | ✅ Deployed | [View](https://qa.example.com) |
       | Staging | ⏳ Pending | - |
-      
+
       **Commit:** ${{ github.sha }}
     dedupe_key: deploy-summary
 ```
@@ -88,7 +88,7 @@ name: Comment on PR from workflow_run
 
 on:
   workflow_run:
-    workflows: ["Build"]
+    workflows: ['Build']
     types: [completed]
 
 jobs:
@@ -109,7 +109,7 @@ jobs:
             if (pullRequests.length > 0) {
               core.setOutput('number', pullRequests[0].number);
             }
-      
+
       - name: Comment on PR
         if: steps.pr.outputs.number
         uses: algtools/actions/.github/actions/comment-pr@v1
@@ -117,7 +117,7 @@ jobs:
           pr_number: ${{ steps.pr.outputs.number }}
           message: |
             ## ✅ Build Completed
-            
+
             **Workflow:** ${{ github.workflow }}
             **Status:** ${{ github.event.workflow_run.conclusion }}
           dedupe_key: workflow-status
@@ -125,20 +125,20 @@ jobs:
 
 ## Inputs
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `pr_number` | Target PR number | Yes | - |
-| `message` | Markdown body to post in the comment | Yes | - |
-| `dedupe_key` | Short key used to detect/update an existing comment (e.g., `preview-url`, `deploy-summary`). If provided, the action will update an existing comment with the same key instead of creating a new one. | No | `''` |
-| `github_token` | GitHub token for API access | No | `${{ github.token }}` |
+| Input          | Description                                                                                                                                                                                           | Required | Default               |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | --------------------- |
+| `pr_number`    | Target PR number                                                                                                                                                                                      | Yes      | -                     |
+| `message`      | Markdown body to post in the comment                                                                                                                                                                  | Yes      | -                     |
+| `dedupe_key`   | Short key used to detect/update an existing comment (e.g., `preview-url`, `deploy-summary`). If provided, the action will update an existing comment with the same key instead of creating a new one. | No       | `''`                  |
+| `github_token` | GitHub token for API access                                                                                                                                                                           | No       | `${{ github.token }}` |
 
 ## Outputs
 
-| Output | Description |
-|--------|-------------|
-| `comment_id` | ID of the created or updated comment |
+| Output        | Description                           |
+| ------------- | ------------------------------------- |
+| `comment_id`  | ID of the created or updated comment  |
 | `comment_url` | URL of the created or updated comment |
-| `action` | Action taken: `created` or `updated` |
+| `action`      | Action taken: `created` or `updated`  |
 
 ## How It Works
 
@@ -193,7 +193,7 @@ jobs:
         uses: algtools/actions/.github/actions/comment-pr@v1
         with:
           pr_number: ${{ github.event.pull_request.number }}
-          message: "🎉 Deployment successful!"
+          message: '🎉 Deployment successful!'
           dedupe_key: deploy-status
 ```
 
@@ -216,23 +216,23 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Deploy to preview environment
         id: deploy
         run: |
           # Your deployment logic here
           echo "url=https://pr-${{ github.event.pull_request.number }}.preview.example.com" >> $GITHUB_OUTPUT
-      
+
       - name: Comment preview URL
         uses: algtools/actions/.github/actions/comment-pr@v1
         with:
           pr_number: ${{ github.event.pull_request.number }}
           message: |
             ## 🚀 Preview Deployment Ready!
-            
+
             **Preview URL:** ${{ steps.deploy.outputs.url }}
             **Commit:** ${{ github.event.pull_request.head.sha }}
-            
+
             Changes will be automatically deployed on every push.
           dedupe_key: preview-url
 ```
@@ -254,24 +254,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Publish to Chromatic
         uses: chromaui/action@latest
         id: chromatic
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-      
+
       - name: Comment Chromatic link
         uses: algtools/actions/.github/actions/comment-pr@v1
         with:
           pr_number: ${{ github.event.pull_request.number }}
           message: |
             ## 📚 Storybook Published to Chromatic
-            
+
             **Build URL:** ${{ steps.chromatic.outputs.buildUrl }}
             **Storybook URL:** ${{ steps.chromatic.outputs.storybookUrl }}
             **Changes:** ${{ steps.chromatic.outputs.changeCount }} component(s)
-            
+
             ${{ steps.chromatic.outputs.changeCount > 0 && '⚠️ Review visual changes before merging' || '✅ No visual changes detected' }}
           dedupe_key: chromatic-build
 ```
@@ -299,7 +299,8 @@ permissions:
 
 **Problem:** `PR #123 not found in repository` error.
 
-**Solution:** 
+**Solution:**
+
 - Verify the PR number is correct
 - Ensure the PR exists in the repository
 - Check that you're using the correct repository context
@@ -309,6 +310,7 @@ permissions:
 **Problem:** GitHub API rate limit exceeded.
 
 **Solution:** The action includes automatic retry logic. If rate limits persist:
+
 - Reduce the frequency of workflow runs
 - Use `dedupe_key` to update existing comments instead of creating new ones
 - Consider using a GitHub App token with higher rate limits

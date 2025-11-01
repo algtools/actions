@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - 'cursor/**'
+      - "cursor/**"
   pull_request:
     branches:
       - main
@@ -32,8 +32,8 @@ jobs:
         id: setup-node
         uses: ./.github/actions/setup-node
         with:
-          working-directory: '.github/tests/setup-node'
-          cache-dependency-path: '.github/tests/setup-node/package-lock.json'
+          working-directory: ".github/tests/setup-node"
+          cache-dependency-path: ".github/tests/setup-node/package-lock.json"
 
       - name: Verify Node.js version
         working-directory: .github/tests/setup-node
@@ -86,9 +86,9 @@ jobs:
         id: setup-node
         uses: ./.github/actions/setup-node
         with:
-          node-version: '18'
-          working-directory: '.github/tests/setup-node'
-          cache-dependency-path: '.github/tests/setup-node/package-lock.json'
+          node-version: "18"
+          working-directory: ".github/tests/setup-node"
+          cache-dependency-path: ".github/tests/setup-node/package-lock.json"
 
       - name: Verify Node.js version
         working-directory: .github/tests/setup-node
@@ -137,8 +137,8 @@ jobs:
         id: first-run
         uses: ./.github/actions/setup-node
         with:
-          working-directory: '.github/tests/setup-node'
-          cache-dependency-path: '.github/tests/setup-node/package-lock.json'
+          working-directory: ".github/tests/setup-node"
+          cache-dependency-path: ".github/tests/setup-node/package-lock.json"
 
       - name: Check first run cache status
         run: |
@@ -152,8 +152,8 @@ jobs:
         id: second-run
         uses: ./.github/actions/setup-node
         with:
-          working-directory: '.github/tests/setup-node'
-          cache-dependency-path: '.github/tests/setup-node/package-lock.json'
+          working-directory: ".github/tests/setup-node"
+          cache-dependency-path: ".github/tests/setup-node/package-lock.json"
 
       - name: Check second run cache status
         run: |
@@ -185,9 +185,9 @@ jobs:
       - name: Setup Node.js with skip-audit
         uses: ./.github/actions/setup-node
         with:
-          working-directory: '.github/tests/setup-node'
-          cache-dependency-path: '.github/tests/setup-node/package-lock.json'
-          skip-audit: 'true'
+          working-directory: ".github/tests/setup-node"
+          cache-dependency-path: ".github/tests/setup-node/package-lock.json"
+          skip-audit: "true"
 
       - name: Verify setup completed
         working-directory: .github/tests/setup-node
@@ -203,7 +203,7 @@ jobs:
       matrix:
         # macOS tests disabled by default (expensive). To enable, add 'macos-latest' to the os array below
         os: [ubuntu-latest, windows-latest]
-        node-version: ['18', '20']
+        node-version: ["18", "20"]
     defaults:
       run:
         working-directory: .github/tests/setup-node
@@ -221,8 +221,8 @@ jobs:
         uses: ./.github/actions/setup-node
         with:
           node-version: ${{ matrix.node-version }}
-          working-directory: '.github/tests/setup-node'
-          cache-dependency-path: '.github/tests/setup-node/package-lock.json'
+          working-directory: ".github/tests/setup-node"
+          cache-dependency-path: ".github/tests/setup-node/package-lock.json"
 
       - name: Verify installation
         working-directory: .github/tests/setup-node

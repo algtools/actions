@@ -48,14 +48,11 @@ const buildInfo = {
     ci: process.env.CI || 'false',
   },
   version: '1.0.0',
-  status: 'success'
+  status: 'success',
 };
 
 // Write build info
-fs.writeFileSync(
-  path.join(outputDir, 'build-info.json'),
-  JSON.stringify(buildInfo, null, 2)
-);
+fs.writeFileSync(path.join(outputDir, 'build-info.json'), JSON.stringify(buildInfo, null, 2));
 console.log('✓ Generated build-info.json');
 
 // Create a mock index.html
@@ -114,7 +111,7 @@ if (!fs.existsSync(assetsDir)) {
 
 fs.writeFileSync(
   path.join(assetsDir, 'manifest.json'),
-  JSON.stringify({ name: 'Test App', version: '1.0.0' }, null, 2)
+  JSON.stringify({ name: 'Test App', version: '1.0.0' }, null, 2),
 );
 console.log('✓ Generated assets/manifest.json');
 

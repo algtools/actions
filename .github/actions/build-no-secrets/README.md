@@ -72,19 +72,19 @@ A composite GitHub Action that builds a project in a clean, secure environment w
 
 ## Inputs
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `build_cmd` | Build command to execute (e.g., "npm run build", "tsc", "yarn build") | Yes | - |
-| `working_dir` | Working directory where the build command will be executed | No | `.` |
-| `output_dir` | Directory where build output/artifacts will be produced (e.g., "dist", "build") | Yes | - |
+| Input         | Description                                                                     | Required | Default |
+| ------------- | ------------------------------------------------------------------------------- | -------- | ------- |
+| `build_cmd`   | Build command to execute (e.g., "npm run build", "tsc", "yarn build")           | Yes      | -       |
+| `working_dir` | Working directory where the build command will be executed                      | No       | `.`     |
+| `output_dir`  | Directory where build output/artifacts will be produced (e.g., "dist", "build") | Yes      | -       |
 
 ## Outputs
 
-| Output | Description |
-|--------|-------------|
-| `build_status` | Status of the build (success or failure) |
-| `output_path` | Absolute path to the build output directory |
-| `artifact_size` | Size of the build artifacts in bytes |
+| Output          | Description                                 |
+| --------------- | ------------------------------------------- |
+| `build_status`  | Status of the build (success or failure)    |
+| `output_path`   | Absolute path to the build output directory |
+| `artifact_size` | Size of the build artifacts in bytes        |
 
 ## Security Features
 
@@ -208,7 +208,7 @@ Make sure to checkout the repository first and that the path exists:
   uses: algtools/actions/.github/actions/build-no-secrets@v1
   with:
     build_cmd: 'npm run build'
-    working_dir: '.'  # Ensure this path exists
+    working_dir: '.' # Ensure this path exists
     output_dir: 'dist'
 ```
 

@@ -1,45 +1,45 @@
-name: 'Upload Storybook to Chromatic from Artifact'
-description: 'Uploads a pre-built Storybook to Chromatic using an already uploaded artifact with secure token handling and detailed logging'
-author: 'Algenium Systems'
+name: "Upload Storybook to Chromatic from Artifact"
+description: "Uploads a pre-built Storybook to Chromatic using an already uploaded artifact with secure token handling and detailed logging"
+author: "Algenium Systems"
 
 inputs:
   artifact_name:
-    description: 'Name of the artifact to download (e.g., storybook-[branch]-[pr].zip)'
+    description: "Name of the artifact to download (e.g., storybook-[branch]-[pr].zip)"
     required: true
   project_token:
-    description: 'Chromatic project token (from repo/org secrets)'
+    description: "Chromatic project token (from repo/org secrets)"
     required: true
   working_dir:
-    description: 'Directory where to run the chromatic command'
+    description: "Directory where to run the chromatic command"
     required: false
-    default: '.'
+    default: "."
   storybook_dir:
-    description: 'Directory path where Storybook will be extracted/located (relative to working directory)'
+    description: "Directory path where Storybook will be extracted/located (relative to working directory)"
     required: false
-    default: '.out/storybook'
+    default: ".out/storybook"
   exit_zero_on_changes:
-    description: 'Do not fail if visual changes occur (exit with code 0)'
+    description: "Do not fail if visual changes occur (exit with code 0)"
     required: false
-    default: 'true'
+    default: "true"
   download_path:
-    description: 'Directory path where the artifact will be downloaded'
+    description: "Directory path where the artifact will be downloaded"
     required: false
-    default: './storybook-artifact'
+    default: "./storybook-artifact"
   auto_accept_changes:
-    description: 'Automatically accept all changes (useful for baseline branches)'
+    description: "Automatically accept all changes (useful for baseline branches)"
     required: false
-    default: 'false'
+    default: "false"
 
 outputs:
   chromatic_url:
-    description: 'URL of the Chromatic build'
+    description: "URL of the Chromatic build"
     value: ${{ steps.upload.outputs.chromatic_url }}
   build_status:
-    description: 'Status of the Chromatic build (success or failure)'
+    description: "Status of the Chromatic build (success or failure)"
     value: ${{ steps.upload.outputs.status }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Validate inputs
       shell: bash

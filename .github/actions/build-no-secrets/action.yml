@@ -1,36 +1,36 @@
-name: 'Build Without Secrets'
-description: 'Builds a project in a clean environment without exposing secrets. Used for PR previews or secure builds.'
-author: 'Algenium Systems'
+name: "Build Without Secrets"
+description: "Builds a project in a clean environment without exposing secrets. Used for PR previews or secure builds."
+author: "Algenium Systems"
 
 inputs:
   build_cmd:
     description: 'Build command to execute (e.g., "npm run build", "tsc", "yarn build")'
     required: true
   working_dir:
-    description: 'Working directory where the build command will be executed'
+    description: "Working directory where the build command will be executed"
     required: false
-    default: '.'
+    default: "."
   output_dir:
     description: 'Directory where build output/artifacts will be produced (e.g., "dist", "build")'
     required: true
   node_env:
     description: 'NODE_ENV value to set during build (e.g., "production", "development", "test")'
     required: false
-    default: 'production'
+    default: "production"
 
 outputs:
   build_status:
-    description: 'Status of the build (success or failure)'
+    description: "Status of the build (success or failure)"
     value: ${{ steps.build.outputs.status }}
   output_path:
-    description: 'Absolute path to the build output directory'
+    description: "Absolute path to the build output directory"
     value: ${{ steps.output-info.outputs.path }}
   artifact_size:
-    description: 'Size of the build artifacts in bytes'
+    description: "Size of the build artifacts in bytes"
     value: ${{ steps.output-info.outputs.size }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Validate inputs
       shell: bash

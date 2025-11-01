@@ -1,44 +1,44 @@
-name: 'Update Deployment Status'
-description: 'Creates and updates GitHub Deployment status for environment deployments and PR previews'
-author: 'Algenium Systems'
+name: "Update Deployment Status"
+description: "Creates and updates GitHub Deployment status for environment deployments and PR previews"
+author: "Algenium Systems"
 
 inputs:
   environment:
     description: 'Environment name (e.g., "dev", "qa", "production", "preview-123")'
     required: true
   state:
-    description: 'Deployment state: pending, in_progress, success, failure, error, inactive'
+    description: "Deployment state: pending, in_progress, success, failure, error, inactive"
     required: true
   deployment_url:
-    description: 'URL where the deployment is accessible (required for success state)'
+    description: "URL where the deployment is accessible (required for success state)"
     required: false
-    default: ''
+    default: ""
   description:
-    description: 'Short description of the deployment status'
+    description: "Short description of the deployment status"
     required: false
-    default: ''
+    default: ""
   github_token:
-    description: 'GitHub token for API access (default: github.token)'
+    description: "GitHub token for API access (default: github.token)"
     required: false
     default: ${{ github.token }}
   auto_inactive:
-    description: 'Automatically mark previous deployments as inactive when creating a new one'
+    description: "Automatically mark previous deployments as inactive when creating a new one"
     required: false
-    default: 'true'
+    default: "true"
 
 outputs:
   deployment_id:
-    description: 'ID of the created/updated deployment'
+    description: "ID of the created/updated deployment"
     value: ${{ steps.create-deployment.outputs.deployment_id || steps.update-deployment.outputs.deployment_id }}
   deployment_status_id:
-    description: 'ID of the deployment status'
+    description: "ID of the deployment status"
     value: ${{ steps.create-status.outputs.status_id }}
   deployment_url:
-    description: 'URL of the deployment'
+    description: "URL of the deployment"
     value: ${{ inputs.deployment_url }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Validate inputs
       shell: bash

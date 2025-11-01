@@ -135,7 +135,7 @@ jobs:
           deploy_environment: 'alpha'
           cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      
+
       - name: Track alpha release in Sentry
         uses: algtools/actions/.github/actions/sentry-release@v1
         with:
@@ -158,7 +158,7 @@ jobs:
           deploy_environment: 'beta'
           cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      
+
       - name: Track beta release in Sentry
         uses: algtools/actions/.github/actions/sentry-release@v1
         with:
@@ -181,7 +181,7 @@ jobs:
           deploy_environment: 'production'
           cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      
+
       - name: Track production release in Sentry
         uses: algtools/actions/.github/actions/sentry-release@v1
         with:
@@ -206,24 +206,24 @@ jobs:
   build:
     uses: algtools/actions/.github/workflows/pr-build-reusable.yml@main
     with:
-      build_cmd: "npm run build"
-      artifact_name: "production-build"
-      artifact_paths: "dist,wrangler.toml"
-  
+      build_cmd: 'npm run build'
+      artifact_name: 'production-build'
+      artifact_paths: 'dist,wrangler.toml'
+
   deploy:
     needs: build
     uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
     with:
-      environment: "production"
-      worker_name: "my-worker"
-      wrangler_config: "wrangler.toml"
-      zone: "${{ vars.CLOUDFLARE_ZONE_ID }}"
-      custom_domain: "example.com"
-      slug: "my-app"
-      artifact_name: "production-build"
+      environment: 'production'
+      worker_name: 'my-worker'
+      wrangler_config: 'wrangler.toml'
+      zone: '${{ vars.CLOUDFLARE_ZONE_ID }}'
+      custom_domain: 'example.com'
+      slug: 'my-app'
+      artifact_name: 'production-build'
       sentry_release: true
-      sentry_org: "my-org"
-      sentry_project: "my-project"
+      sentry_org: 'my-org'
+      sentry_project: 'my-project'
     secrets:
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -232,13 +232,13 @@ jobs:
 
 ## Inputs
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `sentry_auth_token` | Sentry authentication token | Yes | - |
-| `org` | Sentry organization slug | Yes | - |
-| `project` | Sentry project slug | Yes | - |
-| `release` | Release identifier (e.g., git SHA or version tag) | No | `${{ github.sha }}` |
-| `environment` | Target environment (e.g., alpha, beta, prod) | Yes | - |
+| Input               | Description                                       | Required | Default             |
+| ------------------- | ------------------------------------------------- | -------- | ------------------- |
+| `sentry_auth_token` | Sentry authentication token                       | Yes      | -                   |
+| `org`               | Sentry organization slug                          | Yes      | -                   |
+| `project`           | Sentry project slug                               | Yes      | -                   |
+| `release`           | Release identifier (e.g., git SHA or version tag) | No       | `${{ github.sha }}` |
+| `environment`       | Target environment (e.g., alpha, beta, prod)      | Yes      | -                   |
 
 ### Input Details
 
@@ -247,10 +247,12 @@ jobs:
 A Sentry authentication token with permissions to create releases and register deployments. This should be stored as a GitHub secret.
 
 **Required permissions:**
+
 - Project: Releases (Admin)
 - Organization: Read
 
 **Setup:**
+
 1. Go to Sentry → Settings → Account → API → Auth Tokens
 2. Click "Create New Token"
 3. Name it (e.g., "GitHub Actions Releases")
@@ -263,10 +265,12 @@ A Sentry authentication token with permissions to create releases and register d
 Your Sentry organization slug. This is the identifier for your Sentry organization.
 
 **Where to find:**
+
 - In the Sentry URL: `sentry.io/organizations/{org-slug}/`
 - Sentry Settings → General Settings → Organization Slug
 
 **Examples:**
+
 - `'my-company'`
 - `'acme-corp'`
 - `'my-org'`
@@ -276,10 +280,12 @@ Your Sentry organization slug. This is the identifier for your Sentry organizati
 Your Sentry project slug. This identifies the specific project within your organization.
 
 **Where to find:**
+
 - In the Sentry URL: `sentry.io/organizations/{org}/projects/{project-slug}/`
 - Sentry Project Settings → General Settings → Project Slug
 
 **Examples:**
+
 - `'web-app'`
 - `'api-service'`
 - `'mobile-app'`
@@ -289,12 +295,14 @@ Your Sentry project slug. This identifies the specific project within your organ
 The release identifier. Defaults to the current git commit SHA (`${{ github.sha }}`).
 
 **Examples:**
+
 - `${{ github.sha }}` (default - recommended for commit-based tracking)
 - `'v1.0.0'` (semantic version)
 - `'release-2024-01-15'` (date-based version)
 - `${{ github.ref_name }}` (tag name, useful for tagged releases)
 
 **Best practices:**
+
 - Use git SHA for continuous deployment (default)
 - Use semantic versions for tagged releases
 - Keep it consistent across your deployments
@@ -305,6 +313,7 @@ The release identifier. Defaults to the current git commit SHA (`${{ github.sha 
 The target environment for the deployment. This helps track which environment a release is deployed to in Sentry.
 
 **Common values:**
+
 - `'alpha'` - Alpha/development environment
 - `'beta'` - Beta/staging environment
 - `'prod'` - Production environment
@@ -316,9 +325,9 @@ The target environment for the deployment. This helps track which environment a 
 
 ## Outputs
 
-| Output | Description |
-|--------|-------------|
-| `release_version` | The Sentry release version that was created |
+| Output              | Description                                                |
+| ------------------- | ---------------------------------------------------------- |
+| `release_version`   | The Sentry release version that was created                |
 | `deployment_status` | Status of the deployment registration (success or failure) |
 
 ### Using Outputs
@@ -360,29 +369,35 @@ This action performs the following operations in sequence:
 The action provides comprehensive logging throughout the process:
 
 ### Input Validation
+
 - Validates all required inputs
 - Displays configuration (with auth token masked)
 - Shows organization, project, release, and environment
 
 ### Sentry CLI Installation
+
 - Verifies Sentry CLI is available via npx
 - Shows CLI version information
 
 ### Release Creation
+
 - Creates the release in Sentry
 - Associates it with the organization and project
 - Outputs the release identifier
 
 ### Release Finalization
+
 - Finalizes the release to make it active
 - Confirms successful completion
 
 ### Deployment Registration
+
 - Registers the deployment to the specified environment
 - Links the release with the environment
 - Outputs deployment status
 
 ### Security Features
+
 - Automatically masks authentication tokens
 - Filters sensitive information from all logs
 - Redacts credentials from error messages
@@ -458,16 +473,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+
       # ... build and deploy steps ...
-      
+
       - name: Create Sentry release
         uses: algtools/actions/.github/actions/sentry-release@v1
         with:
           sentry_auth_token: ${{ secrets.SENTRY_AUTH_TOKEN }}
           org: 'my-org'
           project: 'my-project'
-          release: ${{ github.ref_name }}  # Uses the tag name (e.g., v1.0.0)
+          release: ${{ github.ref_name }} # Uses the tag name (e.g., v1.0.0)
           environment: 'production'
 ```
 
@@ -497,7 +512,7 @@ jobs:
           sentry_auth_token: ${{ secrets.SENTRY_AUTH_TOKEN }}
           org: 'my-org'
           project: 'my-project'
-          release: ${{ github.sha }}  # Same release, different environment
+          release: ${{ github.sha }} # Same release, different environment
           environment: 'production'
 ```
 
@@ -505,7 +520,7 @@ jobs:
 
 ```yaml
 permissions:
-  contents: read  # Required to access repository
+  contents: read # Required to access repository
 ```
 
 No special GitHub permissions are needed beyond basic repository access.
@@ -513,6 +528,7 @@ No special GitHub permissions are needed beyond basic repository access.
 ## Security Best Practices
 
 1. **Store Token as Secret**: Never hardcode the Sentry auth token
+
    ```yaml
    sentry_auth_token: ${{ secrets.SENTRY_AUTH_TOKEN }}  # ✅ Correct
    sentry_auth_token: 'sntrys_abc123...'                # ❌ Never do this
@@ -523,13 +539,13 @@ No special GitHub permissions are needed beyond basic repository access.
    - `org:read` - Required for organization access
 
 3. **Rotate Tokens Regularly**: Update Sentry auth tokens periodically
-   
 4. **Separate Environments**: Consider using different projects for different environments
+
    ```yaml
    # Development
    project: 'my-app-dev'
    environment: 'alpha'
-   
+
    # Production
    project: 'my-app-prod'
    environment: 'prod'
@@ -538,7 +554,7 @@ No special GitHub permissions are needed beyond basic repository access.
 5. **Use GitHub Environments**: Leverage environment protection rules
    ```yaml
    deploy:
-     environment: production  # Requires approval
+     environment: production # Requires approval
      steps:
        - uses: algtools/actions/.github/actions/sentry-release@v1
    ```
@@ -550,6 +566,7 @@ No special GitHub permissions are needed beyond basic repository access.
 **Error:** "Authentication failed" or "Invalid auth token"
 
 **Solution:** Verify your Sentry auth token:
+
 1. Go to Sentry → Settings → Account → API → Auth Tokens
 2. Check token has correct scopes: `project:releases`, `org:read`
 3. Regenerate token if needed
@@ -560,6 +577,7 @@ No special GitHub permissions are needed beyond basic repository access.
 **Error:** "Organization not found" or "Project not found"
 
 **Solution:** Verify organization and project slugs:
+
 1. Check Sentry URL for correct slugs
 2. Ensure token has access to the organization
 3. Verify project exists and you have access
@@ -571,6 +589,7 @@ No special GitHub permissions are needed beyond basic repository access.
 **Error:** "Release already exists"
 
 **Solution:** This can happen if the same commit is deployed multiple times
+
 - This is usually not an error - Sentry will use the existing release
 - To deploy to a different environment, the action will still register the deployment
 - Use different release identifiers if you need distinct releases
@@ -580,6 +599,7 @@ No special GitHub permissions are needed beyond basic repository access.
 **Error:** "npx: command not found" or "Sentry CLI installation failed"
 
 **Solution:** Ensure Node.js is available in your workflow:
+
 ```yaml
 - name: Setup Node.js
   uses: actions/setup-node@v4
@@ -630,7 +650,7 @@ jobs:
     needs: build
     steps:
       - uses: algtools/actions/.github/actions/deploy-cloudflare-from-artifact@v1
-      - uses: algtools/actions/.github/actions/sentry-release@v1  # Track after deploy
+      - uses: algtools/actions/.github/actions/sentry-release@v1 # Track after deploy
 ```
 
 ## License

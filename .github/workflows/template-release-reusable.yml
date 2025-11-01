@@ -1,23 +1,23 @@
-name: 'Template Release - Reusable'
+name: "Template Release - Reusable"
 
 on:
   workflow_call:
     inputs:
       template_name:
-        description: 'Name of the template (e.g., bff-template)'
+        description: "Name of the template (e.g., bff-template)"
         required: true
         type: string
       working_directory:
-        description: 'Directory containing the template'
+        description: "Directory containing the template"
         required: false
         type: string
-        default: '.'
+        default: "."
       branch:
-        description: 'Branch being released (dev/qa/main)'
+        description: "Branch being released (dev/qa/main)"
         required: true
         type: string
       retention_days:
-        description: 'Artifact retention days'
+        description: "Artifact retention days"
         required: false
         type: number
         default: 30
@@ -26,10 +26,10 @@ on:
         required: true
     outputs:
       version:
-        description: 'Version that was released'
+        description: "Version that was released"
         value: ${{ jobs.release.outputs.version }}
       tarball_url:
-        description: 'URL to download tarball'
+        description: "URL to download tarball"
         value: ${{ jobs.release.outputs.tarball_url }}
 
 jobs:

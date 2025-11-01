@@ -14,56 +14,71 @@ Algenium common GitHub Actions and reusable workflows for all projects across th
 ## Available Actions
 
 ### [build-no-secrets](/.github/actions/build-no-secrets)
+
 Builds a project in a clean environment without exposing secrets. Perfect for PR previews or secure builds.
 
 ### [setup-node](/.github/actions/setup-node)
+
 Sets up Node.js environment with automatic package manager detection (npm, pnpm, yarn) and intelligent caching support for faster builds. Auto-detects lockfiles and configures the appropriate package manager with optimized caching.
 
 ### [upload-artifacts](/.github/actions/upload-artifacts)
+
 Uploads build artifacts to GitHub Actions storage with detailed logging and support for multiple file paths.
 
 ### [deploy-cloudflare-from-artifact](/.github/actions/deploy-cloudflare-from-artifact)
+
 Deploys Cloudflare Workers from pre-built artifacts with secure credential handling. Ensures safe and reproducible deployments without exposing code or secrets.
 
 ### [ensure-wildcard-certificate](/.github/actions/ensure-wildcard-certificate)
+
 Ensures a wildcard SSL certificate exists in Cloudflare ACM. Idempotent action that creates certificates only when needed and waits for activation.
 
 ### [sentry-release](/.github/actions/sentry-release)
+
 Creates and finalizes a Sentry release and registers a deployment for the target environment. Integrates with your deployment pipeline to track releases and errors across environments (alpha, beta, prod).
 
 ### [comment-pr](/.github/actions/comment-pr)
+
 Posts or updates comments on Pull Requests with deployment info (e.g., preview URLs, environment details, Chromatic links). Avoids duplicating the same message across retries by using a dedupe key.
 
 ### [package-template](/.github/actions/package-template)
+
 Wraps, tokenizes, and packages a template into a tarball. Automates the template build process by running `template:wrap`, `template:tokenize`, and `template:pack` scripts in sequence. Used as part of the automated template release system.
 
 **Inputs:**
+
 - `working_directory` (required): Directory containing the template
 - `template_name` (required): Name of the template (e.g., bff-template)
 - `version` (required): Version to package
 
 **Outputs:**
+
 - `tarball_path`: Path to generated tarball
 - `tarball_name`: Name of generated tarball
 
 ### [bump-version](/.github/actions/bump-version)
+
 Automatically bumps version using semantic-release based on conventional commits. Analyzes commit messages to determine the appropriate version bump (major/minor/patch) and updates package.json, creates changelog, and tags the release.
 
 **Inputs:**
+
 - `github_token` (required): GitHub token for authentication
 - `working_directory` (optional): Directory containing package.json (default: ".")
 - `dry_run` (optional): Run in dry-run mode (default: "false")
 
 **Outputs:**
+
 - `new_version`: New version number
 - `new_release_published`: Whether a new release was published
 
 ## Available Reusable Workflows
 
 ### [pr-build-reusable.yml](/.github/workflows/pr-build-reusable.yml)
+
 A complete PR build workflow that sets up Node.js, builds your project without secrets, uploads artifacts, and optionally deploys to Cloudflare Workers dev environment with automatic SSL certificate management. Perfect for pull request previews and automated testing.
 
 **Features:**
+
 - Secure Node.js setup with dependency caching
 - Clean build environment without secret exposure
 - Automatic artifact upload with detailed metadata
@@ -73,6 +88,7 @@ A complete PR build workflow that sets up Node.js, builds your project without s
 - **Optional**: PR preview deployments with secure HTTPS
 
 **Example Usage (Build Only):**
+
 ```yaml
 name: PR Build
 
@@ -84,15 +100,16 @@ jobs:
   build:
     uses: algtools/actions/.github/workflows/pr-build-reusable.yml@main
     with:
-      build_cmd: "npm run build"
-      artifact_name: "pr-build-${{ github.event.pull_request.number }}"
-      artifact_paths: "dist"
-      working_directory: "."
-      output_dir: "dist"
+      build_cmd: 'npm run build'
+      artifact_name: 'pr-build-${{ github.event.pull_request.number }}'
+      artifact_paths: 'dist'
+      working_directory: '.'
+      output_dir: 'dist'
       retention_days: 7
 ```
 
 **Example Usage (Build + Deploy to Dev):**
+
 ```yaml
 name: PR Build and Deploy
 
@@ -104,35 +121,38 @@ jobs:
   build-and-deploy:
     uses: algtools/actions/.github/workflows/pr-build-reusable.yml@main
     with:
-      build_cmd: "npm run build"
-      artifact_name: "pr-build-${{ github.event.pull_request.number }}"
-      artifact_paths: "dist,wrangler.toml"
-      working_directory: "."
-      output_dir: "dist"
+      build_cmd: 'npm run build'
+      artifact_name: 'pr-build-${{ github.event.pull_request.number }}'
+      artifact_paths: 'dist,wrangler.toml'
+      working_directory: '.'
+      output_dir: 'dist'
       retention_days: 7
       # Enable dev deployment
       deploy_to_dev: true
-      worker_name: "my-app-pr-${{ github.event.pull_request.number }}"
-      wrangler_config: "wrangler.toml"
-      zone: "${{ vars.CLOUDFLARE_ZONE_ID }}"
-      custom_domain: "dev.example.com"
+      worker_name: 'my-app-pr-${{ github.event.pull_request.number }}'
+      wrangler_config: 'wrangler.toml'
+      zone: '${{ vars.CLOUDFLARE_ZONE_ID }}'
+      custom_domain: 'dev.example.com'
     secrets:
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 ```
 
 **Required Inputs:**
+
 - `build_cmd` (required): Build command to execute
 - `artifact_name` (required): Name for the uploaded artifact
 - `artifact_paths` (required): Comma-separated paths to upload
 
 **Optional Build Inputs:**
+
 - `node_version` (optional): Node.js version (defaults to .nvmrc)
 - `working_directory` (optional): Working directory (default: ".")
 - `output_dir` (optional): Build output directory (default: "dist")
 - `retention_days` (optional): Artifact retention in days (default: 30)
 
 **Optional Deployment Inputs:**
+
 - `deploy_to_dev` (optional): Enable deployment to dev environment (default: false)
 - `worker_name` (optional): Cloudflare Worker name for dev (required if deploy_to_dev is true)
 - `wrangler_config` (optional): Path to wrangler.toml (default: "wrangler.toml")
@@ -143,10 +163,12 @@ jobs:
 - `poll_interval_seconds` (optional): Certificate status check interval (default: 10)
 
 **Required Secrets (if deploy_to_dev is true):**
+
 - `cloudflare_api_token`: Cloudflare API token with Workers and SSL permissions
 - `cloudflare_account_id`: Cloudflare account ID
 
 **Build Outputs:**
+
 - `artifact_id`: GitHub artifact ID
 - `artifact_url`: Download URL for the artifact
 - `total_files`: Number of files uploaded
@@ -154,6 +176,7 @@ jobs:
 - `build_status`: Build result status
 
 **Deployment Outputs (if deploy_to_dev is true):**
+
 - `worker_url`: URL of the deployed Worker
 - `deployment_status`: Deployment status
 - `certificate_id`: SSL certificate ID
@@ -162,9 +185,11 @@ jobs:
 ---
 
 ### [env-deploy-reusable.yml](/.github/workflows/env-deploy-reusable.yml)
+
 A comprehensive deployment workflow for deploying Cloudflare Workers to dev/qa/production environments. Handles wildcard SSL certificates, artifact-based deployments, optional Sentry release tracking, and automatic GitHub release creation.
 
 **Features:**
+
 - Automatic wildcard SSL certificate management with Cloudflare ACM
 - Secure deployment from pre-built artifacts
 - Environment-specific configurations
@@ -175,6 +200,7 @@ A comprehensive deployment workflow for deploying Cloudflare Workers to dev/qa/p
 - Idempotent certificate operations
 
 **Example Usage (Production with GitHub Release):**
+
 ```yaml
 name: Deploy to Production
 
@@ -186,26 +212,26 @@ jobs:
   build:
     uses: algtools/actions/.github/workflows/pr-build-reusable.yml@main
     with:
-      build_cmd: "npm run build"
-      artifact_name: "production-build"
-      artifact_paths: "dist,wrangler.toml,package.json"
+      build_cmd: 'npm run build'
+      artifact_name: 'production-build'
+      artifact_paths: 'dist,wrangler.toml,package.json'
 
   deploy:
     needs: build
     uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
     with:
-      environment: "production"
-      worker_name: "my-worker"
-      wrangler_config: "wrangler.toml"
-      zone: "${{ vars.CLOUDFLARE_ZONE_ID }}"
-      custom_domain: "example.com"
-      slug: "my-app"
-      artifact_name: "production-build"
+      environment: 'production'
+      worker_name: 'my-worker'
+      wrangler_config: 'wrangler.toml'
+      zone: '${{ vars.CLOUDFLARE_ZONE_ID }}'
+      custom_domain: 'example.com'
+      slug: 'my-app'
+      artifact_name: 'production-build'
       create_github_release: true
-      release_name_template: "My App {0}"
+      release_name_template: 'My App {0}'
       sentry_release: true
-      sentry_org: "my-org"
-      sentry_project: "my-project"
+      sentry_org: 'my-org'
+      sentry_project: 'my-project'
     secrets:
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -213,14 +239,16 @@ jobs:
 ```
 
 **Required Inputs:**
+
 - `environment` (required): Target environment (e.g., "dev", "qa", "production")
 - `worker_name` (required): Name of the Cloudflare Worker
 - `wrangler_config` (required): Path to wrangler.toml (relative to artifact root)
 - `zone` (required): Cloudflare zone ID for the domain
-- `custom_domain` (required): Domain for wildcard certificate (e.g., "example.com" for "*.example.com")
+- `custom_domain` (required): Domain for wildcard certificate (e.g., "example.com" for "\*.example.com")
 - `artifact_name` (required): Name of artifact containing built worker code
 
 **Optional Inputs:**
+
 - `wrangler_version` (optional): Wrangler version to use (default: "latest")
 - `download_path` (optional): Artifact download directory (default: "./worker-artifact")
 - `max_wait_seconds` (optional): Max wait for certificate activation (default: 300)
@@ -233,11 +261,13 @@ jobs:
 - `sentry_project` (optional): Sentry project slug (required if sentry_release is true)
 
 **Required Secrets:**
+
 - `cloudflare_api_token`: Cloudflare API token with Workers deployment and SSL permissions
 - `cloudflare_account_id`: Cloudflare account ID
 - `sentry_auth_token`: Sentry auth token (required if sentry_release is true)
 
 **Outputs:**
+
 - `worker_url`: URL of the deployed Cloudflare Worker
 - `deployment_status`: Deployment status (success/failure)
 - `worker_version`: Version identifier of deployed worker
@@ -252,13 +282,14 @@ To enable Sentry release tracking, set `sentry_release: true` and provide the re
 ```yaml
 with:
   sentry_release: true
-  sentry_org: "your-sentry-org"
-  sentry_project: "your-sentry-project"
+  sentry_org: 'your-sentry-org'
+  sentry_project: 'your-sentry-project'
 secrets:
   sentry_auth_token: ${{ secrets.SENTRY_AUTH_TOKEN }}
 ```
 
 The workflow will automatically:
+
 - Create a Sentry release with the current git SHA
 - Associate commits with the release
 - Create a deployment record for the target environment
@@ -273,20 +304,20 @@ jobs:
   build:
     uses: algtools/actions/.github/workflows/pr-build-reusable.yml@main
     with:
-      build_cmd: "npm run build"
-      artifact_name: "app-build-${{ github.sha }}"
-      artifact_paths: "dist,wrangler.toml"
+      build_cmd: 'npm run build'
+      artifact_name: 'app-build-${{ github.sha }}'
+      artifact_paths: 'dist,wrangler.toml'
 
   deploy-dev:
     needs: build
     uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
     with:
-      environment: "dev"
-      worker_name: "my-worker-dev"
-      wrangler_config: "wrangler.toml"
-      zone: "${{ vars.CLOUDFLARE_ZONE_ID }}"
-      custom_domain: "dev.example.com"
-      artifact_name: "app-build-${{ github.sha }}"
+      environment: 'dev'
+      worker_name: 'my-worker-dev'
+      wrangler_config: 'wrangler.toml'
+      zone: '${{ vars.CLOUDFLARE_ZONE_ID }}'
+      custom_domain: 'dev.example.com'
+      artifact_name: 'app-build-${{ github.sha }}'
     secrets:
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -295,13 +326,13 @@ jobs:
     needs: deploy-dev
     uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
     with:
-      environment: "production"
-      worker_name: "my-worker"
-      wrangler_config: "wrangler.toml"
-      zone: "${{ vars.CLOUDFLARE_ZONE_ID }}"
-      custom_domain: "example.com"
-      slug: "my-app"
-      artifact_name: "app-build-${{ github.sha }}"
+      environment: 'production'
+      worker_name: 'my-worker'
+      wrangler_config: 'wrangler.toml'
+      zone: '${{ vars.CLOUDFLARE_ZONE_ID }}'
+      custom_domain: 'example.com'
+      slug: 'my-app'
+      artifact_name: 'app-build-${{ github.sha }}'
     secrets:
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -310,9 +341,11 @@ jobs:
 ---
 
 ### [template-release-reusable.yml](/.github/workflows/template-release-reusable.yml)
+
 A reusable workflow for automating template versioning, packaging, and releases. Uses semantic-release to automatically determine version bumps based on conventional commits, packages the template with checksums and tokens, and creates GitHub releases with the tarball as an asset.
 
 **Features:**
+
 - Automatic semantic versioning based on conventional commits
 - Branch-based prerelease channels (dev, qa, main)
 - Template packaging with wrapping and tokenization
@@ -322,11 +355,13 @@ A reusable workflow for automating template versioning, packaging, and releases.
 - Priority-based version determination (BREAKING > feat > fix)
 
 **Version Flow:**
+
 - **dev branch**: `1.0.1-dev.1` → `1.0.1-dev.2` → `1.0.1-dev.3`
 - **qa branch**: `1.0.1-rc.1` → `1.0.1-rc.2`
 - **main branch**: `1.0.1` (final release)
 
 **Example Usage:**
+
 ```yaml
 name: Release Template
 
@@ -346,16 +381,16 @@ jobs:
   build:
     uses: algtools/actions/.github/workflows/pr-build-reusable.yml@main
     with:
-      build_cmd: "pnpm run lint && pnpm run test && pnpm run build"
-      artifact_name: "bff-build-${{ github.sha }}"
-      artifact_paths: "dist,wrangler.jsonc,package.json"
+      build_cmd: 'pnpm run lint && pnpm run test && pnpm run build'
+      artifact_name: 'bff-build-${{ github.sha }}'
+      artifact_paths: 'dist,wrangler.jsonc,package.json'
 
   release-template:
     needs: build
     uses: algtools/actions/.github/workflows/template-release-reusable.yml@main
     with:
-      template_name: "bff-template"
-      working_directory: "."
+      template_name: 'bff-template'
+      working_directory: '.'
       branch: ${{ github.ref_name }}
       retention_days: ${{ github.ref_name == 'main' && 90 || github.ref_name == 'qa' && 60 || 30 }}
     secrets:
@@ -363,21 +398,26 @@ jobs:
 ```
 
 **Required Inputs:**
+
 - `template_name` (required): Name of the template (e.g., bff-template)
 - `working_directory` (required): Directory containing the template (default: ".")
 - `branch` (required): Branch being released (dev/qa/main)
 
 **Optional Inputs:**
+
 - `retention_days` (optional): Artifact retention days (default: 30)
 
 **Required Secrets:**
+
 - `github_token`: GitHub token with write permissions for releases
 
 **Outputs:**
+
 - `version`: Version that was released
 - `tarball_url`: URL to download tarball
 
 **Semantic Versioning Rules:**
+
 - `feat:` → minor bump (1.0.0 → 1.1.0)
 - `fix:` → patch bump (1.0.0 → 1.0.1)
 - `BREAKING CHANGE:` or `feat!:` → major bump (1.0.0 → 2.0.0)
@@ -491,9 +531,11 @@ git commit --allow-empty -m "feat: force minor version"
 ---
 
 ### [preview-deploy-reusable.yml](/.github/workflows/preview-deploy-reusable.yml)
+
 A complete PR preview deployment workflow that builds your application, deploys to Cloudflare Workers, optionally uploads to Chromatic for visual testing or generates API documentation, and automatically posts/updates a comment on the PR with all deployment information.
 
 **Features:**
+
 - Full build and deployment pipeline for PR previews
 - Automatic PR comment with deployment info (create/update with no duplicates)
 - Resolves PR number from various event contexts (pull_request, workflow_run, etc.)
@@ -505,6 +547,7 @@ A complete PR preview deployment workflow that builds your application, deploys 
 - Markdown-formatted PR comments with emojis
 
 **Example Usage:**
+
 ```yaml
 name: PR Preview Deploy
 
@@ -516,36 +559,37 @@ jobs:
   preview:
     permissions:
       contents: read
-      pull-requests: write  # Required for PR comments
+      pull-requests: write # Required for PR comments
     uses: algtools/actions/.github/workflows/preview-deploy-reusable.yml@main
     with:
       # Build configuration
-      build_cmd: "npm run build"
-      artifact_name: "preview-${{ github.event.pull_request.number }}"
-      artifact_paths: "dist,wrangler.toml"
-      working_directory: "."
-      output_dir: "dist"
+      build_cmd: 'npm run build'
+      artifact_name: 'preview-${{ github.event.pull_request.number }}'
+      artifact_paths: 'dist,wrangler.toml'
+      working_directory: '.'
+      output_dir: 'dist'
 
       # Deployment configuration
-      worker_name: "my-app-pr-${{ github.event.pull_request.number }}"
-      wrangler_config: "wrangler.toml"
-      zone: "${{ vars.CLOUDFLARE_ZONE_ID }}"
-      custom_domain: "dev.example.com"
+      worker_name: 'my-app-pr-${{ github.event.pull_request.number }}'
+      wrangler_config: 'wrangler.toml'
+      zone: '${{ vars.CLOUDFLARE_ZONE_ID }}'
+      custom_domain: 'dev.example.com'
 
       # Preview URL configuration
-      app_domain: "${{ vars.APP_DOMAIN }}"  # e.g., "my-app"
-      dev_zone: "${{ vars.DEV_ZONE }}"      # e.g., "dev.example.com"
+      app_domain: '${{ vars.APP_DOMAIN }}' # e.g., "my-app"
+      dev_zone: '${{ vars.DEV_ZONE }}' # e.g., "dev.example.com"
 
       # Optional: Enable Chromatic
       enable_chromatic: true
-      chromatic_project_token: "${{ secrets.CHROMATIC_PROJECT_TOKEN }}"
-      storybook_build_dir: "storybook-static"
+      chromatic_project_token: '${{ secrets.CHROMATIC_PROJECT_TOKEN }}'
+      storybook_build_dir: 'storybook-static'
     secrets:
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 ```
 
 **Example Usage (API Documentation):**
+
 ```yaml
 name: PR Preview Deploy
 
@@ -557,36 +601,37 @@ jobs:
   preview:
     permissions:
       contents: read
-      pull-requests: write  # Required for PR comments
+      pull-requests: write # Required for PR comments
     uses: algtools/actions/.github/workflows/preview-deploy-reusable.yml@main
     with:
       # Build configuration
-      build_cmd: "npm run test && npm run lint && npm run type-check"
-      artifact_name: "preview-${{ github.event.pull_request.number }}"
-      artifact_paths: "src,package.json,pnpm-lock.yaml,wrangler.jsonc"
-      working_directory: "."
+      build_cmd: 'npm run test && npm run lint && npm run type-check'
+      artifact_name: 'preview-${{ github.event.pull_request.number }}'
+      artifact_paths: 'src,package.json,pnpm-lock.yaml,wrangler.jsonc'
+      working_directory: '.'
       retention_days: 7
 
       # Deployment configuration
-      worker_name: "my-api-pr-${{ github.event.pull_request.number }}"
-      wrangler_config: "wrangler.jsonc"
-      zone: "${{ vars.CLOUDFLARE_ZONE_ID }}"
-      custom_domain: "dev.example.com"
+      worker_name: 'my-api-pr-${{ github.event.pull_request.number }}'
+      wrangler_config: 'wrangler.jsonc'
+      zone: '${{ vars.CLOUDFLARE_ZONE_ID }}'
+      custom_domain: 'dev.example.com'
 
       # Preview URL configuration
-      app_domain: "${{ vars.APP_DOMAIN }}"  # e.g., "my-api"
-      dev_zone: "${{ vars.DEV_ZONE }}"      # e.g., "dev.example.com"
+      app_domain: '${{ vars.APP_DOMAIN }}' # e.g., "my-api"
+      dev_zone: '${{ vars.DEV_ZONE }}' # e.g., "dev.example.com"
 
       # Optional: Enable API Documentation
       enable_api_docs: true
-      api_docs_type: "scalar"
-      api_docs_output_dir: "api-docs"
+      api_docs_type: 'scalar'
+      api_docs_output_dir: 'api-docs'
     secrets:
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 ```
 
 **Required Inputs:**
+
 - `build_cmd` (required): Build command to execute
 - `artifact_name` (required): Name for the uploaded artifact
 - `artifact_paths` (required): Comma-separated paths to upload
@@ -597,6 +642,7 @@ jobs:
 - `dev_zone` (required): Development zone suffix for preview URLs
 
 **Optional Build Inputs:**
+
 - `node_version` (optional): Node.js version (defaults to .nvmrc)
 - `working_directory` (optional): Working directory (default: ".")
 - `output_dir` (optional): Build output directory (default: "dist")
@@ -607,38 +653,46 @@ jobs:
 - `poll_interval_seconds` (optional): Certificate status check interval (default: 10)
 
 **Optional Chromatic Inputs:**
+
 - `enable_chromatic` (optional): Enable Chromatic visual testing (default: false)
 - `chromatic_project_token` (optional): Chromatic project token (required if enable_chromatic is true)
 - `storybook_build_dir` (optional): Storybook build directory (default: "storybook-static")
 
 **Optional API Documentation Inputs:**
+
 - `enable_api_docs` (optional): Enable API documentation generation (default: false)
 - `api_docs_type` (optional): Type of API documentation (scalar, redoc, swagger-ui) (default: "scalar")
 - `api_docs_output_dir` (optional): Directory where API documentation will be generated (default: "api-docs")
 
 **Required Secrets:**
+
 - `cloudflare_api_token`: Cloudflare API token with Workers and SSL permissions
 - `cloudflare_account_id`: Cloudflare account ID
 
 **Build Outputs:**
+
 - `artifact_id`: GitHub artifact ID
 - `artifact_url`: Download URL for the artifact
 - `build_status`: Build result status
 
 **Deployment Outputs:**
+
 - `worker_url`: URL of the deployed Worker
 - `deployment_status`: Deployment status
 - `certificate_id`: SSL certificate ID
 - `preview_url`: Public preview URL for the PR
 
 **Chromatic Outputs (if enabled):**
+
 - `chromatic_url`: URL to Chromatic visual testing results
 
 **API Documentation Outputs (if enabled):**
+
 - `api_docs_url`: URL to API documentation
 - `api_docs_status`: Status of API documentation generation
 
 **Comment Outputs:**
+
 - `comment_id`: ID of the PR comment
 - `comment_url`: URL of the PR comment
 
@@ -647,6 +701,7 @@ jobs:
 The workflow automatically posts/updates a comment on the PR with this format:
 
 **For Web Templates (with Chromatic):**
+
 ```markdown
 ✅ **Preview deployed successfully!**
 🌐 [Open Preview](https://my-app-pr-42.my-app.dev.example.com)
@@ -655,12 +710,14 @@ The workflow automatically posts/updates a comment on the PR with this format:
 ---
 
 **Deployment Details:**
+
 - Worker: `my-app-pr-42`
 - Environment: `dev`
 - Commit: `abc123def456...`
 ```
 
 **For API Templates (with API Documentation):**
+
 ```markdown
 ✅ **Preview deployed successfully!**
 🌐 [Open Preview](https://my-api-pr-42.my-api.dev.example.com)
@@ -669,12 +726,14 @@ The workflow automatically posts/updates a comment on the PR with this format:
 ---
 
 **Deployment Details:**
+
 - Worker: `my-api-pr-42`
 - Environment: `dev`
 - Commit: `abc123def456...`
 ```
 
 **For Templates with Both:**
+
 ```markdown
 ✅ **Preview deployed successfully!**
 🌐 [Open Preview](https://my-app-pr-42.my-app.dev.example.com)
@@ -684,6 +743,7 @@ The workflow automatically posts/updates a comment on the PR with this format:
 ---
 
 **Deployment Details:**
+
 - Worker: `my-app-pr-42`
 - Environment: `dev`
 - Commit: `abc123def456...`
@@ -704,15 +764,17 @@ The workflow automatically posts/updates a comment on the PR with this format:
 ```yaml
 permissions:
   contents: read
-  pull-requests: write  # Required for posting PR comments
+  pull-requests: write # Required for posting PR comments
 ```
 
 ---
 
 ### [cleanup-preview-reusable.yml](/.github/workflows/cleanup-preview-reusable.yml)
+
 A reusable workflow for cleaning up PR preview environments when pull requests are closed. Removes Cloudflare Workers and optionally SSL certificates to prevent resource accumulation and reduce costs.
 
 **Features:**
+
 - Automatic cleanup of Cloudflare Workers when PRs are closed
 - Optional SSL certificate deletion (with safety warnings)
 - Dry run mode for safe testing without actual deletion
@@ -722,6 +784,7 @@ A reusable workflow for cleaning up PR preview environments when pull requests a
 - Detailed logging and error handling
 
 **Example Usage:**
+
 ```yaml
 name: Cleanup Preview Environment
 
@@ -734,12 +797,12 @@ jobs:
     uses: algtools/actions/.github/workflows/cleanup-preview-reusable.yml@main
     with:
       worker_name: "${{ vars.APP_NAME || 'my-app' }}-pr-${{ github.event.pull_request.number }}"
-      pr_number: "${{ github.event.pull_request.number }}"
+      pr_number: '${{ github.event.pull_request.number }}'
       app_domain: "${{ vars.APP_DOMAIN || vars.APP_NAME || 'my-app' }}"
       dev_zone: "${{ vars.DEV_ZONE || 'dev.example.com' }}"
       slug: "${{ vars.SLUG || 'template' }}"
       delete_worker: true
-      delete_certificate: false  # Certificates are usually shared
+      delete_certificate: false # Certificates are usually shared
       dry_run: false
     secrets:
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -747,22 +810,26 @@ jobs:
 ```
 
 **Required Inputs:**
+
 - `worker_name` (required): Name of the Cloudflare Worker to delete
 - `pr_number` (required): Pull request number for cleanup identification
 - `app_domain` (required): Application domain prefix for preview URL construction
 - `dev_zone` (required): Development zone suffix for preview URLs
 
 **Optional Inputs:**
+
 - `slug` (optional): Project slug for additional identification (default: "")
 - `delete_worker` (optional): Whether to delete the Cloudflare Worker (default: true)
 - `delete_certificate` (optional): Whether to delete the SSL certificate (default: false)
 - `dry_run` (optional): Perform dry run without actual deletion (default: false)
 
 **Required Secrets:**
+
 - `cloudflare_api_token`: Cloudflare API token with Workers and SSL permissions
 - `cloudflare_account_id`: Cloudflare account ID
 
 **Outputs:**
+
 - `worker_deleted`: Whether the worker was successfully deleted
 - `certificate_deleted`: Whether the certificate was successfully deleted
 - `cleanup_status`: Overall status of the cleanup operation
@@ -771,22 +838,25 @@ jobs:
 **Cleanup Options:**
 
 1. **Worker Deletion** (recommended):
+
    ```yaml
    with:
-     delete_worker: true  # Default: true
+     delete_worker: true # Default: true
    ```
 
 2. **Certificate Deletion** (use with caution):
+
    ```yaml
    with:
-     delete_certificate: true  # Default: false
+     delete_certificate: true # Default: false
    ```
+
    ⚠️ **Warning**: Certificates are often shared across deployments. Only delete if you're sure the certificate is not used by other deployments.
 
 3. **Dry Run Mode** (for testing):
    ```yaml
    with:
-     dry_run: true  # Default: false
+     dry_run: true # Default: false
    ```
    This will log what would be deleted without actually performing the deletion.
 
@@ -909,21 +979,27 @@ The repository follows **Semantic Versioning** (SemVer) and maintains both speci
 You can reference actions and workflows using either specific versions or major version tags:
 
 **Major Version Tag (Recommended for stability):**
+
 ```yaml
 - uses: algtools/actions/.github/actions/setup-node@v1
 ```
+
 This automatically gets bug fixes and new features within v1.x.x.
 
 **Specific Version (Recommended for reproducibility):**
+
 ```yaml
 - uses: algtools/actions/.github/actions/setup-node@v1.2.3
 ```
+
 This pins to an exact version.
 
 **Main Branch (Not recommended for production):**
+
 ```yaml
 - uses: algtools/actions/.github/actions/setup-node@main
 ```
+
 This uses the latest code but may include breaking changes.
 
 ### Contributing Changes
@@ -931,6 +1007,7 @@ This uses the latest code but may include breaking changes.
 When creating pull requests, ensure your PR title follows Conventional Commits format:
 
 **Format:**
+
 ```
 <type>(<scope>): <description>
 
@@ -940,6 +1017,7 @@ When creating pull requests, ensure your PR title follows Conventional Commits f
 ```
 
 **Examples:**
+
 ```
 feat(setup-node): add support for Bun package manager
 fix(deploy-cloudflare): resolve artifact download timeout
@@ -948,6 +1026,7 @@ chore: update dependencies
 ```
 
 **Valid Types:**
+
 - `feat`: New feature (triggers minor release)
 - `fix`: Bug fix (triggers patch release)
 - `docs`: Documentation changes (no release)
@@ -995,12 +1074,14 @@ This repository also validates GitHub Actions workflow files before commit:
 **Setting up local validation:**
 
 After cloning the repository, run:
+
 ```powershell
 cd actions
 pnpm install
 ```
 
 The `prepare` script will automatically set up Husky hooks. After this:
+
 - All commits will validate commit messages
 - Commits with workflow changes will run actionlint validation
 
@@ -1024,6 +1105,7 @@ Without actionlint installed, the pre-commit hook will skip workflow validation 
 **Manual workflow validation:**
 
 You can manually validate workflows at any time:
+
 ```powershell
 pnpm run lint:workflows
 ```
@@ -1043,15 +1125,17 @@ pnpm run lint:workflows
 **macOS Tests**: macOS runner tests are disabled by default to reduce CI costs, as macOS runners are significantly more expensive than Linux/Windows runners. Tests run on Ubuntu and Windows provide sufficient cross-platform coverage for most use cases.
 
 To enable macOS tests when needed:
+
 1. Edit the relevant workflow file (e.g., `.github/workflows/test-*.yml`)
 2. Add `macos-latest` to the matrix `os` array
 3. Look for comments like: `# macOS tests disabled by default (expensive)`
 
 Example:
+
 ```yaml
 strategy:
   matrix:
-    os: [ubuntu-latest, windows-latest, macos-latest]  # Add macos-latest here
+    os: [ubuntu-latest, windows-latest, macos-latest] # Add macos-latest here
 ```
 
 ### Adding New Actions

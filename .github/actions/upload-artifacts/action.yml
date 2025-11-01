@@ -1,47 +1,47 @@
-name: 'Upload Artifacts'
-description: 'Uploads build artifacts to GitHub Actions storage with detailed logging and support for multiple file paths'
-author: 'Algenium Systems'
+name: "Upload Artifacts"
+description: "Uploads build artifacts to GitHub Actions storage with detailed logging and support for multiple file paths"
+author: "Algenium Systems"
 
 inputs:
   artifact_name:
-    description: 'Name of the artifact to upload'
+    description: "Name of the artifact to upload"
     required: true
   artifact_paths:
-    description: 'Comma-separated list of file paths or directories to upload as artifacts (will be converted to newline-separated format for upload-artifact@v4)'
+    description: "Comma-separated list of file paths or directories to upload as artifacts (will be converted to newline-separated format for upload-artifact@v4)"
     required: true
   retention_days:
-    description: 'Number of days to retain the artifact (1-90 days, default is repository/org setting)'
+    description: "Number of days to retain the artifact (1-90 days, default is repository/org setting)"
     required: false
-    default: ''
+    default: ""
   if_no_files_found:
-    description: 'Behavior if no files are found: warn, error, or ignore'
+    description: "Behavior if no files are found: warn, error, or ignore"
     required: false
-    default: 'warn'
+    default: "warn"
   compression_level:
-    description: 'Compression level (0-9): 0 for no compression, 9 for maximum compression'
+    description: "Compression level (0-9): 0 for no compression, 9 for maximum compression"
     required: false
-    default: '6'
+    default: "6"
   include_hidden_files:
-    description: 'Include hidden files (files/directories starting with .) in the artifact'
+    description: "Include hidden files (files/directories starting with .) in the artifact"
     required: false
-    default: 'false'
+    default: "false"
 
 outputs:
   artifact_id:
-    description: 'GitHub artifact ID of the uploaded artifact'
+    description: "GitHub artifact ID of the uploaded artifact"
     value: ${{ steps.upload.outputs.artifact-id }}
   artifact_url:
-    description: 'URL to download the artifact'
+    description: "URL to download the artifact"
     value: ${{ steps.upload.outputs.artifact-url }}
   total_files:
-    description: 'Total number of files uploaded'
+    description: "Total number of files uploaded"
     value: ${{ steps.analyze.outputs.file_count }}
   total_size:
-    description: 'Total size of uploaded files in bytes'
+    description: "Total size of uploaded files in bytes"
     value: ${{ steps.analyze.outputs.total_size }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Validate inputs
       shell: bash

@@ -9,19 +9,19 @@ on:
         required: true
         type: string
       enable_coverage:
-        description: 'Enable test coverage reports'
+        description: "Enable test coverage reports"
         required: false
         type: boolean
         default: false
       coverage_cmd:
-        description: 'Coverage command to execute'
+        description: "Coverage command to execute"
         required: false
         type: string
-        default: ''
+        default: ""
 
       # Lint configuration
       lint_cmd:
-        description: 'Lint command to execute (can include multiple commands separated by &&)'
+        description: "Lint command to execute (can include multiple commands separated by &&)"
         required: true
         type: string
 
@@ -37,12 +37,12 @@ on:
         required: true
         type: string
       node_version:
-        description: 'Node.js version to install. If not provided, reads from .nvmrc file.'
+        description: "Node.js version to install. If not provided, reads from .nvmrc file."
         required: false
         type: string
         default: ""
       working_directory:
-        description: 'Working directory for all commands'
+        description: "Working directory for all commands"
         required: false
         type: string
         default: "."
@@ -69,7 +69,7 @@ on:
 
       # Optional: Storybook build
       enable_storybook:
-        description: 'Enable Storybook build (creates separate job)'
+        description: "Enable Storybook build (creates separate job)"
         required: false
         type: boolean
         default: false
@@ -77,16 +77,16 @@ on:
         description: 'Storybook build command (e.g., "pnpm build:storybook && pnpm copy:storybook")'
         required: false
         type: string
-        default: ''
+        default: ""
       storybook_output_dir:
-        description: 'Directory where Storybook output is produced'
+        description: "Directory where Storybook output is produced"
         required: false
         type: string
-        default: 'storybook-static'
+        default: "storybook-static"
 
       # Optional: API documentation
       enable_api_docs:
-        description: 'Enable API documentation generation (part of build job)'
+        description: "Enable API documentation generation (part of build job)"
         required: false
         type: boolean
         default: false
@@ -94,7 +94,7 @@ on:
         description: 'API docs command (e.g., "pnpm openapi:export")'
         required: false
         type: string
-        default: ''
+        default: ""
 
     outputs:
       # Test outputs
@@ -212,6 +212,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
+        id: setup
         uses: algtools/actions/.github/actions/setup-node@main
         with:
           node-version: ${{ inputs.node_version }}
@@ -225,7 +226,7 @@ jobs:
           build_cmd: ${{ inputs.build_cmd }}
           working_dir: ${{ inputs.working_directory }}
           output_dir: ${{ inputs.output_dir }}
-          node_env: 'production'
+          node_env: "production"
 
       - name: Generate API documentation
         if: inputs.enable_api_docs == true
@@ -271,7 +272,7 @@ jobs:
         env:
           NODE_ENV: production
           CI: true
-          NODE_OPTIONS: '--max_old_space_size=4096'
+          NODE_OPTIONS: "--max_old_space_size=4096"
         run: ${{ inputs.storybook_cmd }}
 
       - name: Verify Storybook output
@@ -297,7 +298,7 @@ jobs:
   upload-artifact:
     name: Upload Artifacts
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build, build-storybook]
     # Also depend on storybook if it's enabled
     if: |
       always() &&
@@ -326,7 +327,7 @@ jobs:
           build_cmd: ${{ inputs.build_cmd }}
           working_dir: ${{ inputs.working_directory }}
           output_dir: ${{ inputs.output_dir }}
-          node_env: 'production'
+          node_env: "production"
 
       - name: Regenerate API documentation
         if: inputs.enable_api_docs == true
@@ -339,7 +340,7 @@ jobs:
         env:
           NODE_ENV: production
           CI: true
-          NODE_OPTIONS: '--max_old_space_size=4096'
+          NODE_OPTIONS: "--max_old_space_size=4096"
         run: ${{ inputs.storybook_cmd }}
 
       - name: Upload artifacts
@@ -349,7 +350,7 @@ jobs:
           artifact_name: ${{ inputs.artifact_name }}
           artifact_paths: ${{ inputs.artifact_paths }}
           retention_days: ${{ inputs.retention_days }}
-          include_hidden_files: 'true'
+          include_hidden_files: "true"
 
       - name: Summary
         run: |

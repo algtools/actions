@@ -42,6 +42,7 @@ The action supports creating wildcard certificates for subdomains, which is perf
 ```
 
 **Result**: Certificate for `*.template.algenium.dev` covering:
+
 - `template.algenium.dev`
 - `bff-pr-1.template.algenium.dev`
 - `bff-pr-2.template.algenium.dev`
@@ -61,6 +62,7 @@ The action supports creating wildcard certificates for subdomains, which is perf
 ```
 
 **Result**: Certificate for `*.app.staging.example.com` covering:
+
 - `app.staging.example.com`
 - `api.app.staging.example.com`
 - `web.app.staging.example.com`
@@ -69,6 +71,7 @@ The action supports creating wildcard certificates for subdomains, which is perf
 #### Real-World Use Cases
 
 **1. Multi-tenant SaaS Platform**
+
 ```yaml
 # Each customer gets their own subdomain
 domain: 'customer1.myapp.com'
@@ -77,6 +80,7 @@ domain: 'customer1.myapp.com'
 ```
 
 **2. Environment-based Deployments**
+
 ```yaml
 # Different environments on subdomains
 domain: 'staging.myapp.com'
@@ -85,6 +89,7 @@ domain: 'staging.myapp.com'
 ```
 
 **3. Geographic Distribution**
+
 ```yaml
 # Regional subdomains
 domain: 'us-east.myapp.com'
@@ -93,6 +98,7 @@ domain: 'us-east.myapp.com'
 ```
 
 **4. Project-based Subdomains**
+
 ```yaml
 # Different projects on subdomains
 domain: 'template.algenium.dev'
@@ -109,11 +115,11 @@ domain: 'template.algenium.dev'
 
 #### Zone-Subdomain Relationship
 
-| Domain | Zone ID For | Certificate Covers |
-|--------|-------------|-------------------|
-| `template.algenium.dev` | `algenium.dev` | `*.template.algenium.dev` |
-| `api.janovix.ai` | `janovix.ai` | `*.api.janovix.ai` |
-| `app.staging.example.com` | `example.com` | `*.app.staging.example.com` |
+| Domain                    | Zone ID For    | Certificate Covers          |
+| ------------------------- | -------------- | --------------------------- |
+| `template.algenium.dev`   | `algenium.dev` | `*.template.algenium.dev`   |
+| `api.janovix.ai`          | `janovix.ai`   | `*.api.janovix.ai`          |
+| `app.staging.example.com` | `example.com`  | `*.app.staging.example.com` |
 
 ### Complete Deployment Workflow
 
@@ -210,20 +216,20 @@ jobs:
     current_zone: ${{ secrets.CLOUDFLARE_ZONE_ID }}
     cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-    max_wait_seconds: '600'  # Wait up to 10 minutes
-    poll_interval_seconds: '15'  # Check every 15 seconds
+    max_wait_seconds: '600' # Wait up to 10 minutes
+    poll_interval_seconds: '15' # Check every 15 seconds
 ```
 
 ## Inputs
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `domain` | Domain for the wildcard certificate (e.g., `example.com` for `*.example.com`) | Yes | - |
-| `current_zone` | Cloudflare zone ID for the domain | Yes | - |
-| `cloudflare_api_token` | Cloudflare API token with SSL/TLS certificates permissions | Yes | - |
-| `cloudflare_account_id` | Cloudflare account ID | Yes | - |
-| `max_wait_seconds` | Maximum time to wait for certificate activation (in seconds) | No | `300` |
-| `poll_interval_seconds` | Interval between status checks (in seconds) | No | `10` |
+| Input                   | Description                                                                   | Required | Default |
+| ----------------------- | ----------------------------------------------------------------------------- | -------- | ------- |
+| `domain`                | Domain for the wildcard certificate (e.g., `example.com` for `*.example.com`) | Yes      | -       |
+| `current_zone`          | Cloudflare zone ID for the domain                                             | Yes      | -       |
+| `cloudflare_api_token`  | Cloudflare API token with SSL/TLS certificates permissions                    | Yes      | -       |
+| `cloudflare_account_id` | Cloudflare account ID                                                         | Yes      | -       |
+| `max_wait_seconds`      | Maximum time to wait for certificate activation (in seconds)                  | No       | `300`   |
+| `poll_interval_seconds` | Interval between status checks (in seconds)                                   | No       | `10`    |
 
 ### Input Details
 
@@ -232,6 +238,7 @@ jobs:
 The base domain for the wildcard certificate. The action will create a certificate for both `example.com` and `*.example.com`.
 
 **Examples:**
+
 - `'example.com'` → Creates cert for `example.com` and `*.example.com`
 - `'api.myapp.com'` → Creates cert for `api.myapp.com` and `*.api.myapp.com`
 - `'staging.example.com'` → Creates cert for `staging.example.com` and `*.staging.example.com`
@@ -241,6 +248,7 @@ The base domain for the wildcard certificate. The action will create a certifica
 The Cloudflare zone ID for your domain. This identifies which DNS zone the certificate should be created in.
 
 **Where to find:**
+
 1. Log in to Cloudflare Dashboard
 2. Select your domain
 3. Find Zone ID in the right sidebar under "API" section
@@ -252,10 +260,12 @@ The Cloudflare zone ID for your domain. This identifies which DNS zone the certi
 A Cloudflare API token with SSL/TLS certificate management permissions. This should be stored as a GitHub secret.
 
 **Required permissions:**
+
 - Zone - SSL and Certificates - Edit
 - Zone - SSL and Certificates - Read
 
 **Setup:**
+
 1. Go to Cloudflare Dashboard → My Profile → API Tokens
 2. Click "Create Token"
 3. Use "Edit zone SSL and TLS" template or create custom token with permissions above
@@ -266,6 +276,7 @@ A Cloudflare API token with SSL/TLS certificate management permissions. This sho
 Your Cloudflare account ID. Found in the Cloudflare Dashboard. Store as a GitHub secret.
 
 **Where to find:**
+
 - Cloudflare Dashboard → Account Home → Account ID (right sidebar)
 - Or in the URL: `dash.cloudflare.com/<account-id>/`
 
@@ -276,6 +287,7 @@ Maximum time (in seconds) to wait for the certificate to become active after cre
 **Default:** `300` (5 minutes)
 
 **Recommended values:**
+
 - Development/Testing: `180` (3 minutes)
 - Production: `600` (10 minutes)
 
@@ -286,17 +298,18 @@ How often (in seconds) to check the certificate status while waiting for activat
 **Default:** `10` (check every 10 seconds)
 
 **Recommended values:**
+
 - Frequent checks: `5`
 - Balanced: `10`
 - Reduced API calls: `30`
 
 ## Outputs
 
-| Output | Description |
-|--------|-------------|
-| `certificate_id` | ID of the wildcard certificate (existing or newly created) |
-| `certificate_status` | Final status of the certificate (should be "active") |
-| `certificate_created` | Whether a new certificate was created (`true` or `false`) |
+| Output                | Description                                                |
+| --------------------- | ---------------------------------------------------------- |
+| `certificate_id`      | ID of the wildcard certificate (existing or newly created) |
+| `certificate_status`  | Final status of the certificate (should be "active")       |
+| `certificate_created` | Whether a new certificate was created (`true` or `false`)  |
 
 ### Using Outputs
 
@@ -374,26 +387,31 @@ Once active, the action outputs the certificate details for use in subsequent wo
 The action provides comprehensive logging throughout the process:
 
 ### Input Validation
+
 - Validates all required inputs
 - Displays configuration (with sensitive data masked)
 - Shows wildcard pattern and wait settings
 
 ### Certificate Detection
+
 - Queries Cloudflare API for existing certificates
 - Reports whether certificate was found or needs creation
 - Shows certificate ID and current status
 
 ### Certificate Creation (if needed)
+
 - Creates new certificate with specified parameters
 - Displays creation confirmation
 - Shows initial status
 
 ### Status Monitoring
+
 - Real-time status updates during wait period
 - Progress indicator showing elapsed/remaining time
 - Clear indication when certificate becomes active
 
 ### Security Features
+
 - Automatically masks API tokens and sensitive IDs
 - Filters sensitive information from all logs
 - Redacts credentials from error messages
@@ -528,7 +546,7 @@ jobs:
 
 ```yaml
 permissions:
-  contents: read  # Minimal permissions required
+  contents: read # Minimal permissions required
 ```
 
 ### Cloudflare API Token Permissions
@@ -541,6 +559,7 @@ Your Cloudflare API token must have:
 ## Certificate Details
 
 ### Type
+
 The action creates **Advanced certificates** with the following properties:
 
 - **Certificate Authority**: Let's Encrypt
@@ -557,13 +576,13 @@ The action creates **Advanced certificates** with the following properties:
 
 ### Status States
 
-| Status | Description | Action Behavior |
-|--------|-------------|-----------------|
-| `pending` | Certificate order placed | Waits and polls |
-| `initializing` | Validation in progress | Waits and polls |
-| `active` | Certificate ready to use | Completes successfully |
-| `failed` | Validation or issuance failed | Exits with error |
-| `expired` | Certificate has expired | Exits with error |
+| Status         | Description                   | Action Behavior        |
+| -------------- | ----------------------------- | ---------------------- |
+| `pending`      | Certificate order placed      | Waits and polls        |
+| `initializing` | Validation in progress        | Waits and polls        |
+| `active`       | Certificate ready to use      | Completes successfully |
+| `failed`       | Validation or issuance failed | Exits with error       |
+| `expired`      | Certificate has expired       | Exits with error       |
 
 ## Troubleshooting
 
@@ -572,6 +591,7 @@ The action creates **Advanced certificates** with the following properties:
 **Issue:** Action doesn't detect existing certificate and creates duplicate
 
 **Solution:** Ensure the domain exactly matches:
+
 ```yaml
 # These are different certificates:
 domain: 'example.com'      # Creates *.example.com
@@ -583,6 +603,7 @@ domain: 'www.example.com'  # Creates *.www.example.com
 **Error:** "Failed to query Cloudflare API: Authentication failed"
 
 **Solution:**
+
 1. Verify API token has correct permissions
 2. Check token hasn't expired
 3. Ensure token is for correct Cloudflare account
@@ -593,12 +614,14 @@ domain: 'www.example.com'  # Creates *.www.example.com
 **Error:** "Failed to create certificate: [error message]"
 
 **Common causes:**
+
 1. **Zone not found**: Verify `current_zone` ID is correct
 2. **Permission denied**: API token lacks SSL certificate permissions
 3. **Invalid domain**: Domain doesn't belong to specified zone
 4. **Rate limit**: Too many certificate requests (wait and retry)
 
 **Debug steps:**
+
 ```yaml
 - name: Debug certificate creation
   uses: algtools/actions/.github/actions/ensure-wildcard-certificate@v1
@@ -607,7 +630,7 @@ domain: 'www.example.com'  # Creates *.www.example.com
     current_zone: ${{ secrets.CLOUDFLARE_ZONE_ID }}
     cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-    max_wait_seconds: '60'  # Shorter timeout for debugging
+    max_wait_seconds: '60' # Shorter timeout for debugging
 ```
 
 ### Timeout Waiting for Activation
@@ -615,9 +638,11 @@ domain: 'www.example.com'  # Creates *.www.example.com
 **Error:** "Certificate did not become active within X seconds"
 
 **Solutions:**
+
 1. Increase `max_wait_seconds`:
+
    ```yaml
-   max_wait_seconds: '600'  # Try 10 minutes
+   max_wait_seconds: '600' # Try 10 minutes
    ```
 
 2. Check Cloudflare dashboard for certificate status:
@@ -633,10 +658,11 @@ domain: 'www.example.com'  # Creates *.www.example.com
 **Error:** "Zone not found" or "Domain doesn't belong to zone"
 
 **Solution:** Verify zone ID matches the domain:
+
 ```yaml
 # Get zone ID from Cloudflare dashboard
-current_zone: ${{ secrets.CLOUDFLARE_ZONE_ID }}  # Must match domain
-domain: 'example.com'  # Must be in this zone
+current_zone: ${{ secrets.CLOUDFLARE_ZONE_ID }} # Must match domain
+domain: 'example.com' # Must be in this zone
 ```
 
 ## Security Best Practices
@@ -683,7 +709,7 @@ For production deployments:
 ```yaml
 jobs:
   ensure-certificate:
-    environment: production  # Requires approval
+    environment: production # Requires approval
     steps:
       - uses: algtools/actions/.github/actions/ensure-wildcard-certificate@v1
         with:
@@ -712,6 +738,7 @@ Cloudflare has rate limits for API requests:
 - **Status Queries**: Generally higher limits
 
 **Best Practices:**
+
 - Use reasonable poll intervals (10-30 seconds)
 - Don't create unnecessary certificates
 - Leverage the idempotent nature of this action
@@ -726,6 +753,7 @@ Cloudflare has rate limits for API requests:
 ## Dependencies
 
 This action requires:
+
 - `curl`: For API requests (pre-installed on all GitHub runners)
 - `jq`: For JSON parsing (pre-installed on all GitHub runners)
 - `bash`: For script execution

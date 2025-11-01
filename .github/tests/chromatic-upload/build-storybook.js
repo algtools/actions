@@ -32,7 +32,7 @@ const files = {
   <script src="main.js"></script>
 </body>
 </html>`,
-  
+
   'iframe.html': `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -57,41 +57,49 @@ console.log('Stories:', stories);`,
   'preview.js': `// Mock preview bundle
 console.log('Storybook preview loaded');`,
 
-  'project.json': JSON.stringify({
-    "generatedAt": new Date().toISOString(),
-    "builder": {
-      "name": "@storybook/builder-webpack5"
+  'project.json': JSON.stringify(
+    {
+      generatedAt: new Date().toISOString(),
+      builder: {
+        name: '@storybook/builder-webpack5',
+      },
+      hasCustomBabel: false,
+      hasCustomWebpack: false,
+      hasStaticDirs: false,
+      hasStorybookEslint: false,
+      version: '7.0.0',
     },
-    "hasCustomBabel": false,
-    "hasCustomWebpack": false,
-    "hasStaticDirs": false,
-    "hasStorybookEslint": false,
-    "version": "7.0.0"
-  }, null, 2),
+    null,
+    2,
+  ),
 
-  'stories.json': JSON.stringify({
-    "v": 4,
-    "stories": {
-      "button--primary": {
-        "id": "button--primary",
-        "title": "Button",
-        "name": "Primary",
-        "importPath": "./Button.stories.js"
+  'stories.json': JSON.stringify(
+    {
+      v: 4,
+      stories: {
+        'button--primary': {
+          id: 'button--primary',
+          title: 'Button',
+          name: 'Primary',
+          importPath: './Button.stories.js',
+        },
+        'input--default': {
+          id: 'input--default',
+          title: 'Input',
+          name: 'Default',
+          importPath: './Input.stories.js',
+        },
+        'card--basic': {
+          id: 'card--basic',
+          title: 'Card',
+          name: 'Basic',
+          importPath: './Card.stories.js',
+        },
       },
-      "input--default": {
-        "id": "input--default",
-        "title": "Input",
-        "name": "Default",
-        "importPath": "./Input.stories.js"
-      },
-      "card--basic": {
-        "id": "card--basic",
-        "title": "Card",
-        "name": "Basic",
-        "importPath": "./Card.stories.js"
-      }
-    }
-  }, null, 2)
+    },
+    null,
+    2,
+  ),
 };
 
 // Write all files
@@ -105,10 +113,7 @@ for (const [filename, content] of Object.entries(files)) {
 const assetsDir = path.join(STORYBOOK_DIR, 'assets');
 fs.mkdirSync(assetsDir, { recursive: true });
 
-fs.writeFileSync(
-  path.join(assetsDir, 'logo.svg'),
-  '<svg><text>Storybook Logo</text></svg>'
-);
+fs.writeFileSync(path.join(assetsDir, 'logo.svg'), '<svg><text>Storybook Logo</text></svg>');
 console.log('✓ Created assets/logo.svg');
 
 // Create chunk files

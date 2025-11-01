@@ -103,7 +103,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Required for Chromatic
+          fetch-depth: 0 # Required for Chromatic
 
       - uses: algtools/actions/.github/actions/setup-node@v1
         with:
@@ -152,7 +152,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Build Storybook
         run: npm run build-storybook
 
@@ -182,14 +182,14 @@ jobs:
 
 ## Inputs
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `artifact_name` | Name of the artifact containing the built Storybook | Yes | - |
-| `project_token` | Chromatic project token (from repo/org secrets) | Yes | - |
-| `working_dir` | Directory where to run the chromatic command | No | `.` |
-| `storybook_dir` | Directory path where Storybook will be extracted/located | No | `.out/storybook` |
-| `exit_zero_on_changes` | Do not fail if visual changes occur (exit with code 0) | No | `true` |
-| `download_path` | Directory path where the artifact will be downloaded | No | `./storybook-artifact` |
+| Input                  | Description                                              | Required | Default                |
+| ---------------------- | -------------------------------------------------------- | -------- | ---------------------- |
+| `artifact_name`        | Name of the artifact containing the built Storybook      | Yes      | -                      |
+| `project_token`        | Chromatic project token (from repo/org secrets)          | Yes      | -                      |
+| `working_dir`          | Directory where to run the chromatic command             | No       | `.`                    |
+| `storybook_dir`        | Directory path where Storybook will be extracted/located | No       | `.out/storybook`       |
+| `exit_zero_on_changes` | Do not fail if visual changes occur (exit with code 0)   | No       | `true`                 |
+| `download_path`        | Directory path where the artifact will be downloaded     | No       | `./storybook-artifact` |
 
 ### Input Details
 
@@ -198,11 +198,13 @@ jobs:
 The name of the GitHub Actions artifact that contains your built Storybook. This should match the artifact name used in the `upload-artifacts` action.
 
 **Examples:**
+
 - `'storybook-build'`
 - `'storybook-${{ github.sha }}'`
 - `'storybook-pr-${{ github.event.pull_request.number }}'`
 
 The artifact can contain either:
+
 - A directory with Storybook static files
 - A `.zip` file containing the Storybook (automatically extracted)
 
@@ -211,12 +213,14 @@ The artifact can contain either:
 Your Chromatic project token. This should always be stored as a GitHub secret.
 
 **Setup:**
+
 1. Go to your Chromatic project settings
 2. Navigate to "Manage" → "Configure"
 3. Copy the project token
 4. Add to GitHub repository secrets as `CHROMATIC_PROJECT_TOKEN`
 
 **Usage:**
+
 ```yaml
 project_token: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
 ```
@@ -228,6 +232,7 @@ project_token: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
 The working directory where the Chromatic command will be executed. Useful for monorepos or when your Storybook is in a subdirectory.
 
 **Example for monorepo:**
+
 ```yaml
 working_dir: './packages/ui-components'
 ```
@@ -239,6 +244,7 @@ The directory path (relative to `working_dir`) where Storybook files will be ext
 **Default:** `.out/storybook`
 
 **Examples:**
+
 - `'storybook-static'` (common Storybook build output)
 - `'build/storybook'`
 - `'.storybook-out'`
@@ -250,6 +256,7 @@ When set to `true`, the workflow will not fail even if Chromatic detects visual 
 **Default:** `true`
 
 Set to `false` if you want the workflow to fail when visual changes are detected:
+
 ```yaml
 exit_zero_on_changes: 'false'
 ```
@@ -262,10 +269,10 @@ The directory where the artifact will be downloaded before processing. This is a
 
 ## Outputs
 
-| Output | Description |
-|--------|-------------|
+| Output          | Description                                           |
+| --------------- | ----------------------------------------------------- |
 | `chromatic_url` | URL of the Chromatic build for viewing visual changes |
-| `build_status` | Status of the upload: `success` or `failure` |
+| `build_status`  | Status of the upload: `success` or `failure`          |
 
 ### Using Outputs
 
@@ -302,26 +309,31 @@ The directory where the artifact will be downloaded before processing. This is a
 The action provides comprehensive logging throughout the upload process:
 
 ### Input Validation
+
 - Validates all required inputs
 - Displays configuration (with sensitive data masked)
 - Shows directory paths and settings
 
 ### Artifact Verification
+
 - Lists downloaded artifact contents
 - Shows file count and structure
 - Verifies Storybook files exist
 
 ### Storybook Preparation
+
 - Automatically detects and extracts zip files
 - Shows extraction progress
 - Lists Storybook directory contents
 
 ### Chromatic Upload
+
 - Executes Chromatic CLI with proper token masking
 - Captures and displays upload progress
 - Extracts and displays build URL
 
 ### Security Features
+
 - Automatically masks project tokens in all logs
 - Filters sensitive information from Chromatic output
 - Redacts credentials from error messages
@@ -396,7 +408,7 @@ jobs:
           script: |
             const url = '${{ steps.chromatic.outputs.chromatic_url }}';
             const body = `## 🎨 Visual Review Ready\n\n[View Chromatic build](${url})`;
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -440,7 +452,7 @@ jobs:
         with:
           artifact_name: 'storybook-main-${{ github.sha }}'
           project_token: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-          exit_zero_on_changes: 'false'  # Fail if unexpected changes
+          exit_zero_on_changes: 'false' # Fail if unexpected changes
 ```
 
 ### Monorepo Multi-Package Upload
@@ -500,7 +512,7 @@ jobs:
 ```yaml
 permissions:
   contents: read
-  actions: write  # Required for downloading artifacts
+  actions: write # Required for downloading artifacts
 ```
 
 If you want to comment on PRs with the Chromatic URL:
@@ -509,26 +521,29 @@ If you want to comment on PRs with the Chromatic URL:
 permissions:
   contents: read
   actions: write
-  pull-requests: write  # Required for PR comments
+  pull-requests: write # Required for PR comments
 ```
 
 ## Security Best Practices
 
 1. **Store Tokens as Secrets**: Never hardcode Chromatic project tokens
+
    ```yaml
    project_token: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
    ```
 
 2. **Separate Build and Upload**: Build Storybook in a clean environment without secrets
+
    ```yaml
    jobs:
-     build:  # No secrets here
+     build: # No secrets here
        - run: npm run build-storybook
-     chromatic:  # Secrets only in upload
+     chromatic: # Secrets only in upload
        - uses: algtools/actions/.github/actions/chromatic-upload-from-artifact@v1
    ```
 
 3. **Use Artifact-Based Workflow**: Prevents secret exposure in untrusted build environments
+
    ```yaml
    # Build job (untrusted, e.g., from fork PRs)
    build:
@@ -554,16 +569,17 @@ permissions:
 **Error:** "Artifact not found: storybook-build"
 
 **Solution:** Ensure the artifact name matches exactly between upload and download:
+
 ```yaml
 # Build job
 - uses: algtools/actions/.github/actions/upload-artifacts@v1
   with:
-    artifact_name: 'storybook-build'  # ✅
+    artifact_name: 'storybook-build' # ✅
 
 # Chromatic job
 - uses: algtools/actions/.github/actions/chromatic-upload-from-artifact@v1
   with:
-    artifact_name: 'storybook-build'  # ✅ Must match
+    artifact_name: 'storybook-build' # ✅ Must match
 ```
 
 ### No Storybook Files Found
@@ -571,6 +587,7 @@ permissions:
 **Error:** "No files found in Storybook directory"
 
 **Solution:** Verify your Storybook build output directory:
+
 ```yaml
 # Check your Storybook build output
 - run: npm run build-storybook
@@ -579,19 +596,20 @@ permissions:
 - uses: algtools/actions/.github/actions/upload-artifacts@v1
   with:
     artifact_name: 'storybook-build'
-    artifact_paths: 'storybook-static'  # ✅ Match build output
+    artifact_paths: 'storybook-static' # ✅ Match build output
 ```
 
 ### Invalid Chromatic Token
 
 **Error:** "Authentication failed" or "Invalid project token"
 
-**Solution:** 
+**Solution:**
+
 1. Verify token is correct in Chromatic dashboard
 2. Ensure secret is properly set in GitHub repository settings
 3. Check secret name matches workflow:
    ```yaml
-   project_token: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}  # Exact name
+   project_token: ${{ secrets.CHROMATIC_PROJECT_TOKEN }} # Exact name
    ```
 
 ### Chromatic Build URL Not Extracted
@@ -605,6 +623,7 @@ permissions:
 **Error:** "Failed to extract zip file"
 
 **Solution:** Ensure zip file is properly created:
+
 ```yaml
 - name: Create zip correctly
   run: |
@@ -617,11 +636,12 @@ permissions:
 **Error:** "Directory not found" or "Cannot find Storybook files"
 
 **Solution:** Ensure paths are relative to working_dir:
+
 ```yaml
 - uses: algtools/actions/.github/actions/chromatic-upload-from-artifact@v1
   with:
     working_dir: './frontend'
-    storybook_dir: 'storybook-static'  # Relative to ./frontend
+    storybook_dir: 'storybook-static' # Relative to ./frontend
 ```
 
 ## Compatibility
@@ -632,17 +652,17 @@ permissions:
 
 ## Differences from Direct Chromatic CLI
 
-| Feature | Direct Chromatic CLI | This Action |
-|---------|---------------------|-------------|
-| Upload from source | ✅ | ❌ |
-| Upload from artifact | ❌ | ✅ |
-| Automatic token masking | ❌ | ✅ |
-| Pre-upload validation | ❌ | ✅ |
-| Detailed logging | ⚠️ Basic | ✅ Comprehensive |
-| Artifact verification | ❌ | ✅ |
-| Security-filtered output | ❌ | ✅ |
-| Zip file support | ❌ | ✅ |
-| Build URL output | ⚠️ Manual | ✅ Automatic |
+| Feature                  | Direct Chromatic CLI | This Action      |
+| ------------------------ | -------------------- | ---------------- |
+| Upload from source       | ✅                   | ❌               |
+| Upload from artifact     | ❌                   | ✅               |
+| Automatic token masking  | ❌                   | ✅               |
+| Pre-upload validation    | ❌                   | ✅               |
+| Detailed logging         | ⚠️ Basic             | ✅ Comprehensive |
+| Artifact verification    | ❌                   | ✅               |
+| Security-filtered output | ❌                   | ✅               |
+| Zip file support         | ❌                   | ✅               |
+| Build URL output         | ⚠️ Manual            | ✅ Automatic     |
 
 ## Related Actions
 
@@ -697,6 +717,7 @@ npx chromatic \
 ```
 
 Common additional flags you might want:
+
 - `--auto-accept-changes`: Automatically accept all changes
 - `--only-changed`: Only test changed stories (requires git)
 - `--branch-name`: Specify branch name
@@ -709,6 +730,7 @@ MIT License - see [LICENSE](../../../LICENSE) for details
 ## Support
 
 For questions or issues:
+
 - 📖 [Chromatic Documentation](https://www.chromatic.com/docs/)
 - 🐛 [Report an issue](https://github.com/algtools/actions/issues)
 - 💬 [Discussions](https://github.com/algtools/actions/discussions)

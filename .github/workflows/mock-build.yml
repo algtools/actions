@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - 'cursor/**'
+      - "cursor/**"
   pull_request:
     branches:
       - main
@@ -24,72 +24,72 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          working-directory: '.github/tests/build-no-secrets'
-          cache-dependency-path: '.github/tests/build-no-secrets/package-lock.json'
+          working-directory: ".github/tests/build-no-secrets"
+          cache-dependency-path: ".github/tests/build-no-secrets/package-lock.json"
 
       - name: Build without secrets
         id: build
         uses: ./.github/actions/build-no-secrets
         with:
-          build_cmd: 'npm run build'
-          working_dir: '.github/tests/build-no-secrets'
-          output_dir: 'dist'
+          build_cmd: "npm run build"
+          working_dir: ".github/tests/build-no-secrets"
+          output_dir: "dist"
 
       - name: Verify build outputs
         run: |
           echo "Build status: ${{ steps.build.outputs.build_status }}"
           echo "Output path: ${{ steps.build.outputs.output_path }}"
           echo "Artifact size: ${{ steps.build.outputs.artifact_size }}"
-          
+
           # Verify outputs are not empty
           if [ -z "${{ steps.build.outputs.build_status }}" ]; then
             echo "Error: build_status output is empty"
             exit 1
           fi
-          
+
           if [ -z "${{ steps.build.outputs.output_path }}" ]; then
             echo "Error: output_path output is empty"
             exit 1
           fi
-          
+
           if [ -z "${{ steps.build.outputs.artifact_size }}" ]; then
             echo "Error: artifact_size output is empty"
             exit 1
           fi
-          
+
           echo "✓ All outputs validated"
 
       - name: Verify build artifacts
         working-directory: .github/tests/build-no-secrets/dist
         run: |
           echo "Verifying build artifacts exist..."
-          
+
           # Check for expected files
           if [ ! -f "build-info.json" ]; then
             echo "Error: build-info.json not found"
             exit 1
           fi
-          
+
           if [ ! -f "index.html" ]; then
             echo "Error: index.html not found"
             exit 1
           fi
-          
+
           if [ ! -f "bundle.js" ]; then
             echo "Error: bundle.js not found"
             exit 1
           fi
-          
+
           if [ ! -f "styles.css" ]; then
             echo "Error: styles.css not found"
             exit 1
           fi
-          
+
           if [ ! -f "assets/manifest.json" ]; then
             echo "Error: assets/manifest.json not found"
             exit 1
           fi
-          
+
           echo "✓ All expected artifacts found"
 
       - name: Verify build info
@@ -97,13 +97,13 @@ jobs:
         run: |
           echo "Checking build-info.json contents..."
           cat build-info.json
-          
+
           # Verify build was run in production mode
           if ! grep -q '"nodeEnv": "production"' build-info.json; then
             echo "Error: Build was not run in production mode"
             exit 1
           fi
-          
+
           echo "✓ Build configuration verified"
 
       - name: Verify no secrets in logs
@@ -121,16 +121,16 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          working-directory: '.github/tests/build-no-secrets'
-          cache-dependency-path: '.github/tests/build-no-secrets/package-lock.json'
+          working-directory: ".github/tests/build-no-secrets"
+          cache-dependency-path: ".github/tests/build-no-secrets/package-lock.json"
 
       - name: Build from custom directory
         id: build
         uses: ./.github/actions/build-no-secrets
         with:
-          build_cmd: 'npm run build'
-          working_dir: '.github/tests/build-no-secrets'
-          output_dir: 'dist'
+          build_cmd: "npm run build"
+          working_dir: ".github/tests/build-no-secrets"
+          output_dir: "dist"
 
       - name: Verify build succeeded
         run: |
@@ -144,13 +144,13 @@ jobs:
         run: |
           SIZE=${{ steps.build.outputs.artifact_size }}
           echo "Artifact size: $SIZE bytes"
-          
+
           # Verify size is greater than 0
           if [ "$SIZE" -le "0" ]; then
             echo "Error: Artifact size is not greater than 0"
             exit 1
           fi
-          
+
           echo "✓ Artifact size is valid"
 
   test-build-deterministic:
@@ -163,16 +163,16 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          working-directory: '.github/tests/build-no-secrets'
-          cache-dependency-path: '.github/tests/build-no-secrets/package-lock.json'
+          working-directory: ".github/tests/build-no-secrets"
+          cache-dependency-path: ".github/tests/build-no-secrets/package-lock.json"
 
       - name: First build
         id: build1
         uses: ./.github/actions/build-no-secrets
         with:
-          build_cmd: 'npm run build'
-          working_dir: '.github/tests/build-no-secrets'
-          output_dir: 'dist'
+          build_cmd: "npm run build"
+          working_dir: ".github/tests/build-no-secrets"
+          output_dir: "dist"
 
       - name: Save first build info
         run: |
@@ -185,9 +185,9 @@ jobs:
         id: build2
         uses: ./.github/actions/build-no-secrets
         with:
-          build_cmd: 'npm run build'
-          working_dir: '.github/tests/build-no-secrets'
-          output_dir: 'dist'
+          build_cmd: "npm run build"
+          working_dir: ".github/tests/build-no-secrets"
+          output_dir: "dist"
 
       - name: Save second build info
         run: |
@@ -196,28 +196,28 @@ jobs:
       - name: Compare builds
         run: |
           echo "Comparing build artifacts..."
-          
+
           # Both builds should produce the same structure
           # (Note: timestamps will differ, but structure should be same)
-          
+
           if [ ! -f "/tmp/build-info-1.json" ] || [ ! -f "/tmp/build-info-2.json" ]; then
             echo "Error: Build info files missing"
             exit 1
           fi
-          
+
           echo "✓ Both builds produced consistent output structure"
-          
+
           # Verify both builds have production environment
           if ! grep -q '"nodeEnv": "production"' /tmp/build-info-1.json; then
             echo "Error: First build not in production mode"
             exit 1
           fi
-          
+
           if ! grep -q '"nodeEnv": "production"' /tmp/build-info-2.json; then
             echo "Error: Second build not in production mode"
             exit 1
           fi
-          
+
           echo "✓ Build determinism verified"
 
   test-matrix:
@@ -234,16 +234,16 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          working-directory: '.github/tests/build-no-secrets'
-          cache-dependency-path: '.github/tests/build-no-secrets/package-lock.json'
+          working-directory: ".github/tests/build-no-secrets"
+          cache-dependency-path: ".github/tests/build-no-secrets/package-lock.json"
 
       - name: Build without secrets
         id: build
         uses: ./.github/actions/build-no-secrets
         with:
-          build_cmd: 'npm run build'
-          working_dir: '.github/tests/build-no-secrets'
-          output_dir: 'dist'
+          build_cmd: "npm run build"
+          working_dir: ".github/tests/build-no-secrets"
+          output_dir: "dist"
 
       - name: Verify build
         shell: bash

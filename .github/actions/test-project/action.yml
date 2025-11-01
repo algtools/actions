@@ -1,34 +1,34 @@
-name: 'Test Project'
-description: 'Runs tests in a clean environment with NODE_ENV=test. Supports coverage reports and test output.'
-author: 'Algenium Systems'
+name: "Test Project"
+description: "Runs tests in a clean environment with NODE_ENV=test. Supports coverage reports and test output."
+author: "Algenium Systems"
 
 inputs:
   test_cmd:
     description: 'Test command to execute (e.g., "npm test", "pnpm test", "vitest run")'
     required: true
   working_dir:
-    description: 'Working directory where the test command will be executed'
+    description: "Working directory where the test command will be executed"
     required: false
-    default: '.'
+    default: "."
   coverage:
-    description: 'Enable coverage reports (true/false)'
+    description: "Enable coverage reports (true/false)"
     required: false
-    default: 'false'
+    default: "false"
   coverage_cmd:
     description: 'Coverage command to execute if coverage is enabled (e.g., "npm run test:coverage")'
     required: false
-    default: ''
+    default: ""
 
 outputs:
   test_status:
-    description: 'Status of the tests (success or failure)'
+    description: "Status of the tests (success or failure)"
     value: ${{ steps.test.outputs.status }}
   coverage_generated:
-    description: 'Whether coverage was generated (true/false)'
+    description: "Whether coverage was generated (true/false)"
     value: ${{ steps.coverage.outputs.generated }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Validate inputs
       shell: bash

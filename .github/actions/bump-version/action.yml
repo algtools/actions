@@ -1,31 +1,31 @@
-name: 'Bump Version'
-description: 'Automatically bump version using semantic-release'
+name: "Bump Version"
+description: "Automatically bump version using semantic-release"
 inputs:
   github_token:
-    description: 'GitHub token for authentication'
+    description: "GitHub token for authentication"
     required: true
   working_directory:
-    description: 'Directory containing package.json'
+    description: "Directory containing package.json"
     required: false
-    default: '.'
+    default: "."
   dry_run:
-    description: 'Run in dry-run mode'
+    description: "Run in dry-run mode"
     required: false
-    default: 'false'
+    default: "false"
 outputs:
   new_version:
-    description: 'New version number'
+    description: "New version number"
     value: ${{ steps.semantic.outputs.new_release_version }}
   new_release_published:
-    description: 'Whether a new release was published'
+    description: "Whether a new release was published"
     value: ${{ steps.semantic.outputs.new_release_published }}
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: "20"
 
     - name: Install pnpm
       uses: pnpm/action-setup@v4

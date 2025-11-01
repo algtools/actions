@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - 'cursor/**'
+      - "cursor/**"
   pull_request:
     branches:
       - main
@@ -25,23 +25,23 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          node-version: '20'
-          working-directory: '.github/tests/deploy-cloudflare'
-          cache-dependency-path: '.github/tests/deploy-cloudflare/package-lock.json'
+          node-version: "20"
+          working-directory: ".github/tests/deploy-cloudflare"
+          cache-dependency-path: ".github/tests/deploy-cloudflare/package-lock.json"
 
       - name: Build test worker
         uses: ./.github/actions/build-no-secrets
         with:
-          build_cmd: 'npm run build'
-          working_dir: '.github/tests/deploy-cloudflare'
-          output_dir: 'dist'
+          build_cmd: "npm run build"
+          working_dir: ".github/tests/deploy-cloudflare"
+          output_dir: "dist"
 
       - name: Upload worker artifact
         id: upload
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'test-worker-dry-run'
-          artifact_paths: '.github/tests/deploy-cloudflare/dist'
+          artifact_name: "test-worker-dry-run"
+          artifact_paths: ".github/tests/deploy-cloudflare/dist"
 
       - name: Verify upload
         run: |
@@ -54,12 +54,12 @@ jobs:
         id: deploy
         uses: ./.github/actions/deploy-cloudflare-from-artifact
         with:
-          artifact_name: 'test-worker-dry-run'
-          worker_name: 'test-worker-dry-run'
-          wrangler_config: 'wrangler.toml'
-          cloudflare_api_token: 'mock-token-for-dry-run'
-          cloudflare_account_id: 'mock-account-id'
-          dry_run: 'true'
+          artifact_name: "test-worker-dry-run"
+          worker_name: "test-worker-dry-run"
+          wrangler_config: "wrangler.toml"
+          cloudflare_api_token: "mock-token-for-dry-run"
+          cloudflare_account_id: "mock-account-id"
+          dry_run: "true"
         continue-on-error: true
 
       - name: Verify dry run outputs
@@ -81,49 +81,49 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          node-version: '20'
-          working-directory: '.github/tests/deploy-cloudflare'
-          cache-dependency-path: '.github/tests/deploy-cloudflare/package-lock.json'
+          node-version: "20"
+          working-directory: ".github/tests/deploy-cloudflare"
+          cache-dependency-path: ".github/tests/deploy-cloudflare/package-lock.json"
 
       - name: Build test worker
         uses: ./.github/actions/build-no-secrets
         with:
-          build_cmd: 'npm run build'
-          working_dir: '.github/tests/deploy-cloudflare'
-          output_dir: 'dist'
+          build_cmd: "npm run build"
+          working_dir: ".github/tests/deploy-cloudflare"
+          output_dir: "dist"
 
       - name: Upload worker artifact
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'test-worker-validation'
-          artifact_paths: '.github/tests/deploy-cloudflare/dist'
+          artifact_name: "test-worker-validation"
+          artifact_paths: ".github/tests/deploy-cloudflare/dist"
 
       - name: Test artifact download
         uses: actions/download-artifact@v4
         with:
-          name: 'test-worker-validation'
-          path: './downloaded-worker'
+          name: "test-worker-validation"
+          path: "./downloaded-worker"
 
       - name: Verify artifact contents
         run: |
           echo "Verifying downloaded artifact contents..."
-          
+
           if [ ! -f "./downloaded-worker/worker.js" ]; then
             echo "❌ Error: worker.js not found in artifact"
             exit 1
           fi
           echo "✓ worker.js found"
-          
+
           if [ ! -f "./downloaded-worker/wrangler.toml" ]; then
             echo "❌ Error: wrangler.toml not found in artifact"
             exit 1
           fi
           echo "✓ wrangler.toml found"
-          
+
           echo ""
           echo "Artifact contents:"
           ls -lah ./downloaded-worker/
-          
+
           echo ""
           echo "✓ Artifact validation successful"
 
@@ -143,18 +143,18 @@ jobs:
       - name: Upload dummy artifact
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'test-validation'
-          artifact_paths: 'test-validation'
+          artifact_name: "test-validation"
+          artifact_paths: "test-validation"
 
       - name: Test missing worker_name (should fail)
         id: test-missing-worker-name
         uses: ./.github/actions/deploy-cloudflare-from-artifact
         with:
-          artifact_name: 'test-validation'
-          worker_name: ''
-          wrangler_config: 'wrangler.toml'
-          cloudflare_api_token: 'mock-token'
-          cloudflare_account_id: 'mock-account'
+          artifact_name: "test-validation"
+          worker_name: ""
+          wrangler_config: "wrangler.toml"
+          cloudflare_api_token: "mock-token"
+          cloudflare_account_id: "mock-account"
         continue-on-error: true
 
       - name: Verify validation caught missing worker_name
@@ -171,7 +171,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        wrangler-version: ['latest', '3.78.0']
+        wrangler-version: ["latest", "3.78.0"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -179,21 +179,21 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Test Wrangler installation
         run: |
           echo "Testing Wrangler installation with version: ${{ matrix.wrangler-version }}"
-          
+
           if [ "${{ matrix.wrangler-version }}" = "latest" ]; then
             npm install -g wrangler
           else
             npm install -g wrangler@${{ matrix.wrangler-version }}
           fi
-          
+
           INSTALLED_VERSION=$(wrangler --version)
           echo "✓ Wrangler installed: $INSTALLED_VERSION"
-          
+
           # Verify wrangler is accessible
           which wrangler || exit 1
           echo "✓ Wrangler is in PATH"
@@ -208,36 +208,36 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          node-version: '20'
-          working-directory: '.github/tests/deploy-cloudflare'
-          cache-dependency-path: '.github/tests/deploy-cloudflare/package-lock.json'
+          node-version: "20"
+          working-directory: ".github/tests/deploy-cloudflare"
+          cache-dependency-path: ".github/tests/deploy-cloudflare/package-lock.json"
 
       - name: Build worker
         id: build
         uses: ./.github/actions/build-no-secrets
         with:
-          build_cmd: 'npm run build'
-          working_dir: '.github/tests/deploy-cloudflare'
-          output_dir: 'dist'
+          build_cmd: "npm run build"
+          working_dir: ".github/tests/deploy-cloudflare"
+          output_dir: "dist"
 
       - name: Upload worker artifacts
         id: upload
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'complete-workflow-worker-${{ github.run_id }}'
-          artifact_paths: '.github/tests/deploy-cloudflare/dist'
-          retention_days: '7'
+          artifact_name: "complete-workflow-worker-${{ github.run_id }}"
+          artifact_paths: ".github/tests/deploy-cloudflare/dist"
+          retention_days: "7"
 
       - name: Deploy worker (dry run)
         id: deploy
         uses: ./.github/actions/deploy-cloudflare-from-artifact
         with:
-          artifact_name: 'complete-workflow-worker-${{ github.run_id }}'
-          worker_name: 'complete-test-worker'
-          wrangler_config: 'wrangler.toml'
-          cloudflare_api_token: 'mock-token-for-testing'
-          cloudflare_account_id: 'mock-account-id'
-          dry_run: 'true'
+          artifact_name: "complete-workflow-worker-${{ github.run_id }}"
+          worker_name: "complete-test-worker"
+          wrangler_config: "wrangler.toml"
+          cloudflare_api_token: "mock-token-for-testing"
+          cloudflare_account_id: "mock-account-id"
+          dry_run: "true"
         continue-on-error: true
 
       - name: Display complete workflow summary
@@ -268,7 +268,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        environment: ['staging', 'production']
+        environment: ["staging", "production"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -276,34 +276,34 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          node-version: '20'
-          working-directory: '.github/tests/deploy-cloudflare'
-          cache-dependency-path: '.github/tests/deploy-cloudflare/package-lock.json'
+          node-version: "20"
+          working-directory: ".github/tests/deploy-cloudflare"
+          cache-dependency-path: ".github/tests/deploy-cloudflare/package-lock.json"
 
       - name: Build worker
         uses: ./.github/actions/build-no-secrets
         with:
-          build_cmd: 'npm run build'
-          working_dir: '.github/tests/deploy-cloudflare'
-          output_dir: 'dist'
+          build_cmd: "npm run build"
+          working_dir: ".github/tests/deploy-cloudflare"
+          output_dir: "dist"
 
       - name: Upload worker artifact
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'multi-env-worker-${{ matrix.environment }}'
-          artifact_paths: '.github/tests/deploy-cloudflare/dist'
+          artifact_name: "multi-env-worker-${{ matrix.environment }}"
+          artifact_paths: ".github/tests/deploy-cloudflare/dist"
 
       - name: Deploy to ${{ matrix.environment }} (dry run)
         id: deploy
         uses: ./.github/actions/deploy-cloudflare-from-artifact
         with:
-          artifact_name: 'multi-env-worker-${{ matrix.environment }}'
-          worker_name: 'test-worker'
-          wrangler_config: 'wrangler.toml'
+          artifact_name: "multi-env-worker-${{ matrix.environment }}"
+          worker_name: "test-worker"
+          wrangler_config: "wrangler.toml"
           deploy_environment: ${{ matrix.environment }}
-          cloudflare_api_token: 'mock-token'
-          cloudflare_account_id: 'mock-account'
-          dry_run: 'true'
+          cloudflare_api_token: "mock-token"
+          cloudflare_account_id: "mock-account"
+          dry_run: "true"
         continue-on-error: true
 
       - name: Verify environment deployment
@@ -324,33 +324,33 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          node-version: '20'
-          working-directory: '.github/tests/deploy-cloudflare'
-          cache-dependency-path: '.github/tests/deploy-cloudflare/package-lock.json'
+          node-version: "20"
+          working-directory: ".github/tests/deploy-cloudflare"
+          cache-dependency-path: ".github/tests/deploy-cloudflare/package-lock.json"
 
       - name: Build worker
         uses: ./.github/actions/build-no-secrets
         with:
-          build_cmd: 'npm run build'
-          working_dir: '.github/tests/deploy-cloudflare'
-          output_dir: 'dist'
+          build_cmd: "npm run build"
+          working_dir: ".github/tests/deploy-cloudflare"
+          output_dir: "dist"
 
       - name: Upload worker artifact
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'security-test-worker'
-          artifact_paths: '.github/tests/deploy-cloudflare/dist'
+          artifact_name: "security-test-worker"
+          artifact_paths: ".github/tests/deploy-cloudflare/dist"
 
       - name: Deploy with sensitive data (dry run)
         id: deploy
         uses: ./.github/actions/deploy-cloudflare-from-artifact
         with:
-          artifact_name: 'security-test-worker'
-          worker_name: 'security-test'
-          wrangler_config: 'wrangler.toml'
-          cloudflare_api_token: 'super-secret-token-12345'
-          cloudflare_account_id: 'account-abc123def456'
-          dry_run: 'true'
+          artifact_name: "security-test-worker"
+          worker_name: "security-test"
+          wrangler_config: "wrangler.toml"
+          cloudflare_api_token: "super-secret-token-12345"
+          cloudflare_account_id: "account-abc123def456"
+          dry_run: "true"
         continue-on-error: true
 
       - name: Verify secrets are masked

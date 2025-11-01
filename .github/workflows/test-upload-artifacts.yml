@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - 'cursor/**'
+      - "cursor/**"
   pull_request:
     branches:
       - main
@@ -25,34 +25,34 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          working-directory: '.github/tests/build-no-secrets'
-          cache-dependency-path: '.github/tests/build-no-secrets/package-lock.json'
+          working-directory: ".github/tests/build-no-secrets"
+          cache-dependency-path: ".github/tests/build-no-secrets/package-lock.json"
 
       - name: Build test artifacts
         uses: ./.github/actions/build-no-secrets
         with:
-          build_cmd: 'npm run build'
-          working_dir: '.github/tests/build-no-secrets'
-          output_dir: 'dist'
+          build_cmd: "npm run build"
+          working_dir: ".github/tests/build-no-secrets"
+          output_dir: "dist"
 
       - name: Upload build artifacts
         id: upload
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'test-build-basic'
-          artifact_paths: '.github/tests/build-no-secrets/dist'
+          artifact_name: "test-build-basic"
+          artifact_paths: ".github/tests/build-no-secrets/dist"
 
       - name: Verify upload outputs
         run: |
           echo "Testing upload outputs..."
-          
+
           # Verify artifact_id is not empty
           if [ -z "${{ steps.upload.outputs.artifact_id }}" ]; then
             echo "Error: artifact_id output is empty"
             exit 1
           fi
           echo "✓ Artifact ID: ${{ steps.upload.outputs.artifact_id }}"
-          
+
           # Verify total_files is a number and greater than 0
           TOTAL_FILES="${{ steps.upload.outputs.total_files }}"
           if [ -z "$TOTAL_FILES" ]; then
@@ -64,7 +64,7 @@ jobs:
             exit 1
           fi
           echo "✓ Total files: $TOTAL_FILES"
-          
+
           # Verify total_size is a number and greater than 0
           TOTAL_SIZE="${{ steps.upload.outputs.total_size }}"
           if [ -z "$TOTAL_SIZE" ]; then
@@ -76,7 +76,7 @@ jobs:
             exit 1
           fi
           echo "✓ Total size: $TOTAL_SIZE bytes"
-          
+
           echo ""
           echo "✓ All outputs validated successfully"
 
@@ -90,15 +90,15 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          working-directory: '.github/tests/build-no-secrets'
-          cache-dependency-path: '.github/tests/build-no-secrets/package-lock.json'
+          working-directory: ".github/tests/build-no-secrets"
+          cache-dependency-path: ".github/tests/build-no-secrets/package-lock.json"
 
       - name: Build test artifacts
         uses: ./.github/actions/build-no-secrets
         with:
-          build_cmd: 'npm run build'
-          working_dir: '.github/tests/build-no-secrets'
-          output_dir: 'dist'
+          build_cmd: "npm run build"
+          working_dir: ".github/tests/build-no-secrets"
+          output_dir: "dist"
 
       - name: Create additional test files
         run: |
@@ -111,23 +111,23 @@ jobs:
         id: upload
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'test-multiple-paths'
-          artifact_paths: '.github/tests/build-no-secrets/dist, test-extra, test-readme.md'
+          artifact_name: "test-multiple-paths"
+          artifact_paths: ".github/tests/build-no-secrets/dist, test-extra, test-readme.md"
 
       - name: Verify multiple paths upload
         run: |
           echo "Verifying multiple paths upload..."
-          
+
           # Should have uploaded files from all three paths
           FILES=${{ steps.upload.outputs.total_files }}
           echo "Total files uploaded: $FILES"
-          
+
           # At least 6 files (5 from dist + 2 from test-extra + 1 readme)
           if [ "$FILES" -lt 6 ]; then
             echo "Error: Expected at least 6 files, got $FILES"
             exit 1
           fi
-          
+
           echo "✓ Multiple paths uploaded successfully"
 
   test-with-retention:
@@ -146,9 +146,9 @@ jobs:
         id: upload
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'test-retention-7days'
-          artifact_paths: 'test-retention'
-          retention_days: '7'
+          artifact_name: "test-retention-7days"
+          artifact_paths: "test-retention"
+          retention_days: "7"
 
       - name: Verify upload
         run: |
@@ -163,7 +163,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        compression: ['0', '6', '9']
+        compression: ["0", "6", "9"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -171,22 +171,22 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          working-directory: '.github/tests/build-no-secrets'
-          cache-dependency-path: '.github/tests/build-no-secrets/package-lock.json'
+          working-directory: ".github/tests/build-no-secrets"
+          cache-dependency-path: ".github/tests/build-no-secrets/package-lock.json"
 
       - name: Build test artifacts
         uses: ./.github/actions/build-no-secrets
         with:
-          build_cmd: 'npm run build'
-          working_dir: '.github/tests/build-no-secrets'
-          output_dir: 'dist'
+          build_cmd: "npm run build"
+          working_dir: ".github/tests/build-no-secrets"
+          output_dir: "dist"
 
       - name: Upload with compression level ${{ matrix.compression }}
         id: upload
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'test-compression-${{ matrix.compression }}'
-          artifact_paths: '.github/tests/build-no-secrets/dist'
+          artifact_name: "test-compression-${{ matrix.compression }}"
+          artifact_paths: ".github/tests/build-no-secrets/dist"
           compression_level: ${{ matrix.compression }}
 
       - name: Verify upload
@@ -208,9 +208,9 @@ jobs:
         id: upload-warn
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'test-no-files-warn'
-          artifact_paths: 'non-existent-path'
-          if_no_files_found: 'warn'
+          artifact_name: "test-no-files-warn"
+          artifact_paths: "non-existent-path"
+          if_no_files_found: "warn"
         continue-on-error: true
 
       - name: Verify warn behavior
@@ -222,9 +222,9 @@ jobs:
         id: upload-ignore
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'test-no-files-ignore'
-          artifact_paths: 'non-existent-path'
-          if_no_files_found: 'ignore'
+          artifact_name: "test-no-files-ignore"
+          artifact_paths: "non-existent-path"
+          if_no_files_found: "ignore"
         continue-on-error: true
 
       - name: Verify ignore behavior
@@ -241,25 +241,25 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
-          working-directory: '.github/tests/build-no-secrets'
-          cache-dependency-path: '.github/tests/build-no-secrets/package-lock.json'
+          working-directory: ".github/tests/build-no-secrets"
+          cache-dependency-path: ".github/tests/build-no-secrets/package-lock.json"
 
       - name: Build without secrets
         id: build
         uses: ./.github/actions/build-no-secrets
         with:
-          build_cmd: 'npm run build'
-          working_dir: '.github/tests/build-no-secrets'
-          output_dir: 'dist'
+          build_cmd: "npm run build"
+          working_dir: ".github/tests/build-no-secrets"
+          output_dir: "dist"
 
       - name: Upload build artifacts
         id: upload
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'complete-workflow-${{ github.run_id }}'
-          artifact_paths: '.github/tests/build-no-secrets/dist'
-          retention_days: '30'
-          compression_level: '6'
+          artifact_name: "complete-workflow-${{ github.run_id }}"
+          artifact_paths: ".github/tests/build-no-secrets/dist"
+          retention_days: "30"
+          compression_level: "6"
 
       - name: Display complete workflow info
         run: |
@@ -302,8 +302,8 @@ jobs:
         id: upload
         uses: ./.github/actions/upload-artifacts
         with:
-          artifact_name: 'test-${{ matrix.os }}'
-          artifact_paths: 'test-platform'
+          artifact_name: "test-${{ matrix.os }}"
+          artifact_paths: "test-platform"
 
       - name: Verify upload on ${{ matrix.os }}
         shell: bash
@@ -312,11 +312,11 @@ jobs:
             echo "Error: Upload failed on ${{ matrix.os }}"
             exit 1
           fi
-          
+
           TOTAL_FILES="${{ steps.upload.outputs.total_files }}"
           if [ "$TOTAL_FILES" -ne 2 ]; then
             echo "Error: Expected 2 files on ${{ matrix.os }}, got $TOTAL_FILES"
             exit 1
           fi
-          
+
           echo "✓ Upload verified on ${{ matrix.os }}"

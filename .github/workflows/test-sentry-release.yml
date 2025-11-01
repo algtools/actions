@@ -4,23 +4,23 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to test'
+        description: "Environment to test"
         required: true
-        default: 'alpha'
+        default: "alpha"
         type: choice
         options:
           - alpha
           - beta
           - prod
       dry_run:
-        description: 'Dry run mode (skip actual Sentry calls)'
+        description: "Dry run mode (skip actual Sentry calls)"
         required: true
         default: true
         type: boolean
   pull_request:
     paths:
-      - '.github/actions/sentry-release/**'
-      - '.github/workflows/test-sentry-release.yml'
+      - ".github/actions/sentry-release/**"
+      - ".github/workflows/test-sentry-release.yml"
 
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
   test-sentry-release:
     name: Test Sentry Release Action
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -37,7 +37,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Test action (dry run)
         if: github.event.inputs.dry_run == 'true' || github.event_name == 'pull_request'
@@ -81,7 +81,7 @@ jobs:
           echo "  Environment: ${{ github.event.inputs.environment || 'alpha' }}"
           echo "  Dry Run: ${{ github.event.inputs.dry_run || 'true' }}"
           echo ""
-          
+
           if [ "${{ github.event.inputs.dry_run }}" = "true" ] || [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "Mode: Dry Run (Validation Only)"
             echo "  ✓ Action structure validated"
@@ -91,7 +91,7 @@ jobs:
             echo "  ✓ Release created in Sentry"
             echo "  ✓ Deployment registered"
           fi
-          
+
           echo ""
           echo "✓ Test completed successfully"
           echo "::endgroup::"
@@ -100,7 +100,7 @@ jobs:
     name: Test with Custom Release Version
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -108,7 +108,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Test with semantic version
         run: |
@@ -128,7 +128,7 @@ jobs:
     name: Integration Test (Full Workflow)
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -136,7 +136,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Simulate build step
         run: |
