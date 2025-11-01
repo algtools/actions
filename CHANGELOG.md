@@ -1,3 +1,10 @@
+## [1.2.2](https://github.com/algtools/actions/compare/v1.2.1...v1.2.2) (2025-11-01)
+
+
+### Bug Fixes
+
+* improve error handling when listing files in upload artifacts action ([66f0423](https://github.com/algtools/actions/commit/66f04234a81d3097d93377e55847119d1553145e))
+
 ## [1.2.1](https://github.com/algtools/actions/compare/v1.2.0...v1.2.1) (2025-11-01)
 
 
