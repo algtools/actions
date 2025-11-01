@@ -1,3 +1,10 @@
+## [1.2.3](https://github.com/algtools/actions/compare/v1.2.2...v1.2.3) (2025-11-01)
+
+
+### Bug Fixes
+
+* enhance file listing in deploy action to prevent broken pipe errors ([d0530a2](https://github.com/algtools/actions/commit/d0530a2bd9fffacb5731838c3cbbb226317c1a98))
+
 ## [1.2.2](https://github.com/algtools/actions/compare/v1.2.1...v1.2.2) (2025-11-01)
 
 
