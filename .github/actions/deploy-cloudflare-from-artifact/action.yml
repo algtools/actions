@@ -170,69 +170,75 @@ runs:
         DOWNLOAD_PATH="${{ inputs.download_path }}"
         CONFIG_PATH="$DOWNLOAD_PATH/${{ inputs.wrangler_config }}"
 
+        # Always convert JSONC to JSON to support custom domain configuration
+        echo "Converting JSONC to JSON..."
+
         # Check if dist/index.js exists (built worker)
+        UPDATE_MAIN_FIELD="false"
         if [ -f "$DOWNLOAD_PATH/dist/index.js" ]; then
           echo "Built worker found at dist/index.js"
-          echo "Converting JSONC to JSON and updating main field..."
-
-          # Use Node.js to strip comments and update main field
-          node -e "
-            const fs = require('fs');
-            const configPath = '$CONFIG_PATH';
-
-            // Read the JSONC file
-            let content = fs.readFileSync(configPath, 'utf8');
-
-            // Strip comments from JSONC
-            // Remove single-line comments (but preserve URLs with //)
-            content = content.split('\n').map(line => {
-              // Check if line has a comment
-              const commentIndex = line.indexOf('//');
-              if (commentIndex !== -1) {
-                // Check if it's inside a string (basic check for quotes before //)
-                const beforeComment = line.substring(0, commentIndex);
-                const quoteCount = (beforeComment.match(/\"/g) || []).length;
-                // If odd number of quotes, it's inside a string, keep the line
-                if (quoteCount % 2 === 0) {
-                  // Even quotes or no quotes, it's a real comment
-                  return line.substring(0, commentIndex);
-                }
-              }
-              return line;
-            }).join('\n');
-
-            // Remove multi-line comments
-            content = content.replace(/\/\*[\s\S]*?\*\//g, '');
-
-            // Remove trailing commas (common in JSONC)
-            content = content.replace(/,(\s*[}\]])/g, '\$1');
-
-            try {
-              // Parse the cleaned JSON
-              const config = JSON.parse(content);
-
-              // Update the main field
-              config.main = 'dist/index.js';
-
-              // Remove \$schema field (points to node_modules which won't exist)
-              delete config['\$schema'];
-
-              // Write back as clean JSON
-              fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-              console.log('✓ Converted to JSON and updated main field to: dist/index.js');
-            } catch (error) {
-              console.error('Failed to parse config:', error.message);
-              console.error('Config content preview:', content.substring(0, 500));
-              process.exit(1);
-            }
-          " || exit 1
-
-          echo ""
-          echo "Updated configuration (first 30 lines):"
-          cat "$CONFIG_PATH" | head -30
-        else
-          echo "⚠️  dist/index.js not found, using config as-is"
+          UPDATE_MAIN_FIELD="true"
         fi
+
+        # Use Node.js to strip comments and optionally update main field
+        node -e "
+          const fs = require('fs');
+          const configPath = '$CONFIG_PATH';
+          const updateMainField = '$UPDATE_MAIN_FIELD' === 'true';
+
+          // Read the JSONC file
+          let content = fs.readFileSync(configPath, 'utf8');
+
+          // Strip comments from JSONC
+          // Remove single-line comments (but preserve URLs with //)
+          content = content.split('\n').map(line => {
+            // Check if line has a comment
+            const commentIndex = line.indexOf('//');
+            if (commentIndex !== -1) {
+              // Check if it's inside a string (basic check for quotes before //)
+              const beforeComment = line.substring(0, commentIndex);
+              const quoteCount = (beforeComment.match(/\"/g) || []).length;
+              // If odd number of quotes, it's inside a string, keep the line
+              if (quoteCount % 2 === 0) {
+                // Even quotes or no quotes, it's a real comment
+                return line.substring(0, commentIndex);
+              }
+            }
+            return line;
+          }).join('\n');
+
+          // Remove multi-line comments
+          content = content.replace(/\/\*[\s\S]*?\*\//g, '');
+
+          // Remove trailing commas (common in JSONC)
+          content = content.replace(/,(\s*[}\]])/g, '\$1');
+
+          try {
+            // Parse the cleaned JSON
+            const config = JSON.parse(content);
+
+            // Update the main field only if dist/index.js exists
+            if (updateMainField) {
+              config.main = 'dist/index.js';
+              console.log('✓ Updated main field to: dist/index.js');
+            }
+
+            // Remove \$schema field (points to node_modules which won't exist)
+            delete config['\$schema'];
+
+            // Write back as clean JSON
+            fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+            console.log('✓ Converted JSONC to JSON successfully');
+          } catch (error) {
+            console.error('Failed to parse config:', error.message);
+            console.error('Config content preview:', content.substring(0, 500));
+            process.exit(1);
+          }
+        " || exit 1
+
+        echo ""
+        echo "Updated configuration (first 30 lines):"
+        cat "$CONFIG_PATH" | head -30
 
         echo "::endgroup::"
 
