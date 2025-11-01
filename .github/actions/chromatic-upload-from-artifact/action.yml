@@ -148,9 +148,9 @@ runs:
 
         echo ""
         echo "Storybook directory contents (first 10 files):"
-        find "$STORYBOOK_DIR" -type f | head -10 | while read -r file; do
+        find "$STORYBOOK_DIR" -type f 2>/dev/null | head -10 | while read -r file; do
           echo "  - ${file#$STORYBOOK_DIR/}"
-        done
+        done 2>/dev/null || true
 
         if [ "$STORYBOOK_FILES" -gt 10 ]; then
           echo "  ... and $((STORYBOOK_FILES - 10)) more files"
