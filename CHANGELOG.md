@@ -1,3 +1,10 @@
+## [1.2.5](https://github.com/algtools/actions/compare/v1.2.4...v1.2.5) (2025-11-01)
+
+
+### Bug Fixes
+
+* enhance JSONC to JSON conversion in deploy action with optional main field update ([ead2f29](https://github.com/algtools/actions/commit/ead2f295f5d33df25b5cd6e32eeab2d38ac9d1a0))
+
 ## [1.2.4](https://github.com/algtools/actions/compare/v1.2.3...v1.2.4) (2025-11-01)
 
 
