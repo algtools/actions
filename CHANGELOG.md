@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/algtools/actions/compare/v1.2.0...v1.2.1) (2025-11-01)
+
+
+### Bug Fixes
+
+* suppress errors when listing Storybook directory contents in chromatic upload action ([16c0348](https://github.com/algtools/actions/commit/16c034881edecdf0e9c378797fa44cf9b8d98ca7))
+
 # [1.2.0](https://github.com/algtools/actions/compare/v1.1.4...v1.2.0) (2025-10-31)
 
 
