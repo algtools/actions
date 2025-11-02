@@ -301,8 +301,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: api-docs-output-${{ github.sha }}-${{ github.run_id }}
-          path: ${{ inputs.working_directory }}
+          path: |
+            ${{ inputs.working_directory }}/openapi.json
+            ${{ inputs.working_directory }}/postman-collection.json
           include-hidden-files: true
+          if-no-files-found: warn
           retention-days: 1
 
       - name: Summary
