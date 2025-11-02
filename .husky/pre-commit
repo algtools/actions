@@ -5,8 +5,13 @@ echo "Running pre-commit checks..."
 # Run lint-staged for formatted files
 npx lint-staged
 
-# Run actionlint on all workflow files
+# Run actionlint on all workflow files (skip if not installed)
 echo "🔍 Validating workflow files..."
-pnpm run lint:workflows
+if command -v actionlint >/dev/null 2>&1; then
+  pnpm run lint:workflows
+else
+  echo "⚠️  actionlint not found, skipping workflow validation"
+  echo "   (Install actionlint locally for workflow validation)"
+fi
 
 echo "✅ All pre-commit checks passed!"
