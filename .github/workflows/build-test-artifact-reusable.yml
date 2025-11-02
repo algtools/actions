@@ -1,4 +1,4 @@
-name: "Build, Test, and Artifact - Reusable Workflow"
+name: 'Build, Test, and Artifact - Reusable Workflow'
 
 on:
   workflow_call:
@@ -9,19 +9,19 @@ on:
         required: true
         type: string
       enable_coverage:
-        description: "Enable test coverage reports"
+        description: 'Enable test coverage reports'
         required: false
         type: boolean
         default: false
       coverage_cmd:
-        description: "Coverage command to execute"
+        description: 'Coverage command to execute'
         required: false
         type: string
-        default: ""
+        default: ''
 
       # Lint configuration
       lint_cmd:
-        description: "Lint command to execute (can include multiple commands separated by &&)"
+        description: 'Lint command to execute (can include multiple commands separated by &&)'
         required: true
         type: string
 
@@ -37,39 +37,39 @@ on:
         required: true
         type: string
       node_version:
-        description: "Node.js version to install. If not provided, reads from .nvmrc file."
+        description: 'Node.js version to install. If not provided, reads from .nvmrc file.'
         required: false
         type: string
-        default: ""
+        default: ''
       working_directory:
-        description: "Working directory for all commands"
+        description: 'Working directory for all commands'
         required: false
         type: string
-        default: "."
+        default: '.'
       output_dir:
         description: 'Directory where build output/artifacts will be produced (e.g., "dist", "build")'
         required: false
         type: string
-        default: "dist"
+        default: 'dist'
 
       # Artifact configuration
       artifact_name:
-        description: "Name of the artifact to upload"
+        description: 'Name of the artifact to upload'
         required: true
         type: string
       artifact_paths:
-        description: "Comma-separated list of file paths or directories to upload as artifacts"
+        description: 'Comma-separated list of file paths or directories to upload as artifacts'
         required: true
         type: string
       retention_days:
-        description: "Number of days to retain the artifact (1-90 days, default is repository/org setting)"
+        description: 'Number of days to retain the artifact (1-90 days, default is repository/org setting)'
         required: false
         type: number
         default: 30
 
       # Optional: Storybook build
       enable_storybook:
-        description: "Enable Storybook build (creates separate job)"
+        description: 'Enable Storybook build (creates separate job)'
         required: false
         type: boolean
         default: false
@@ -77,16 +77,16 @@ on:
         description: 'Storybook build command (e.g., "pnpm build:storybook && pnpm copy:storybook")'
         required: false
         type: string
-        default: ""
+        default: ''
       storybook_output_dir:
-        description: "Directory where Storybook output is produced"
+        description: 'Directory where Storybook output is produced'
         required: false
         type: string
-        default: "storybook-static"
+        default: 'storybook-static'
 
       # Optional: API documentation
       enable_api_docs:
-        description: "Enable API documentation generation (part of build job)"
+        description: 'Enable API documentation generation (part of build job)'
         required: false
         type: boolean
         default: false
@@ -94,11 +94,11 @@ on:
         description: 'API docs command (e.g., "pnpm openapi:export")'
         required: false
         type: string
-        default: ""
+        default: ''
 
       # Optional: Build cache configuration
       enable_build_cache:
-        description: "Enable build caching (e.g., Next.js .next/cache, TypeScript .tsbuildinfo, etc.)"
+        description: 'Enable build caching (e.g., Next.js .next/cache, TypeScript .tsbuildinfo, etc.)'
         required: false
         type: boolean
         default: false
@@ -106,36 +106,36 @@ on:
         description: 'Newline-separated list of cache paths to cache between builds (e.g., ".next/cache" for Next.js)'
         required: false
         type: string
-        default: ""
+        default: ''
       build_cache_key_files:
         description: 'Glob patterns for files to include in cache key (e.g., "src/**/*.ts,src/**/*.tsx")'
         required: false
         type: string
-        default: "src/**/*"
+        default: 'src/**/*'
 
     outputs:
       # Test outputs
       test_status:
-        description: "Status of the tests"
+        description: 'Status of the tests'
         value: ${{ jobs.test.outputs.test_status }}
 
       # Build outputs
       build_status:
-        description: "Status of the build"
+        description: 'Status of the build'
         value: ${{ jobs.build.outputs.build_status }}
 
       # Artifact outputs
       artifact_id:
-        description: "GitHub artifact ID"
+        description: 'GitHub artifact ID'
         value: ${{ jobs.upload-artifact.outputs.artifact_id }}
       artifact_url:
-        description: "Download URL for the artifact"
+        description: 'Download URL for the artifact'
         value: ${{ jobs.upload-artifact.outputs.artifact_url }}
       total_files:
-        description: "Number of files uploaded"
+        description: 'Number of files uploaded'
         value: ${{ jobs.upload-artifact.outputs.total_files }}
       total_size:
-        description: "Total size in bytes"
+        description: 'Total size in bytes'
         value: ${{ jobs.upload-artifact.outputs.total_size }}
 
 permissions:
@@ -160,6 +160,25 @@ jobs:
           node-version: ${{ inputs.node_version }}
           working-directory: ${{ inputs.working_directory }}
           github-token: ${{ github.token }}
+
+      - name: Setup test cache
+        id: test-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ inputs.working_directory }}/node_modules/.vitest
+            ${{ inputs.working_directory }}/node_modules/.cache
+          key: ${{ runner.os }}-test-cache-${{ hashFiles(format('{0}/package.json', inputs.working_directory), format('{0}/pnpm-lock.yaml', inputs.working_directory)) }}
+          restore-keys: |
+            ${{ runner.os }}-test-cache-
+
+      - name: Log test cache status
+        run: |
+          if [ "${{ steps.test-cache.outputs.cache-hit }}" = "true" ]; then
+            echo "✓ Test cache hit - using cached test results"
+          else
+            echo "○ Test cache miss - fresh test run"
+          fi
 
       - name: Run tests
         id: test
@@ -237,6 +256,7 @@ jobs:
           github-token: ${{ github.token }}
 
       - name: Setup build cache
+        id: build-cache
         if: inputs.enable_build_cache == true && inputs.build_cache_paths != ''
         uses: actions/cache@v4
         with:
@@ -246,6 +266,15 @@ jobs:
             ${{ runner.os }}-build-cache-${{ hashFiles(format('{0}/package.json', inputs.working_directory), format('{0}/pnpm-lock.yaml', inputs.working_directory), format('{0}/package-lock.json', inputs.working_directory)) }}-
             ${{ runner.os }}-build-cache-
 
+      - name: Log build cache status
+        if: inputs.enable_build_cache == true && inputs.build_cache_paths != ''
+        run: |
+          if [ "${{ steps.build-cache.outputs.cache-hit }}" = "true" ]; then
+            echo "✓ Build cache hit - incremental build enabled"
+          else
+            echo "○ Build cache miss - full build"
+          fi
+
       - name: Build project
         id: build
         uses: algtools/actions/.github/actions/build-no-secrets@main
@@ -253,12 +282,28 @@ jobs:
           build_cmd: ${{ inputs.build_cmd }}
           working_dir: ${{ inputs.working_directory }}
           output_dir: ${{ inputs.output_dir }}
-          node_env: "production"
+          node_env: 'production'
 
       - name: Generate API documentation
         if: inputs.enable_api_docs == true
         working-directory: ${{ inputs.working_directory }}
         run: ${{ inputs.api_docs_cmd }}
+
+      - name: Upload build outputs (intermediate)
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ inputs.working_directory }}/${{ inputs.output_dir }}
+          retention-days: 1
+
+      - name: Upload API docs (intermediate)
+        if: inputs.enable_api_docs == true
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-docs-output-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ inputs.working_directory }}
+          include-hidden-files: true
+          retention-days: 1
 
       - name: Summary
         run: |
@@ -275,6 +320,9 @@ jobs:
             echo "- **Working Directory**: ${{ inputs.working_directory }}"
             echo "- **Output Directory**: ${{ inputs.output_dir }}"
             echo "- **Node Version**: ${{ steps.setup.outputs.node-version || 'default' }}"
+            echo ""
+            echo "### Intermediate Artifacts"
+            echo "- Build outputs uploaded for reuse"
           } >> "$GITHUB_STEP_SUMMARY"
 
   # Job 5: Build Storybook (optional, parallel with main build)
@@ -299,7 +347,7 @@ jobs:
         env:
           NODE_ENV: production
           CI: true
-          NODE_OPTIONS: "--max_old_space_size=4096"
+          NODE_OPTIONS: '--max_old_space_size=4096'
         run: ${{ inputs.storybook_cmd }}
 
       - name: Verify Storybook output
@@ -312,6 +360,13 @@ jobs:
           echo "✓ Storybook built successfully"
           ls -lah "${{ inputs.storybook_output_dir }}" || true
 
+      - name: Upload Storybook outputs (intermediate)
+        uses: actions/upload-artifact@v4
+        with:
+          name: storybook-output-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ inputs.working_directory }}/${{ inputs.storybook_output_dir }}
+          retention-days: 1
+
       - name: Summary
         run: |
           {
@@ -319,9 +374,12 @@ jobs:
             echo ""
             echo "- **Status**: ✅ Success"
             echo "- **Output Directory**: ${{ inputs.storybook_output_dir }}"
+            echo ""
+            echo "### Intermediate Artifacts"
+            echo "- Storybook outputs uploaded for reuse"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # Job 6: Upload all artifacts
+  # Job 6: Combine and upload final artifacts (no rebuilding!)
   upload-artifact:
     name: Upload Artifacts
     runs-on: ubuntu-latest
@@ -337,47 +395,74 @@ jobs:
       total_files: ${{ steps.upload.outputs.total_files }}
       total_size: ${{ steps.upload.outputs.total_size }}
     steps:
-      - name: Checkout repository
+      - name: Checkout repository (for artifact paths)
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: algtools/actions/.github/actions/setup-node@main
+      - name: Download build outputs
+        uses: actions/download-artifact@v4
         with:
-          node-version: ${{ inputs.node_version }}
-          working-directory: ${{ inputs.working_directory }}
-          github-token: ${{ github.token }}
+          name: build-output-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ inputs.working_directory }}/${{ inputs.output_dir }}
 
-      # Rebuild to ensure we have all artifacts (since jobs run on different runners)
-      - name: Rebuild artifacts
-        uses: algtools/actions/.github/actions/build-no-secrets@main
-        with:
-          build_cmd: ${{ inputs.build_cmd }}
-          working_dir: ${{ inputs.working_directory }}
-          output_dir: ${{ inputs.output_dir }}
-          node_env: "production"
-
-      - name: Regenerate API documentation
+      - name: Download API docs
         if: inputs.enable_api_docs == true
-        working-directory: ${{ inputs.working_directory }}
-        run: ${{ inputs.api_docs_cmd }}
+        uses: actions/download-artifact@v4
+        with:
+          name: api-docs-output-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ inputs.working_directory }}
 
-      - name: Rebuild Storybook
+      - name: Download Storybook outputs
         if: inputs.enable_storybook == true
-        working-directory: ${{ inputs.working_directory }}
-        env:
-          NODE_ENV: production
-          CI: true
-          NODE_OPTIONS: "--max_old_space_size=4096"
-        run: ${{ inputs.storybook_cmd }}
+        uses: actions/download-artifact@v4
+        with:
+          name: storybook-output-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ inputs.working_directory }}/${{ inputs.storybook_output_dir }}
 
-      - name: Upload artifacts
+      - name: Verify downloaded artifacts
+        run: |
+          echo "Verifying downloaded artifacts..."
+          if [ -d "${{ inputs.working_directory }}/${{ inputs.output_dir }}" ]; then
+            echo "✓ Build output found"
+            ls -lh "${{ inputs.working_directory }}/${{ inputs.output_dir }}" || true
+          else
+            echo "::error::Build output directory not found"
+            exit 1
+          fi
+
+          if [ "${{ inputs.enable_api_docs }}" = "true" ]; then
+            echo "✓ API docs verified"
+          fi
+
+          if [ "${{ inputs.enable_storybook }}" = "true" ]; then
+            if [ -d "${{ inputs.working_directory }}/${{ inputs.storybook_output_dir }}" ]; then
+              echo "✓ Storybook output found"
+            else
+              echo "::error::Storybook output directory not found"
+              exit 1
+            fi
+          fi
+
+      - name: Upload final artifacts
         id: upload
         uses: algtools/actions/.github/actions/upload-artifacts@main
         with:
           artifact_name: ${{ inputs.artifact_name }}
           artifact_paths: ${{ inputs.artifact_paths }}
           retention_days: ${{ inputs.retention_days }}
-          include_hidden_files: "true"
+          include_hidden_files: 'true'
+
+      - name: Cleanup intermediate artifacts
+        if: always()
+        continue-on-error: true
+        run: |
+          echo "Intermediate artifacts will auto-expire in 1 day"
+          echo "- build-output-${{ github.sha }}-${{ github.run_id }}"
+          if [ "${{ inputs.enable_api_docs }}" = "true" ]; then
+            echo "- api-docs-output-${{ github.sha }}-${{ github.run_id }}"
+          fi
+          if [ "${{ inputs.enable_storybook }}" = "true" ]; then
+            echo "- storybook-output-${{ github.sha }}-${{ github.run_id }}"
+          fi
 
       - name: Summary
         run: |
