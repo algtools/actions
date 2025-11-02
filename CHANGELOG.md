@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/algtools/actions/compare/v1.8.1...v1.9.0) (2025-11-02)
+
+
+### Features
+
+* add configurable preview links in PR comments for reusable workflow ([5f5fb1b](https://github.com/algtools/actions/commit/5f5fb1b61d553e59b016c0ec83cc0a6112d6e3a1))
+
 ## [1.8.1](https://github.com/algtools/actions/compare/v1.8.0...v1.8.1) (2025-11-02)
 
 
