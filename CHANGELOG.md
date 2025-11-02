@@ -1,3 +1,10 @@
+## [1.7.6](https://github.com/algtools/actions/compare/v1.7.5...v1.7.6) (2025-11-02)
+
+
+### Bug Fixes
+
+* specify paths for uploaded artifacts in reusable workflow and add warning for missing files ([bd64fb6](https://github.com/algtools/actions/commit/bd64fb6aae806163faf8acc32d04e9f1d2eb809b))
+
 ## [1.7.5](https://github.com/algtools/actions/compare/v1.7.4...v1.7.5) (2025-11-02)
 
 
