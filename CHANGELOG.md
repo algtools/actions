@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/algtools/actions/compare/v1.7.6...v1.8.0) (2025-11-02)
+
+
+### Features
+
+* add verification step for build outputs in reusable workflow ([b922459](https://github.com/algtools/actions/commit/b922459bd7726617d46f6821b6553ebc8802c97e))
+
 ## [1.7.6](https://github.com/algtools/actions/compare/v1.7.5...v1.7.6) (2025-11-02)
 
 
