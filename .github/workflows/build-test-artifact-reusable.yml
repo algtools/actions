@@ -96,6 +96,23 @@ on:
         type: string
         default: ""
 
+      # Optional: Build cache configuration
+      enable_build_cache:
+        description: "Enable build caching (e.g., Next.js .next/cache, TypeScript .tsbuildinfo, etc.)"
+        required: false
+        type: boolean
+        default: false
+      build_cache_paths:
+        description: 'Newline-separated list of cache paths to cache between builds (e.g., ".next/cache" for Next.js)'
+        required: false
+        type: string
+        default: ""
+      build_cache_key_files:
+        description: 'Glob patterns for files to include in cache key (e.g., "src/**/*.ts,src/**/*.tsx")'
+        required: false
+        type: string
+        default: "src/**/*"
+
     outputs:
       # Test outputs
       test_status:
@@ -218,6 +235,16 @@ jobs:
           node-version: ${{ inputs.node_version }}
           working-directory: ${{ inputs.working_directory }}
           github-token: ${{ github.token }}
+
+      - name: Setup build cache
+        if: inputs.enable_build_cache == true && inputs.build_cache_paths != ''
+        uses: actions/cache@v4
+        with:
+          path: ${{ inputs.build_cache_paths }}
+          key: ${{ runner.os }}-build-cache-${{ hashFiles(format('{0}/package.json', inputs.working_directory), format('{0}/pnpm-lock.yaml', inputs.working_directory), format('{0}/package-lock.json', inputs.working_directory)) }}-${{ hashFiles(format('{0}/{1}', inputs.working_directory, inputs.build_cache_key_files)) }}
+          restore-keys: |
+            ${{ runner.os }}-build-cache-${{ hashFiles(format('{0}/package.json', inputs.working_directory), format('{0}/pnpm-lock.yaml', inputs.working_directory), format('{0}/package-lock.json', inputs.working_directory)) }}-
+            ${{ runner.os }}-build-cache-
 
       - name: Build project
         id: build
