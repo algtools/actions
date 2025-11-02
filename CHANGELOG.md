@@ -1,3 +1,10 @@
+## [1.7.1](https://github.com/algtools/actions/compare/v1.7.0...v1.7.1) (2025-11-02)
+
+
+### Bug Fixes
+
+* correct flag usage in deployment status action configuration ([38ebaf3](https://github.com/algtools/actions/commit/38ebaf35ee2a78a402e8fc3c558c921449a6fedb))
+
 # [1.7.0](https://github.com/algtools/actions/compare/v1.6.0...v1.7.0) (2025-11-02)
 
 
