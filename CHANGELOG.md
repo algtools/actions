@@ -1,3 +1,17 @@
+# [1.6.0](https://github.com/algtools/actions/compare/v1.5.0...v1.6.0) (2025-11-02)
+
+
+### Bug Fixes
+
+* standardize string quotes in preview deploy workflow configuration ([6cc21e5](https://github.com/algtools/actions/commit/6cc21e53e9b03883d0b1ddac0579247880813522))
+* update build command execution to use eval for proper parsing ([f005009](https://github.com/algtools/actions/commit/f005009310c3adc7650abccb9b088809c9dc1762))
+* update Prettier ignore file and enhance release configuration with git commit options ([6653651](https://github.com/algtools/actions/commit/665365159c4f38412c9703f2b2299d66c5f17d78))
+
+
+### Features
+
+* enhance artifact handling in preview deploy workflow with download verification and conditional build execution ([507fccd](https://github.com/algtools/actions/commit/507fccd4c59c1ef296500180bba4d554d86eb0ec))
+
 # [1.5.0](https://github.com/algtools/actions/compare/v1.4.0...v1.5.0) (2025-11-01)
 
 
