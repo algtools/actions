@@ -1,4 +1,4 @@
-name: 'Build, Test, and Artifact - Reusable Workflow'
+name: "Build, Test, and Artifact - Reusable Workflow"
 
 on:
   workflow_call:
@@ -9,19 +9,19 @@ on:
         required: true
         type: string
       enable_coverage:
-        description: 'Enable test coverage reports'
+        description: "Enable test coverage reports"
         required: false
         type: boolean
         default: false
       coverage_cmd:
-        description: 'Coverage command to execute'
+        description: "Coverage command to execute"
         required: false
         type: string
-        default: ''
+        default: ""
 
       # Lint configuration
       lint_cmd:
-        description: 'Lint command to execute (can include multiple commands separated by &&)'
+        description: "Lint command to execute (can include multiple commands separated by &&)"
         required: true
         type: string
 
@@ -37,39 +37,39 @@ on:
         required: true
         type: string
       node_version:
-        description: 'Node.js version to install. If not provided, reads from .nvmrc file.'
+        description: "Node.js version to install. If not provided, reads from .nvmrc file."
         required: false
         type: string
-        default: ''
+        default: ""
       working_directory:
-        description: 'Working directory for all commands'
+        description: "Working directory for all commands"
         required: false
         type: string
-        default: '.'
+        default: "."
       output_dir:
         description: 'Directory where build output/artifacts will be produced (e.g., "dist", "build")'
         required: false
         type: string
-        default: 'dist'
+        default: "dist"
 
       # Artifact configuration
       artifact_name:
-        description: 'Name of the artifact to upload'
+        description: "Name of the artifact to upload"
         required: true
         type: string
       artifact_paths:
-        description: 'Comma-separated list of file paths or directories to upload as artifacts'
+        description: "Comma-separated list of file paths or directories to upload as artifacts"
         required: true
         type: string
       retention_days:
-        description: 'Number of days to retain the artifact (1-90 days, default is repository/org setting)'
+        description: "Number of days to retain the artifact (1-90 days, default is repository/org setting)"
         required: false
         type: number
         default: 30
 
       # Optional: Storybook build
       enable_storybook:
-        description: 'Enable Storybook build (creates separate job)'
+        description: "Enable Storybook build (creates separate job)"
         required: false
         type: boolean
         default: false
@@ -77,16 +77,16 @@ on:
         description: 'Storybook build command (e.g., "pnpm build:storybook && pnpm copy:storybook")'
         required: false
         type: string
-        default: ''
+        default: ""
       storybook_output_dir:
-        description: 'Directory where Storybook output is produced'
+        description: "Directory where Storybook output is produced"
         required: false
         type: string
-        default: 'storybook-static'
+        default: "storybook-static"
 
       # Optional: API documentation
       enable_api_docs:
-        description: 'Enable API documentation generation (part of build job)'
+        description: "Enable API documentation generation (part of build job)"
         required: false
         type: boolean
         default: false
@@ -94,11 +94,11 @@ on:
         description: 'API docs command (e.g., "pnpm openapi:export")'
         required: false
         type: string
-        default: ''
+        default: ""
 
       # Optional: Build cache configuration
       enable_build_cache:
-        description: 'Enable build caching (e.g., Next.js .next/cache, TypeScript .tsbuildinfo, etc.)'
+        description: "Enable build caching (e.g., Next.js .next/cache, TypeScript .tsbuildinfo, etc.)"
         required: false
         type: boolean
         default: false
@@ -106,36 +106,36 @@ on:
         description: 'Newline-separated list of cache paths to cache between builds (e.g., ".next/cache" for Next.js)'
         required: false
         type: string
-        default: ''
+        default: ""
       build_cache_key_files:
         description: 'Glob patterns for files to include in cache key (e.g., "src/**/*.ts,src/**/*.tsx")'
         required: false
         type: string
-        default: 'src/**/*'
+        default: "src/**/*"
 
     outputs:
       # Test outputs
       test_status:
-        description: 'Status of the tests'
+        description: "Status of the tests"
         value: ${{ jobs.test.outputs.test_status }}
 
       # Build outputs
       build_status:
-        description: 'Status of the build'
+        description: "Status of the build"
         value: ${{ jobs.build.outputs.build_status }}
 
       # Artifact outputs
       artifact_id:
-        description: 'GitHub artifact ID'
+        description: "GitHub artifact ID"
         value: ${{ jobs.upload-artifact.outputs.artifact_id }}
       artifact_url:
-        description: 'Download URL for the artifact'
+        description: "Download URL for the artifact"
         value: ${{ jobs.upload-artifact.outputs.artifact_url }}
       total_files:
-        description: 'Number of files uploaded'
+        description: "Number of files uploaded"
         value: ${{ jobs.upload-artifact.outputs.total_files }}
       total_size:
-        description: 'Total size in bytes'
+        description: "Total size in bytes"
         value: ${{ jobs.upload-artifact.outputs.total_size }}
 
 permissions:
@@ -282,7 +282,7 @@ jobs:
           build_cmd: ${{ inputs.build_cmd }}
           working_dir: ${{ inputs.working_directory }}
           output_dir: ${{ inputs.output_dir }}
-          node_env: 'production'
+          node_env: "production"
 
       - name: Generate API documentation
         if: inputs.enable_api_docs == true
@@ -347,7 +347,7 @@ jobs:
         env:
           NODE_ENV: production
           CI: true
-          NODE_OPTIONS: '--max_old_space_size=4096'
+          NODE_OPTIONS: "--max_old_space_size=4096"
         run: ${{ inputs.storybook_cmd }}
 
       - name: Verify Storybook output
@@ -449,7 +449,7 @@ jobs:
           artifact_name: ${{ inputs.artifact_name }}
           artifact_paths: ${{ inputs.artifact_paths }}
           retention_days: ${{ inputs.retention_days }}
-          include_hidden_files: 'true'
+          include_hidden_files: "true"
 
       - name: Cleanup intermediate artifacts
         if: always()
