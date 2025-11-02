@@ -115,6 +115,16 @@ runs:
             --jq '.[0].id // empty')
 
           if [ -z "$DEPLOYMENT_ID" ]; then
+            # For inactive state during cleanup, if no deployment exists, just succeed
+            if [ "${{ inputs.state }}" = "inactive" ]; then
+              echo "::notice::No deployment found for cleanup - nothing to mark as inactive"
+              echo "deployment_id=none" >> $GITHUB_OUTPUT
+              echo "✓ Cleanup completed (no deployment to clean)"
+              echo "::endgroup::"
+              exit 0
+            fi
+
+            # For other states, try to create deployment
             echo "::warning::No existing deployment found, creating new one"
             DEPLOYMENT_ID=$(gh api \
               --method POST \
@@ -124,7 +134,10 @@ runs:
               -f ref='${{ github.sha }}' \
               -f environment='${{ inputs.environment }}' \
               -F auto_merge=false \
-              --jq '.id')
+              --jq '.id' 2>&1) || {
+                echo "::error::Failed to create deployment: $DEPLOYMENT_ID"
+                exit 1
+              }
           fi
 
           echo "deployment_id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
@@ -170,6 +183,7 @@ runs:
 
     - name: Create deployment status
       id: create-status
+      if: steps.create-deployment.outputs.deployment_id != 'none'
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github_token }}
@@ -230,6 +244,7 @@ runs:
         echo "::endgroup::"
 
     - name: Deployment status summary
+      if: steps.create-deployment.outputs.deployment_id != 'none'
       shell: bash
       run: |
         echo "::group::Deployment Status Summary"
