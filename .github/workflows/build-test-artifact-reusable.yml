@@ -289,11 +289,35 @@ jobs:
         working-directory: ${{ inputs.working_directory }}
         run: ${{ inputs.api_docs_cmd }}
 
+      - name: Verify build outputs exist
+        run: |
+          echo "::group::Verifying build outputs"
+          OUTPUT_PATH="${{ inputs.working_directory }}/${{ inputs.output_dir }}"
+
+          if [ ! -d "$OUTPUT_PATH" ]; then
+            echo "::error::Output directory not found at: $OUTPUT_PATH"
+            echo "Current directory: $(pwd)"
+            echo "Directory contents:"
+            ls -la "${{ inputs.working_directory }}" || ls -la .
+            exit 1
+          fi
+
+          FILE_COUNT=$(find "$OUTPUT_PATH" -type f | wc -l)
+          if [ "$FILE_COUNT" -eq 0 ]; then
+            echo "::error::Output directory is empty: $OUTPUT_PATH"
+            exit 1
+          fi
+
+          echo "✓ Build output directory exists: $OUTPUT_PATH"
+          echo "✓ Contains $FILE_COUNT files"
+          echo "::endgroup::"
+
       - name: Upload build outputs (intermediate)
         uses: actions/upload-artifact@v4
         with:
           name: build-output-${{ github.sha }}-${{ github.run_id }}
           path: ${{ inputs.working_directory }}/${{ inputs.output_dir }}
+          if-no-files-found: error
           retention-days: 1
 
       - name: Upload API docs (intermediate)
