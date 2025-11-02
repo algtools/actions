@@ -1,3 +1,10 @@
+## [1.7.4](https://github.com/algtools/actions/compare/v1.7.3...v1.7.4) (2025-11-02)
+
+
+### Bug Fixes
+
+* enhance deployment status action to handle inactive state and improve error handling for deployment creation ([55ddbc3](https://github.com/algtools/actions/commit/55ddbc3f99b84ed786e00959d4733e679ef61171))
+
 ## [1.7.3](https://github.com/algtools/actions/compare/v1.7.2...v1.7.3) (2025-11-02)
 
 
