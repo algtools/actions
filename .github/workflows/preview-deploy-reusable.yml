@@ -106,6 +106,13 @@ on:
         type: string
         default: "api-docs"
 
+      # PR Comment configuration
+      preview_links:
+        description: "Comma-separated list of links to show in PR comment (preview,api-docs,openapi-spec,health,storybook)"
+        required: false
+        type: string
+        default: "preview,api-docs,openapi-spec,health"
+
       # Miscellaneous
       retention_days:
         description: "Number of days to retain the artifact (1-90 days, default is repository/org setting)"
@@ -673,10 +680,11 @@ jobs:
             Your preview environment is ready!
 
             ### 🔗 Links
-            - 🌐 **Preview URL**: ${{ needs.deploy.outputs.preview_url }}
-            - 📚 **API Docs**: ${{ needs.deploy.outputs.preview_url }}/docs
-            - 📋 **OpenAPI Spec**: ${{ needs.deploy.outputs.preview_url }}/openapi.json
-            - 💚 **Health Check**: ${{ needs.deploy.outputs.preview_url }}/health
+            ${{ contains(inputs.preview_links, 'preview') && format('- 🌐 **Preview URL**: {0}', needs.deploy.outputs.preview_url) || '' }}
+            ${{ contains(inputs.preview_links, 'storybook') && format('- 📚 **Storybook**: {0}/storybook', needs.deploy.outputs.preview_url) || '' }}
+            ${{ contains(inputs.preview_links, 'api-docs') && format('- 📚 **API Docs**: {0}/docsz', needs.deploy.outputs.preview_url) || '' }}
+            ${{ contains(inputs.preview_links, 'openapi-spec') && format('- 📋 **OpenAPI Spec**: {0}/openapi.json', needs.deploy.outputs.preview_url) || '' }}
+            ${{ contains(inputs.preview_links, 'health') && format('- 💚 **Health Check**: {0}/healthz', needs.deploy.outputs.preview_url) || '' }}
 
             ### ℹ️ Details
             - **Worker**: `${{ needs.deploy.outputs.worker_name }}`
@@ -685,15 +693,11 @@ jobs:
             - **Deployed**: <t:${{ github.event.pull_request.updated_at }}:R>
 
             <details>
-            <summary>Deployment Info</summary>
+            <summary>▶ Deployment Info</summary>
 
-            - **Artifact**: `pr-preview-${{ github.event.pull_request.number }}`
-            - **Build Status**: ✅ Success
-            - **Deployment Status**: ${{ needs.deploy.outputs.deployment_status }}
+            This environment will be automatically cleaned up when the PR is closed or merged.
 
             </details>
-
-            > This environment will be automatically cleaned up when the PR is closed or merged.
 
       - name: Deployment Summary
         run: |
