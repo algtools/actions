@@ -1,3 +1,10 @@
+## [1.7.5](https://github.com/algtools/actions/compare/v1.7.4...v1.7.5) (2025-11-02)
+
+
+### Bug Fixes
+
+* enhance reusable workflow with intermediate artifact uploads and cache logging ([49425b5](https://github.com/algtools/actions/commit/49425b572c2c53434ee05bdd6721f396f7aa17a5))
+
 ## [1.7.4](https://github.com/algtools/actions/compare/v1.7.3...v1.7.4) (2025-11-02)
 
 
