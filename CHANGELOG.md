@@ -1,3 +1,10 @@
+## [1.7.3](https://github.com/algtools/actions/compare/v1.7.2...v1.7.3) (2025-11-02)
+
+
+### Bug Fixes
+
+* improve artifact and Storybook file listing by adding checks for empty results ([184b0d2](https://github.com/algtools/actions/commit/184b0d27172c342dd4a19ff7863fcafb287b943b))
+
 ## [1.7.2](https://github.com/algtools/actions/compare/v1.7.1...v1.7.2) (2025-11-02)
 
 
