@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/algtools/actions/compare/v1.6.0...v1.7.0) (2025-11-02)
+
+
+### Features
+
+* add overwrite option to artifact upload action for improved workflow management ([e8ba7cb](https://github.com/algtools/actions/commit/e8ba7cbe52a490e17997f12955305cedf4a7fd5a))
+
 # [1.6.0](https://github.com/algtools/actions/compare/v1.5.0...v1.6.0) (2025-11-02)
 
 
