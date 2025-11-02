@@ -7,6 +7,9 @@ dist/
 build/
 coverage/
 
+# Auto-generated files
+CHANGELOG.md
+
 # Logs
 *.log
 npm-debug.log*
