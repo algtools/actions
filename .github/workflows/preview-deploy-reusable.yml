@@ -194,13 +194,43 @@ jobs:
       artifact_url: ${{ steps.upload.outputs.artifact_url }}
       total_files: ${{ steps.upload.outputs.total_files }}
       total_size: ${{ steps.upload.outputs.total_size }}
-      build_status: ${{ steps.build.outputs.build_status }}
+      build_status: ${{ steps.download.outcome == 'success' && 'success' || steps.build.outputs.build_status }}
+      artifact_source: ${{ steps.download.outcome == 'success' && 'downloaded' || 'built' }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Try to download existing artifact
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ inputs.working_directory }}
+
+      - name: Verify downloaded artifact
+        if: steps.download.outcome == 'success'
+        shell: bash
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          echo "::group::Verifying downloaded artifact"
+          OUTPUT_DIR="${{ inputs.output_dir }}"
+
+          if [ -d "$OUTPUT_DIR" ]; then
+            echo "✓ Artifact downloaded successfully from previous job"
+            echo "✓ Output directory exists: $OUTPUT_DIR"
+            echo "✓ Skipping build step (using pre-built artifact)"
+            ls -lah "$OUTPUT_DIR" || true
+          else
+            echo "::warning::Artifact downloaded but output directory not found at: $OUTPUT_DIR"
+            echo "::warning::Will proceed to build from source"
+            exit 1
+          fi
+          echo "::endgroup::"
+
       - name: Setup Node.js securely
+        if: steps.download.outcome != 'success'
         id: setup
         uses: algtools/actions/.github/actions/setup-node@main
         with:
@@ -209,6 +239,7 @@ jobs:
           cache-dependency-path: ${{ inputs.working_directory }}/package-lock.json
 
       - name: Build without secrets
+        if: steps.download.outcome != 'success'
         id: build
         uses: algtools/actions/.github/actions/build-no-secrets@main
         with:

@@ -36,18 +36,21 @@ runs:
       shell: bash
       run: |
         echo "::group::Validating inputs"
-        if [ -z "${{ inputs.build_cmd }}" ]; then
+        BUILD_CMD="${{ inputs.build_cmd }}"
+        OUTPUT_DIR="${{ inputs.output_dir }}"
+
+        if [ -z "$BUILD_CMD" ]; then
           echo "::error::build_cmd input is required"
           exit 1
         fi
-        if [ -z "${{ inputs.output_dir }}" ]; then
+        if [ -z "$OUTPUT_DIR" ]; then
           echo "::error::output_dir input is required"
           exit 1
         fi
         echo "✓ Inputs validated successfully"
-        echo "  Build command: ${{ inputs.build_cmd }}"
+        echo "  Build command: $BUILD_CMD"
         echo "  Working directory: ${{ inputs.working_dir }}"
-        echo "  Output directory: ${{ inputs.output_dir }}"
+        echo "  Output directory: $OUTPUT_DIR"
         echo "  NODE_ENV: ${{ inputs.node_env }}"
         echo "::endgroup::"
 
