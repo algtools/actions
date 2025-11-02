@@ -1,3 +1,10 @@
+## [1.8.1](https://github.com/algtools/actions/compare/v1.8.0...v1.8.1) (2025-11-02)
+
+
+### Bug Fixes
+
+* include hidden files in artifact uploads for reusable workflow ([009fe5c](https://github.com/algtools/actions/commit/009fe5c96abc57d9233ee0a0598976e0a795ea1c))
+
 # [1.8.0](https://github.com/algtools/actions/compare/v1.7.6...v1.8.0) (2025-11-02)
 
 
