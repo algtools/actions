@@ -86,8 +86,8 @@ runs:
         echo "Executing: ${{ inputs.build_cmd }}"
         echo ""
 
-        # Run the build command
-        if ${{ inputs.build_cmd }}; then
+        # Run the build command using eval for proper parsing
+        if eval "${{ inputs.build_cmd }}"; then
           echo ""
           echo "✓ Build completed successfully"
           echo "status=success" >> $GITHUB_OUTPUT
