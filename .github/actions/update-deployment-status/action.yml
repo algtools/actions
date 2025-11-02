@@ -99,8 +99,7 @@ runs:
             /repos/${{ github.repository }}/deployments \
             -f ref='${{ github.sha }}' \
             -f environment='${{ inputs.environment }}' \
-            -f auto_merge=false \
-            -f required_contexts='[]' \
+            -F auto_merge=false \
             --jq '.id')
 
           echo "deployment_id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
@@ -124,8 +123,7 @@ runs:
               /repos/${{ github.repository }}/deployments \
               -f ref='${{ github.sha }}' \
               -f environment='${{ inputs.environment }}' \
-              -f auto_merge=false \
-              -f required_contexts='[]' \
+              -F auto_merge=false \
               --jq '.id')
           fi
 
