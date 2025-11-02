@@ -36,6 +36,11 @@ on:
         description: 'Build command to execute (e.g., "npm run build", "pnpm build")'
         required: true
         type: string
+      checkout_ref:
+        description: "Git ref to checkout (branch, tag, or SHA). If not provided, uses the default ref from the triggering workflow."
+        required: false
+        type: string
+        default: ""
       node_version:
         description: "Node.js version to install. If not provided, reads from .nvmrc file."
         required: false
@@ -152,6 +157,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref }}
+          fetch-depth: ${{ inputs.checkout_ref && 0 || 1 }}
 
       - name: Setup Node.js
         id: setup
@@ -205,6 +213,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref }}
+          fetch-depth: ${{ inputs.checkout_ref && 0 || 1 }}
 
       - name: Setup Node.js
         uses: algtools/actions/.github/actions/setup-node@main
@@ -224,6 +235,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref }}
+          fetch-depth: ${{ inputs.checkout_ref && 0 || 1 }}
 
       - name: Setup Node.js
         uses: algtools/actions/.github/actions/setup-node@main
@@ -246,6 +260,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref }}
+          fetch-depth: ${{ inputs.checkout_ref && 0 || 1 }}
 
       - name: Setup Node.js
         id: setup
@@ -426,6 +443,9 @@ jobs:
     steps:
       - name: Checkout repository (for artifact paths)
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref }}
+          fetch-depth: ${{ inputs.checkout_ref && 0 || 1 }}
 
       - name: Download build outputs
         uses: actions/download-artifact@v4
