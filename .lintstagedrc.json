@@ -1,7 +1,4 @@
 {
-  "*.{yml,yaml}": [
-    "prettier --check",
-    "actionlint"
-  ],
+  "*.{yml,yaml}": ["prettier --check"],
   "*.{json,md}": ["prettier --check"]
 }

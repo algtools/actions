@@ -1,5 +1,6 @@
 name: CI Lint
 
+# Test pre-commit hook
 on:
   push:
     branches:
