@@ -92,6 +92,7 @@ runs:
           echo "Creating new deployment for environment: ${{ inputs.environment }}"
 
           # Create deployment using GitHub CLI
+          # Use empty required_contexts to bypass status check requirements
           DEPLOYMENT_ID=$(gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
@@ -100,6 +101,7 @@ runs:
             -f ref='${{ github.sha }}' \
             -f environment='${{ inputs.environment }}' \
             -F auto_merge=false \
+            -f required_contexts=[] \
             --jq '.id')
 
           echo "deployment_id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
@@ -134,6 +136,7 @@ runs:
               -f ref='${{ github.sha }}' \
               -f environment='${{ inputs.environment }}' \
               -F auto_merge=false \
+              -f required_contexts=[] \
               --jq '.id' 2>&1) || {
                 echo "::error::Failed to create deployment: $DEPLOYMENT_ID"
                 exit 1
