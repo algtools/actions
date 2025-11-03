@@ -1,4 +1,7 @@
 {
-  "*.{yml,yaml}": ["prettier --write"],
-  "*.{json,md}": ["prettier --write"]
+  "*.{yml,yaml}": [
+    "prettier --check",
+    "actionlint"
+  ],
+  "*.{json,md}": ["prettier --check"]
 }
