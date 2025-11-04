@@ -78,11 +78,6 @@ on:
         required: false
         type: boolean
         default: false
-      chromatic_project_token:
-        description: "Chromatic project token (required if enable_chromatic is true)"
-        required: false
-        type: string
-        default: ""
       storybook_build_dir:
         description: "Directory containing Storybook build (required if enable_chromatic is true)"
         required: false
@@ -137,6 +132,9 @@ on:
       cloudflare_account_id:
         description: "Cloudflare account ID"
         required: true
+      chromatic_project_token:
+        description: "Chromatic project token for visual testing (optional)"
+        required: false
 
     outputs:
       # Build outputs
@@ -441,7 +439,7 @@ jobs:
         run: |
           echo "::group::Validating Chromatic configuration"
 
-          if [ -z "${{ inputs.chromatic_project_token }}" ]; then
+          if [ -z "${{ secrets.chromatic_project_token }}" ]; then
             echo "::error::chromatic_project_token is required when enable_chromatic is true"
             exit 1
           fi
@@ -459,7 +457,7 @@ jobs:
         uses: algtools/actions/.github/actions/chromatic-upload-from-artifact@main
         with:
           artifact_name: ${{ inputs.artifact_name }}
-          project_token: ${{ inputs.chromatic_project_token }}
+          project_token: ${{ secrets.chromatic_project_token }}
           storybook_dir: ${{ inputs.storybook_build_dir }}
 
   api-docs:
