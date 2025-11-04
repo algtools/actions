@@ -1,3 +1,10 @@
+## [1.9.3](https://github.com/algtools/actions/compare/v1.9.2...v1.9.3) (2025-11-04)
+
+
+### Bug Fixes
+
+* add step to copy Storybook files to OpenNext assets directory in build workflow ([7876ca1](https://github.com/algtools/actions/commit/7876ca14383e63cdb4b94d908ca02aff01f0190a))
+
 ## [1.9.2](https://github.com/algtools/actions/compare/v1.9.1...v1.9.2) (2025-11-04)
 
 
