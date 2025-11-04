@@ -447,6 +447,26 @@ jobs:
           name: storybook-output-${{ github.sha }}-${{ github.run_id }}
           path: ${{ inputs.working_directory }}/${{ inputs.storybook_output_dir }}
 
+      - name: Copy Storybook to OpenNext assets
+        if: inputs.enable_storybook == true
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          echo "Copying Storybook to OpenNext assets directory..."
+
+          # Ensure the assets directory exists
+          mkdir -p .open-next/assets/storybook
+
+          # Copy Storybook files from public/storybook to .open-next/assets/storybook
+          if [ -d "${{ inputs.storybook_output_dir }}" ]; then
+            cp -r ${{ inputs.storybook_output_dir }}/* .open-next/assets/storybook/
+            echo "✓ Storybook files copied to .open-next/assets/storybook"
+            echo "  Files copied:"
+            ls -lh .open-next/assets/storybook/ | head -10
+          else
+            echo "::error::Storybook output directory not found at ${{ inputs.storybook_output_dir }}"
+            exit 1
+          fi
+
       - name: Verify downloaded artifacts
         run: |
           echo "Verifying downloaded artifacts..."
