@@ -1,3 +1,11 @@
+## [1.9.1](https://github.com/algtools/actions/compare/v1.9.0...v1.9.1) (2025-11-04)
+
+
+### Bug Fixes
+
+* bypass status check requirements by using empty required_contexts in deployment creation ([80e28ea](https://github.com/algtools/actions/commit/80e28ea089a88549ec7d74fdcb2341476fe2ea8d))
+* standardize YAML descriptions and quotes in preview deploy workflow ([5ce32bd](https://github.com/algtools/actions/commit/5ce32bdd61e7be2c9c832208f5a365dbd6939927))
+
 # [1.9.0](https://github.com/algtools/actions/compare/v1.8.1...v1.9.0) (2025-11-02)
 
 
