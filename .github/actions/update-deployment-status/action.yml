@@ -93,15 +93,13 @@ runs:
 
           # Create deployment using GitHub CLI
           # Use empty required_contexts to bypass status check requirements
-          DEPLOYMENT_ID=$(gh api \
+          DEPLOYMENT_ID=$(echo '{"ref":"${{ github.sha }}","environment":"${{ inputs.environment }}","auto_merge":false,"required_contexts":[]}' | \
+            gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             /repos/${{ github.repository }}/deployments \
-            -f ref='${{ github.sha }}' \
-            -f environment='${{ inputs.environment }}' \
-            -F auto_merge=false \
-            -f required_contexts=[] \
+            --input - \
             --jq '.id')
 
           echo "deployment_id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
@@ -128,15 +126,13 @@ runs:
 
             # For other states, try to create deployment
             echo "::warning::No existing deployment found, creating new one"
-            DEPLOYMENT_ID=$(gh api \
+            DEPLOYMENT_ID=$(echo '{"ref":"${{ github.sha }}","environment":"${{ inputs.environment }}","auto_merge":false,"required_contexts":[]}' | \
+              gh api \
               --method POST \
               -H "Accept: application/vnd.github+json" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               /repos/${{ github.repository }}/deployments \
-              -f ref='${{ github.sha }}' \
-              -f environment='${{ inputs.environment }}' \
-              -F auto_merge=false \
-              -f required_contexts=[] \
+              --input - \
               --jq '.id' 2>&1) || {
                 echo "::error::Failed to create deployment: $DEPLOYMENT_ID"
                 exit 1
