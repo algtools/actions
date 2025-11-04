@@ -1,3 +1,10 @@
+## [1.9.2](https://github.com/algtools/actions/compare/v1.9.1...v1.9.2) (2025-11-04)
+
+
+### Bug Fixes
+
+* streamline deployment creation by using JSON input for GitHub CLI ([b900875](https://github.com/algtools/actions/commit/b90087551dd93d6001b069e7b2c07002285a0420))
+
 ## [1.9.1](https://github.com/algtools/actions/compare/v1.9.0...v1.9.1) (2025-11-04)
 
 
