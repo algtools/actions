@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/algtools/actions/compare/v1.9.7...v1.10.0) (2025-11-05)
+
+
+### Features
+
+* remove update-deployment-status action and its usages from workflows ([d8d7656](https://github.com/algtools/actions/commit/d8d76566cd77ca8f075b2bef6467d582af094c45))
+
 ## [1.9.7](https://github.com/algtools/actions/compare/v1.9.6...v1.9.7) (2025-11-05)
 
 
