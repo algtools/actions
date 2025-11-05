@@ -292,6 +292,8 @@ jobs:
           download_path: ${{ inputs.download_path }}
           wrangler_version: ${{ inputs.wrangler_version }}
           deploy_environment: ${{ inputs.environment }}
+          custom_domain: ${{ inputs.custom_domain }}
+          zone_id: ${{ inputs.zone }}
           dry_run: "false"
 
       - name: Create Sentry release

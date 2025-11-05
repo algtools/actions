@@ -421,21 +421,30 @@ runs:
         echo ""
         echo "✓ Deployment completed successfully"
 
-        # Extract worker URL from output
-        WORKER_URL=$(echo "$FILTERED_OUTPUT" | grep -oP 'https://[a-zA-Z0-9\-]+\.workers\.dev' | head -1 || echo "")
+        # Determine worker URL (prioritize custom domain if provided)
+        CUSTOM_DOMAIN="${{ inputs.custom_domain }}"
 
-        # If no workers.dev URL found, try to construct it
-        if [ -z "$WORKER_URL" ]; then
-          # Try to find custom domain
-          WORKER_URL=$(echo "$FILTERED_OUTPUT" | grep -oP 'https://[a-zA-Z0-9\-\.]+' | grep -v "dash.cloudflare.com" | head -1 || echo "")
-        fi
-
-        if [ -z "$WORKER_URL" ]; then
-          # Construct default URL
-          WORKER_URL="https://$WORKER_NAME.workers.dev"
-          echo "⚠️  Could not extract URL from output, using default: $WORKER_URL"
+        if [ -n "$CUSTOM_DOMAIN" ]; then
+          # Use custom domain as the primary URL
+          WORKER_URL="https://$CUSTOM_DOMAIN"
+          echo "📍 Worker URL (custom domain): $WORKER_URL"
         else
-          echo "📍 Worker URL: $WORKER_URL"
+          # Extract worker URL from output
+          WORKER_URL=$(echo "$FILTERED_OUTPUT" | grep -oP 'https://[a-zA-Z0-9\-]+\.workers\.dev' | head -1 || echo "")
+
+          # If no workers.dev URL found, try to construct it
+          if [ -z "$WORKER_URL" ]; then
+            # Try to find custom domain
+            WORKER_URL=$(echo "$FILTERED_OUTPUT" | grep -oP 'https://[a-zA-Z0-9\-\.]+' | grep -v "dash.cloudflare.com" | head -1 || echo "")
+          fi
+
+          if [ -z "$WORKER_URL" ]; then
+            # Construct default URL
+            WORKER_URL="https://$WORKER_NAME.workers.dev"
+            echo "⚠️  Could not extract URL from output, using default: $WORKER_URL"
+          else
+            echo "📍 Worker URL: $WORKER_URL"
+          fi
         fi
 
         # Set outputs
