@@ -1,3 +1,10 @@
+## [1.9.6](https://github.com/algtools/actions/compare/v1.9.5...v1.9.6) (2025-11-05)
+
+
+### Bug Fixes
+
+* enhance Cloudflare deployment action to support custom domains ([b66d881](https://github.com/algtools/actions/commit/b66d8818f6f152400044f9359cee7d84dce7a888))
+
 ## [1.9.5](https://github.com/algtools/actions/compare/v1.9.4...v1.9.5) (2025-11-05)
 
 
