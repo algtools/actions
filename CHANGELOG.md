@@ -1,3 +1,10 @@
+## [1.9.4](https://github.com/algtools/actions/compare/v1.9.3...v1.9.4) (2025-11-05)
+
+
+### Bug Fixes
+
+* add production_environment flag to bypass environment protection rules in deployments ([a8ccf49](https://github.com/algtools/actions/commit/a8ccf49f3b92fae9cadbda217b457470b270acf7))
+
 ## [1.9.3](https://github.com/algtools/actions/compare/v1.9.2...v1.9.3) (2025-11-04)
 
 
