@@ -411,7 +411,6 @@ jobs:
           deployment_url: "https://${{ inputs.custom_domain }}"
           description: "Deployment successful"
           github_token: ${{ github.token }}
-          auto_inactive: "true"
 
       - name: Deployment summary
         run: |

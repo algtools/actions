@@ -24,7 +24,7 @@ inputs:
   auto_inactive:
     description: "Automatically mark previous deployments as inactive when creating a new one"
     required: false
-    default: "true"
+    default: "false"
 
 outputs:
   deployment_id:
@@ -85,10 +85,10 @@ runs:
         echo "::group::Managing GitHub Deployment"
 
         # Check if we're updating an existing deployment or creating a new one
-        # For pending/in_progress states, we create a new deployment
-        # For success/failure/error states, we look for an existing deployment
+        # Only "pending" creates a new deployment
+        # All other states (in_progress, success, failure, error) update existing deployment
 
-        if [ "${{ inputs.state }}" = "pending" ] || [ "${{ inputs.state }}" = "in_progress" ]; then
+        if [ "${{ inputs.state }}" = "pending" ]; then
           echo "Creating new deployment for environment: ${{ inputs.environment }}"
 
           # Create deployment using GitHub CLI
@@ -154,15 +154,17 @@ runs:
       run: |
         echo "::group::Marking previous deployments as inactive"
 
-        # Get all active deployments for this environment (excluding current)
+        # Get deployments for this environment with the same SHA (excluding current deployment)
+        # This ensures we only mark deployments from the same commit as inactive,
+        # not unrelated deployments from different commits
         PREV_DEPLOYMENTS=$(gh api \
           -H "Accept: application/vnd.github+json" \
           -H "X-GitHub-Api-Version: 2022-11-28" \
-          "/repos/${{ github.repository }}/deployments?environment=${{ inputs.environment }}" \
+          "/repos/${{ github.repository }}/deployments?environment=${{ inputs.environment }}&sha=${{ github.sha }}" \
           --jq '.[] | select(.id != ${{ steps.create-deployment.outputs.deployment_id }}) | .id')
 
         if [ -n "$PREV_DEPLOYMENTS" ]; then
-          echo "Found previous deployments to mark as inactive"
+          echo "Found previous deployments for this commit to mark as inactive"
           for DEPLOY_ID in $PREV_DEPLOYMENTS; do
             echo "Marking deployment $DEPLOY_ID as inactive..."
             gh api \
@@ -176,7 +178,7 @@ runs:
           done
           echo "✓ Previous deployments marked as inactive"
         else
-          echo "No previous deployments to mark as inactive"
+          echo "No previous deployments for this commit to mark as inactive"
         fi
 
         echo "::endgroup::"

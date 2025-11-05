@@ -461,7 +461,7 @@ jobs:
             cp -r ${{ inputs.storybook_output_dir }}/* .open-next/assets/storybook/
             echo "✓ Storybook files copied to .open-next/assets/storybook"
             echo "  Files copied:"
-            ls -lh .open-next/assets/storybook/ | head -10
+            find .open-next/assets/storybook/ -maxdepth 1 -type f -printf '%f\n' | head -10 || true
           else
             echo "::error::Storybook output directory not found at ${{ inputs.storybook_output_dir }}"
             exit 1
