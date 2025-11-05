@@ -189,7 +189,6 @@ permissions:
   contents: read
   pull-requests: write
   deployments: write
-  checks: write
 
 jobs:
   build:
