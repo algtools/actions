@@ -1,3 +1,10 @@
+## [1.9.5](https://github.com/algtools/actions/compare/v1.9.4...v1.9.5) (2025-11-05)
+
+
+### Bug Fixes
+
+* enhance Chromatic GitHub Check integration by adding repository checkout and upload flag ([9611bbf](https://github.com/algtools/actions/commit/9611bbf9c9e6c88be4fba810047ade5dbb87c60c))
+
 ## [1.9.4](https://github.com/algtools/actions/compare/v1.9.3...v1.9.4) (2025-11-05)
 
 
