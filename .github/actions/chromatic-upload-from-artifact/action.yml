@@ -41,6 +41,12 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        # Chromatic needs full git history to create proper check statuses and compare builds
+        fetch-depth: 0
+
     - name: Validate inputs
       shell: bash
       run: |
@@ -190,7 +196,8 @@ runs:
         echo ""
 
         # Build chromatic command
-        CHROMATIC_CMD="npx chromatic --project-token=\$CHROMATIC_PROJECT_TOKEN --storybook-build-dir=\"$STORYBOOK_DIR\""
+        # Note: --exit-once-uploaded ensures GitHub Check status is created immediately
+        CHROMATIC_CMD="npx chromatic --project-token=\$CHROMATIC_PROJECT_TOKEN --storybook-build-dir=\"$STORYBOOK_DIR\" --exit-once-uploaded"
 
         if [ "$EXIT_ZERO" = "true" ]; then
           CHROMATIC_CMD="$CHROMATIC_CMD --exit-zero-on-changes"
@@ -201,7 +208,7 @@ runs:
         fi
 
         echo "Executing Chromatic upload..."
-        echo "Command: npx chromatic --project-token=[REDACTED] --storybook-build-dir=\"$STORYBOOK_DIR\""
+        echo "Command: npx chromatic --project-token=[REDACTED] --storybook-build-dir=\"$STORYBOOK_DIR\" --exit-once-uploaded"
         if [ "$EXIT_ZERO" = "true" ]; then
           echo "  --exit-zero-on-changes"
         fi

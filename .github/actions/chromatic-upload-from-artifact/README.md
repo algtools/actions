@@ -11,6 +11,7 @@ A composite GitHub Action that uploads a pre-built Storybook to Chromatic from a
 - 🔗 **Build URL Output**: Extracts and provides the Chromatic build URL for downstream steps
 - ⚡ **No Rebuild Required**: Uses existing Storybook build, saving time and resources
 - 🛡️ **Exit Zero Option**: Optionally continue workflow even if visual changes are detected
+- ✓ **GitHub Check Status**: Automatically creates GitHub Check status visible in PR (requires full git history)
 
 ## Usage
 
@@ -617,6 +618,29 @@ permissions:
 **Issue:** Build succeeds but URL shows default value
 
 **Solution:** The URL extraction uses pattern matching on Chromatic CLI output. Check the action logs for the actual Chromatic output. The build should still be visible in your Chromatic dashboard.
+
+### GitHub Check Status Not Appearing
+
+**Issue:** Chromatic uploads successfully but doesn't show as a check in the PR
+
+**Cause:** Chromatic requires full git history to create GitHub Check statuses. This action now automatically checks out the repository with full git history.
+
+**Note:** This issue has been fixed in the latest version. The action now includes:
+
+- Repository checkout with `fetch-depth: 0` (full git history)
+- `--exit-once-uploaded` flag to ensure check status is created immediately
+
+If you're still not seeing checks after updating to the latest version, verify:
+
+1. The workflow has proper permissions:
+   ```yaml
+   permissions:
+     contents: read
+     pull-requests: write
+     checks: write # Required for check status
+   ```
+2. The Chromatic project is properly linked to your GitHub repository
+3. Check the Chromatic dashboard to ensure the build was processed
 
 ### Zip Extraction Fails
 
