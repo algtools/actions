@@ -1,3 +1,10 @@
+## [1.10.1](https://github.com/algtools/actions/compare/v1.10.0...v1.10.1) (2025-11-05)
+
+
+### Bug Fixes
+
+* remove unnecessary checks permission from preview deploy workflow ([af57a4f](https://github.com/algtools/actions/commit/af57a4fb75da903fcd00e06527704bb14bc6a12e))
+
 # [1.10.0](https://github.com/algtools/actions/compare/v1.9.7...v1.10.0) (2025-11-05)
 
 
