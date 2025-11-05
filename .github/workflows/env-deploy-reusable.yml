@@ -208,15 +208,6 @@ jobs:
           echo "  Sentry Release: ${{ inputs.sentry_release }}"
           echo "::endgroup::"
 
-      - name: Create GitHub Deployment (pending)
-        id: create-deployment-pending
-        uses: algtools/actions/.github/actions/update-deployment-status@main
-        with:
-          environment: ${{ inputs.environment }}
-          state: "pending"
-          description: "Deployment pending - preparing environment"
-          github_token: ${{ github.token }}
-
       - name: Extract wildcard domain
         id: wildcard-domain
         run: |
@@ -271,14 +262,6 @@ jobs:
           cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
           max_wait_seconds: ${{ inputs.max_wait_seconds }}
           poll_interval_seconds: ${{ inputs.poll_interval_seconds }}
-
-      - name: Update GitHub Deployment (in progress)
-        uses: algtools/actions/.github/actions/update-deployment-status@main
-        with:
-          environment: ${{ inputs.environment }}
-          state: "in_progress"
-          description: "Deploying to ${{ inputs.environment }}"
-          github_token: ${{ github.token }}
 
       - name: Deploy Cloudflare Worker from artifact
         id: deploy-worker
@@ -403,15 +386,6 @@ jobs:
             ${{ inputs.sentry_release == true && format('\n### Sentry Release\n- **Organization**: `{0}`\n- **Project**: `{1}`\n- **Version**: `{2}`', inputs.sentry_org, inputs.sentry_project, github.sha) || '' }}
             </details>
 
-      - name: Update GitHub Deployment (success)
-        uses: algtools/actions/.github/actions/update-deployment-status@main
-        with:
-          environment: ${{ inputs.environment }}
-          state: "success"
-          deployment_url: "https://${{ inputs.custom_domain }}"
-          description: "Deployment successful"
-          github_token: ${{ github.token }}
-
       - name: Deployment summary
         run: |
           {
@@ -455,15 +429,6 @@ jobs:
             echo ""
             echo "**Deployment completed successfully at $(date -u '+%Y-%m-%d %H:%M:%S UTC')**"
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Update GitHub Deployment (failure)
-        if: failure()
-        uses: algtools/actions/.github/actions/update-deployment-status@main
-        with:
-          environment: ${{ inputs.environment }}
-          state: "failure"
-          description: "Deployment failed"
-          github_token: ${{ github.token }}
 
   release:
     name: Create GitHub Release
