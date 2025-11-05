@@ -1,3 +1,10 @@
+## [1.9.7](https://github.com/algtools/actions/compare/v1.9.6...v1.9.7) (2025-11-05)
+
+
+### Bug Fixes
+
+* update deployment status action to prevent auto-inactivation of previous deployments ([b1d48a5](https://github.com/algtools/actions/commit/b1d48a53f35e36a92fa8e240238b8fccb4d29435))
+
 ## [1.9.6](https://github.com/algtools/actions/compare/v1.9.5...v1.9.6) (2025-11-05)
 
 
