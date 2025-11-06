@@ -32,6 +32,10 @@ on:
         description: "URL to download tarball"
         value: ${{ jobs.release.outputs.tarball_url }}
 
+permissions:
+  contents: write
+  packages: read
+
 jobs:
   release:
     runs-on: ubuntu-latest
