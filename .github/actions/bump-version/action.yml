@@ -26,6 +26,8 @@ runs:
       uses: actions/setup-node@v4
       with:
         node-version: "20"
+        registry-url: https://npm.pkg.github.com
+        scope: "@algtools"
 
     - name: Install pnpm
       uses: pnpm/action-setup@v4
@@ -35,6 +37,8 @@ runs:
     - name: Install project dependencies
       shell: bash
       working-directory: ${{ inputs.working_directory }}
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.github_token }}
       run: pnpm install --frozen-lockfile
 
     - name: Install semantic-release
