@@ -1,3 +1,10 @@
+## [1.10.2](https://github.com/algtools/actions/compare/v1.10.1...v1.10.2) (2025-11-06)
+
+
+### Bug Fixes
+
+* update bump-version action to include npm registry configuration and authentication token ([ab9c1bc](https://github.com/algtools/actions/commit/ab9c1bc6bcdb02529892a8cef186aa4f6fef0296))
+
 ## [1.10.1](https://github.com/algtools/actions/compare/v1.10.0...v1.10.1) (2025-11-05)
 
 
