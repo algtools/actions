@@ -65,7 +65,7 @@ jobs:
           echo "✓ Required secrets defined"
 
           # Check for required outputs
-          REQUIRED_OUTPUTS=("worker_url" "deployment_status" "certificate_id")
+          REQUIRED_OUTPUTS=("worker_url" "deployment_status" "worker_version")
           for output in "${REQUIRED_OUTPUTS[@]}"; do
             if ! grep -q "$output:" .github/workflows/env-deploy-reusable.yml; then
               echo "❌ Missing required output: $output"
@@ -77,13 +77,6 @@ jobs:
       - name: Check action references
         run: |
           echo "Verifying action references..."
-
-          # Check for ensure-wildcard-certificate action
-          if ! grep -q "algtools/actions/.github/actions/ensure-wildcard-certificate" .github/workflows/env-deploy-reusable.yml; then
-            echo "❌ Missing ensure-wildcard-certificate action reference"
-            exit 1
-          fi
-          echo "✓ ensure-wildcard-certificate action referenced"
 
           # Check for deploy-cloudflare-from-artifact action
           if ! grep -q "algtools/actions/.github/actions/deploy-cloudflare-from-artifact" .github/workflows/env-deploy-reusable.yml; then
@@ -165,12 +158,12 @@ jobs:
           echo "  ✓ Required inputs (environment, slug, app_name, etc.)"
           echo "  ✓ Required secrets (Cloudflare credentials)"
           echo "  ✓ Required outputs (worker_url, deployment_status, etc.)"
-          echo "  ✓ ensure-wildcard-certificate action"
           echo "  ✓ deploy-cloudflare-from-artifact action"
           echo "  ✓ comment-pr action"
           echo "  ✓ Sentry integration (optional)"
           echo "  ✓ PR comment integration"
           echo ""
+          echo "Note: SSL certificates must be pre-generated using generate-ssl-certificate workflow"
           echo "The workflow is properly structured and ready for use."
 
   test-documentation:
