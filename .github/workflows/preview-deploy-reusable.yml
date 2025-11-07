@@ -773,7 +773,7 @@ jobs:
             - **Environment**: `preview-${{ needs.deploy.outputs.pr_number }}`
             - **Commit**: `${{ github.event.pull_request.head.sha }}`
             - **Deployed**: <t:${{ github.event.pull_request.updated_at }}:R>
-            ${{ inputs.enable_ephemeral_db && needs.manage-database.outputs.database_created == 'true' && format('- **Database**: Ephemeral DB `{0}` (testing {1} new migration{2})', needs.manage-database.outputs.database_name, needs.manage-database.outputs.new_migration_count, needs.manage-database.outputs.new_migration_count > 1 && 's' || '') || inputs.enable_ephemeral_db && format('- **Database**: Dev database (no new migrations)') || '' }}
+            ${{ inputs.enable_ephemeral_db && needs.manage-database.outputs.database_created == 'true' && format('- **Database**: Ephemeral DB `{0}` (testing {1} new migration{2})', needs.manage-database.outputs.database_name, needs.manage-database.outputs.new_migration_count, needs.manage-database.outputs.new_migration_count > 1 && 's' || '') || inputs.enable_ephemeral_db && '- **Database**: Dev database (no new migrations)' || '' }}
 
             <details>
             <summary>▶ Deployment Info</summary>
