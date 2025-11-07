@@ -1,3 +1,10 @@
+## [1.12.1](https://github.com/algtools/actions/compare/v1.12.0...v1.12.1) (2025-11-07)
+
+
+### Bug Fixes
+
+* update SSL certificate handling to use custom domain input ([376453e](https://github.com/algtools/actions/commit/376453e4eb2b265730d293ad507f7ea6a762fc37))
+
 # [1.12.0](https://github.com/algtools/actions/compare/v1.11.2...v1.12.0) (2025-11-07)
 
 
