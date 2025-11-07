@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/algtools/actions/compare/v1.10.2...v1.11.0) (2025-11-07)
+
+
+### Features
+
+* add Manage Ephemeral D1 Database, removed wildcard cert check ([fabc13c](https://github.com/algtools/actions/commit/fabc13c38e72a52029fc3eec6f3360f5027dbd3f))
+
 ## [1.10.2](https://github.com/algtools/actions/compare/v1.10.1...v1.10.2) (2025-11-06)
 
 
