@@ -348,17 +348,6 @@ jobs:
           echo "name=${WORKER_NAME}" >> "$GITHUB_OUTPUT"
           echo "::endgroup::"
 
-      - name: Ensure wildcard SSL certificate
-        id: ensure-cert
-        uses: algtools/actions/.github/actions/ensure-wildcard-certificate@main
-        with:
-          domain: ${{ inputs.custom_domain }}
-          current_zone: ${{ inputs.zone }}
-          cloudflare_api_token: ${{ secrets.cloudflare_api_token }}
-          cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
-          max_wait_seconds: ${{ inputs.max_wait_seconds }}
-          poll_interval_seconds: ${{ inputs.poll_interval_seconds }}
-
       - name: Deploy to Cloudflare Workers
         id: deploy-worker
         uses: algtools/actions/.github/actions/deploy-cloudflare-from-artifact@main
