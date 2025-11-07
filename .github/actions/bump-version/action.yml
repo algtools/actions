@@ -52,4 +52,5 @@ runs:
       working-directory: ${{ inputs.working_directory }}
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}
+        HUSKY: 0
       run: npx semantic-release ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
