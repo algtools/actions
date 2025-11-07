@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/algtools/actions/compare/v1.12.1...v1.13.0) (2025-11-07)
+
+
+### Features
+
+* add provision and test template actions for automated repository setup and validation ([55c2dbb](https://github.com/algtools/actions/commit/55c2dbbdd0eeb0f4b3cc2e599aaef6a4eb385a87))
+
 ## [1.12.1](https://github.com/algtools/actions/compare/v1.12.0...v1.12.1) (2025-11-07)
 
 
