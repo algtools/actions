@@ -1,0 +1,250 @@
+name: "Provision Template"
+description: "Provisions a new repository from a template release"
+
+inputs:
+  source_repo:
+    description: "Source template repository (e.g., 'owner/repo')"
+    required: true
+  app_name:
+    description: "Name of the repository to create (e.g., 'acme-bff')"
+    required: true
+  slug:
+    description: "URL-friendly slug for environment configuration (e.g., 'janovi')"
+    required: true
+  sentry_project:
+    description: "Sentry project name (defaults to app_name if not provided)"
+    required: false
+    default: ""
+  version:
+    description: "Template release tag (use 'latest' for newest release)"
+    required: false
+    default: "latest"
+  admin_token:
+    description: "GitHub token with repo and admin:org scopes"
+    required: true
+  github_token:
+    description: "Standard GitHub token for API calls"
+    required: true
+
+outputs:
+  repository_url:
+    description: "URL of the created repository"
+    value: ${{ steps.create-repo.outputs.repository_url }}
+  release_tag:
+    description: "Template version used for provisioning"
+    value: ${{ steps.release-info.outputs.release_tag }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Mask sensitive tokens
+      shell: bash
+      run: |
+        echo "::add-mask::${{ inputs.admin_token }}"
+
+    - name: Resolve release information
+      id: release-info
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        VERSION_INPUT: ${{ inputs.version }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+      run: |
+        set -euo pipefail
+
+        VERSION="${VERSION_INPUT:-latest}"
+
+        # Get repository owner and name
+        IFS='/' read -r OWNER REPO <<< "${SOURCE_REPO}"
+
+        if [ "${VERSION}" = "latest" ]; then
+          echo "Fetching latest release..."
+          RELEASE_DATA=$(gh api "/repos/${SOURCE_REPO}/releases/latest")
+        else
+          echo "Fetching release with tag: ${VERSION}"
+          RELEASE_DATA=$(gh api "/repos/${SOURCE_REPO}/releases/tags/${VERSION}")
+        fi
+
+        RELEASE_TAG=$(echo "${RELEASE_DATA}" | jq -r '.tag_name')
+        echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+
+        # Look for custom template asset first (e.g., bff-template-v1.2.1.tar.gz)
+        ASSET_NAME=$(echo "${RELEASE_DATA}" | jq -r '.assets[] | select(.name | endswith(".tar.gz") or endswith(".tgz")) | .name' | head -n 1)
+
+        if [ -n "${ASSET_NAME}" ]; then
+          echo "Found custom template asset: ${ASSET_NAME}"
+          echo "asset_name=${ASSET_NAME}" >> $GITHUB_OUTPUT
+          echo "use_source_tarball=false" >> $GITHUB_OUTPUT
+        else
+          echo "No custom template asset found, using source tarball"
+          # GitHub source tarballs don't include 'v' prefix in filename
+          VERSION_NO_V="${RELEASE_TAG#v}"
+          ASSET_NAME="${REPO}-${VERSION_NO_V}.tar.gz"
+          echo "asset_name=${ASSET_NAME}" >> $GITHUB_OUTPUT
+          echo "use_source_tarball=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Download template archive
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
+        ASSET_NAME: ${{ steps.release-info.outputs.asset_name }}
+        USE_SOURCE_TARBALL: ${{ steps.release-info.outputs.use_source_tarball }}
+      run: |
+        set -euo pipefail
+        mkdir -p dist
+
+        if [ "${USE_SOURCE_TARBALL}" = "true" ]; then
+          echo "Downloading source tarball from ${SOURCE_REPO} (tag: ${RELEASE_TAG})"
+          curl -L \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${SOURCE_REPO}/tarball/${RELEASE_TAG}" \
+            -o "dist/${ASSET_NAME}"
+
+          # Verify the downloaded file is a valid tarball
+          if ! gzip -t "dist/${ASSET_NAME}" 2>/dev/null; then
+            echo "Error: Downloaded file is not a valid gzip archive"
+            echo "File contents (first 200 bytes):"
+            head -c 200 "dist/${ASSET_NAME}"
+            exit 1
+          fi
+        else
+          echo "Downloading custom asset: ${ASSET_NAME}"
+          gh release download "${RELEASE_TAG}" \
+            --repo "${SOURCE_REPO}" \
+            --pattern "${ASSET_NAME}" \
+            --dir dist \
+            --clobber
+        fi
+
+    - name: Extract template archive
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p extracted
+
+        TARBALL=$(find dist -maxdepth 1 -type f -name '*.tar.gz' -o -name '*.tgz' | head -n 1)
+        if [ -z "${TARBALL}" ]; then
+          echo 'Unable to locate downloaded tarball.' >&2
+          exit 1
+        fi
+
+        tar -xzf "${TARBALL}" -C extracted
+
+        # Find the template directory
+        if [ -d extracted/package ]; then
+          mv extracted/package template
+        else
+          FIRST_DIR=$(find extracted -mindepth 1 -maxdepth 1 -type d | head -n 1)
+          if [ -z "${FIRST_DIR}" ]; then
+            echo 'Extracted archive did not contain a directory.' >&2
+            exit 1
+          fi
+          mv "${FIRST_DIR}" template
+        fi
+
+    - name: Initialize repository contents
+      shell: bash
+      working-directory: template
+      env:
+        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
+      run: |
+        set -euo pipefail
+        git init
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git checkout -b main
+        git add .
+        git commit -m "chore: bootstrap from template ${RELEASE_TAG}"
+
+    - name: Create remote repository
+      id: create-repo
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.admin_token }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        APP_NAME: ${{ inputs.app_name }}
+      run: |
+        set -euo pipefail
+
+        # Extract owner from source repo
+        IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+
+        gh repo create "${OWNER}/${APP_NAME}" --private -y
+
+        echo "repository_url=https://github.com/${OWNER}/${APP_NAME}" >> $GITHUB_OUTPUT
+
+    - name: Push bootstrap commit
+      shell: bash
+      working-directory: template
+      env:
+        ADMIN_TOKEN: ${{ inputs.admin_token }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        APP_NAME: ${{ inputs.app_name }}
+      run: |
+        set -euo pipefail
+
+        # Extract owner from source repo
+        IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+
+        git remote add origin "https://x-access-token:${ADMIN_TOKEN}@github.com/${OWNER}/${APP_NAME}.git"
+        git push -u origin main
+
+    - name: Configure repository variables
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.admin_token }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        APP_NAME: ${{ inputs.app_name }}
+        SLUG: ${{ inputs.slug }}
+        SENTRY_PROJECT: ${{ inputs.sentry_project }}
+      run: |
+        set -euo pipefail
+
+        # Extract owner from source repo
+        IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+
+        gh variable set APP_NAME --repo "${OWNER}/${APP_NAME}" --body "${APP_NAME}"
+        gh variable set SLUG --repo "${OWNER}/${APP_NAME}" --body "${SLUG}"
+
+        # Set SENTRY_PROJECT (default to APP_NAME if not provided)
+        SENTRY_PROJECT_VALUE="${SENTRY_PROJECT:-${APP_NAME}}"
+        gh variable set SENTRY_PROJECT --repo "${OWNER}/${APP_NAME}" --body "${SENTRY_PROJECT_VALUE}"
+
+        if [ -n "${SENTRY_PROJECT:-}" ]; then
+          echo "Set SENTRY_PROJECT variable: ${SENTRY_PROJECT_VALUE}"
+        else
+          echo "SENTRY_PROJECT not provided, defaulting to APP_NAME: ${SENTRY_PROJECT_VALUE}"
+        fi
+
+    - name: Generate summary
+      shell: bash
+      env:
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        APP_NAME: ${{ inputs.app_name }}
+        SLUG: ${{ inputs.slug }}
+        SENTRY_PROJECT: ${{ inputs.sentry_project }}
+        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
+        REPOSITORY_URL: ${{ steps.create-repo.outputs.repository_url }}
+      run: |
+        # Extract owner from source repo
+        IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+
+        SENTRY_PROJECT_VALUE="${SENTRY_PROJECT:-${APP_NAME}}"
+
+        {
+          echo '## Provisioning Summary'
+          echo
+          echo "- **Repository**: [${OWNER}/${APP_NAME}](${REPOSITORY_URL})"
+          echo "- **Release tag used**: ${RELEASE_TAG}"
+          echo "- **Repository variables**: APP_NAME, SLUG, SENTRY_PROJECT"
+          echo "- **Sentry project**: ${SENTRY_PROJECT_VALUE}"
+          if [ -z "${SENTRY_PROJECT:-}" ]; then
+            echo "  - ℹ️ Defaulted to repository name"
+          fi
+          echo '- **Organization secrets used**: SENTRY_TOKEN'
+        } >> "${GITHUB_STEP_SUMMARY}"

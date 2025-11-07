@@ -113,6 +113,13 @@ on:
         type: string
         default: "src/**/*"
 
+      # Optional: Template testing
+      enable_template_tests:
+        description: "Enable template packaging and provision regression tests"
+        required: false
+        type: boolean
+        default: false
+
     outputs:
       # Test outputs
       test_status:
@@ -197,6 +204,12 @@ jobs:
           path: ${{ inputs.working_directory }}/coverage
           retention-days: 7
           if-no-files-found: warn
+
+      - name: Run template tests
+        if: inputs.enable_template_tests == true
+        uses: algtools/actions/.github/actions/test-template@main
+        with:
+          working_directory: ${{ inputs.working_directory }}
 
   # Job 2: Lint and format check
   lint:
