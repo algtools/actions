@@ -140,7 +140,7 @@ If new migrations are detected:
 1. **Check for existing database**: `wrangler d1 list`
 2. **Delete if exists**: Ensures clean state for migration testing
 3. **Create fresh database**: `wrangler d1 create <repo>-<pr-number>`
-4. **Extract database ID**: Parse from wrangler output
+4. **Extract database ID**: Parse from wrangler JSON output (supports both old and new formats)
 
 **Database naming**: `{repository-name}-{pr-number}`
 
@@ -370,6 +370,19 @@ jobs:
 **Cause**: Database wasn't properly deleted before recreation
 
 **Solution**: The action handles this automatically by always deleting before creating. If you see this error, it may be a race condition. Try again.
+
+### Could Not Extract Database ID Error
+
+**Error**: `Could not extract database ID from wrangler output`
+
+**Cause**: Wrangler output format changed between versions (v3 vs v4+).
+
+**Solution**: The action now supports both formats automatically:
+
+- **New format** (Wrangler 4.x): JSON with `"database_id": "uuid"`
+- **Old format** (Wrangler 3.x): Plain text with `database_id = "uuid"`
+
+If you still see this error, check the wrangler output in the logs and ensure you're using a supported version.
 
 ### Database Not Found During Deployment
 

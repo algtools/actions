@@ -312,8 +312,13 @@ runs:
           echo "$CREATE_OUTPUT"
 
           # Extract database ID from output
-          # Wrangler output format: database_id = "uuid-here"
-          DB_ID=$(echo "$CREATE_OUTPUT" | grep -oP 'database_id\s*=\s*"\K[^"]+' || echo "")
+          # Try new JSON format first: "database_id": "uuid-here"
+          DB_ID=$(echo "$CREATE_OUTPUT" | grep -oP '"database_id":\s*"\K[^"]+' || echo "")
+
+          # Fallback to old format: database_id = "uuid-here"
+          if [ -z "$DB_ID" ]; then
+            DB_ID=$(echo "$CREATE_OUTPUT" | grep -oP 'database_id\s*=\s*"\K[^"]+' || echo "")
+          fi
 
           if [ -z "$DB_ID" ]; then
             echo "::error::Could not extract database ID from wrangler output"
