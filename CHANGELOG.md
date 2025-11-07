@@ -1,3 +1,10 @@
+## [1.11.2](https://github.com/algtools/actions/compare/v1.11.1...v1.11.2) (2025-11-07)
+
+
+### Bug Fixes
+
+* enhance database ID extraction to support both old and new wrangler output formats ([d07968f](https://github.com/algtools/actions/commit/d07968f85536ccb72c8b22745e6d8e6f41a1c448))
+
 ## [1.11.1](https://github.com/algtools/actions/compare/v1.11.0...v1.11.1) (2025-11-07)
 
 
