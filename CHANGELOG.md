@@ -1,3 +1,10 @@
+## [1.13.1](https://github.com/algtools/actions/compare/v1.13.0...v1.13.1) (2025-11-07)
+
+
+### Bug Fixes
+
+* added new transformTemplateToApp script ([c2a591b](https://github.com/algtools/actions/commit/c2a591b23079dbcd239d50ef5993b1f98ffd28c1))
+
 # [1.13.0](https://github.com/algtools/actions/compare/v1.12.1...v1.13.0) (2025-11-07)
 
 
