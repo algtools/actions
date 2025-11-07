@@ -1,0 +1,172 @@
+name: Generate SSL Certificate
+
+on:
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: "Domain for the certificate (e.g., example.com or template.algenium.dev)"
+        required: true
+        type: string
+      zone_id:
+        description: "Cloudflare zone ID for the domain"
+        required: true
+        type: string
+      certificate_type:
+        description: "Type of certificate to generate"
+        required: true
+        type: choice
+        options:
+          - wildcard
+          - single
+        default: wildcard
+      max_wait_seconds:
+        description: "Maximum time to wait for certificate activation (in seconds)"
+        required: false
+        type: number
+        default: 300
+      poll_interval_seconds:
+        description: "Interval between status checks (in seconds)"
+        required: false
+        type: number
+        default: 10
+
+permissions:
+  contents: read
+
+jobs:
+  generate-certificate:
+    name: Generate SSL Certificate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate inputs
+        run: |
+          echo "::group::Validating Inputs"
+
+          # Validate domain
+          if [ -z "${{ inputs.domain }}" ]; then
+            echo "::error::Domain is required"
+            exit 1
+          fi
+
+          # Validate zone ID
+          if [ -z "${{ inputs.zone_id }}" ]; then
+            echo "::error::Zone ID is required"
+            exit 1
+          fi
+
+          # Validate certificate type
+          if [ "${{ inputs.certificate_type }}" != "wildcard" ] && [ "${{ inputs.certificate_type }}" != "single" ]; then
+            echo "::error::Certificate type must be 'wildcard' or 'single'"
+            exit 1
+          fi
+
+          echo "✓ All inputs validated successfully"
+          echo ""
+          echo "Configuration:"
+          echo "  Domain: ${{ inputs.domain }}"
+          echo "  Certificate Type: ${{ inputs.certificate_type }}"
+          echo "  Zone ID: $(echo "${{ inputs.zone_id }}" | head -c 8)***"
+          echo "  Max Wait: ${{ inputs.max_wait_seconds }}s"
+          echo "  Poll Interval: ${{ inputs.poll_interval_seconds }}s"
+
+          echo "::endgroup::"
+
+      - name: Generate Wildcard Certificate
+        if: inputs.certificate_type == 'wildcard'
+        id: wildcard-cert
+        uses: ./.github/actions/ensure-wildcard-certificate
+        with:
+          domain: ${{ inputs.domain }}
+          current_zone: ${{ inputs.zone_id }}
+          cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          max_wait_seconds: ${{ inputs.max_wait_seconds }}
+          poll_interval_seconds: ${{ inputs.poll_interval_seconds }}
+
+      - name: Generate Single Certificate
+        if: inputs.certificate_type == 'single'
+        id: single-cert
+        uses: ./.github/actions/ensure-single-certificate
+        with:
+          domain: ${{ inputs.domain }}
+          current_zone: ${{ inputs.zone_id }}
+          cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          max_wait_seconds: ${{ inputs.max_wait_seconds }}
+          poll_interval_seconds: ${{ inputs.poll_interval_seconds }}
+
+      - name: Certificate Generation Summary
+        run: |
+          {
+            echo "## 🔒 SSL Certificate Generated Successfully"
+            echo ""
+            echo "### Certificate Details"
+
+            if [ "${{ inputs.certificate_type }}" = "wildcard" ]; then
+              echo "- **Type**: Wildcard Certificate"
+              echo "- **Domain**: ${{ inputs.domain }}"
+              echo "- **Pattern**: *.${{ inputs.domain }}"
+              echo "- **Certificate ID**: \`${{ steps.wildcard-cert.outputs.certificate_id }}\`"
+              echo "- **Status**: ${{ steps.wildcard-cert.outputs.certificate_status }}"
+              echo "- **Created New**: ${{ steps.wildcard-cert.outputs.certificate_created }}"
+              echo ""
+              echo "### Coverage"
+              echo "This wildcard certificate covers:"
+              echo "- Base domain: \`${{ inputs.domain }}\`"
+              echo "- All subdomains: \`*.${{ inputs.domain }}\`"
+              echo ""
+              echo "**Examples:**"
+              echo "- \`${{ inputs.domain }}\`"
+              echo "- \`api.${{ inputs.domain }}\`"
+              echo "- \`app.${{ inputs.domain }}\`"
+              echo "- \`www.${{ inputs.domain }}\`"
+            else
+              echo "- **Type**: Single Certificate"
+              echo "- **Domain**: ${{ inputs.domain }}"
+              echo "- **Certificate ID**: \`${{ steps.single-cert.outputs.certificate_id }}\`"
+              echo "- **Status**: ${{ steps.single-cert.outputs.certificate_status }}"
+              echo "- **Created New**: ${{ steps.single-cert.outputs.certificate_created }}"
+              echo ""
+              echo "### Coverage"
+              echo "This certificate covers only:"
+              echo "- \`${{ inputs.domain }}\`"
+            fi
+
+            echo ""
+            echo "### Configuration"
+            echo "- **Zone ID**: \`$(echo "${{ inputs.zone_id }}" | head -c 8)***\`"
+            echo "- **Certificate Authority**: Let's Encrypt"
+            echo "- **Validity**: 90 days"
+            echo "- **Validation Method**: TXT"
+            echo ""
+            echo "### Next Steps"
+            echo "✅ Certificate is active and ready to use"
+            echo "✅ Cloudflare will automatically renew before expiration"
+            echo "✅ You can now deploy applications using this certificate"
+            echo ""
+            echo "---"
+            echo ""
+            echo "**Note**: Certificates are automatically managed by Cloudflare and will renew before expiration."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Log Certificate Information
+        run: |
+          echo "::notice title=Certificate Generated::SSL certificate for ${{ inputs.domain }} (${{ inputs.certificate_type }}) is now active"
+
+          if [ "${{ inputs.certificate_type }}" = "wildcard" ]; then
+            echo "Certificate Type: Wildcard"
+            echo "Certificate ID: ${{ steps.wildcard-cert.outputs.certificate_id }}"
+            echo "Status: ${{ steps.wildcard-cert.outputs.certificate_status }}"
+            echo "Created New: ${{ steps.wildcard-cert.outputs.certificate_created }}"
+            echo "Covers: ${{ inputs.domain }} and *.${{ inputs.domain }}"
+          else
+            echo "Certificate Type: Single"
+            echo "Certificate ID: ${{ steps.single-cert.outputs.certificate_id }}"
+            echo "Status: ${{ steps.single-cert.outputs.certificate_status }}"
+            echo "Created New: ${{ steps.single-cert.outputs.certificate_created }}"
+            echo "Covers: ${{ inputs.domain }} only"
+          fi

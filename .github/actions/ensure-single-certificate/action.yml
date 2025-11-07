@@ -1,0 +1,253 @@
+name: "Ensure Single Certificate"
+description: "Ensures a single-domain SSL certificate exists in Cloudflare ACM, creates one if missing, and waits until active"
+author: "Algenium Systems"
+
+inputs:
+  domain:
+    description: "Domain for the single certificate (e.g., example.com)"
+    required: true
+  current_zone:
+    description: "Cloudflare zone ID for the domain"
+    required: true
+  cloudflare_api_token:
+    description: "Cloudflare API token with SSL/TLS certificates permissions"
+    required: true
+  cloudflare_account_id:
+    description: "Cloudflare account ID"
+    required: true
+  max_wait_seconds:
+    description: "Maximum time to wait for certificate activation (in seconds)"
+    required: false
+    default: "300"
+  poll_interval_seconds:
+    description: "Interval between status checks (in seconds)"
+    required: false
+    default: "10"
+
+outputs:
+  certificate_id:
+    description: "ID of the single certificate (existing or newly created)"
+    value: ${{ steps.ensure-cert.outputs.certificate_id }}
+  certificate_status:
+    description: "Final status of the certificate"
+    value: ${{ steps.ensure-cert.outputs.certificate_status }}
+  certificate_created:
+    description: "Whether a new certificate was created (true/false)"
+    value: ${{ steps.ensure-cert.outputs.certificate_created }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        echo "::group::Validating inputs"
+
+        # Validate required inputs
+        if [ -z "${{ inputs.domain }}" ]; then
+          echo "::error::domain input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.current_zone }}" ]; then
+          echo "::error::current_zone input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.cloudflare_api_token }}" ]; then
+          echo "::error::cloudflare_api_token input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.cloudflare_account_id }}" ]; then
+          echo "::error::cloudflare_account_id input is required"
+          exit 1
+        fi
+
+        echo "✓ All required inputs validated successfully"
+        echo ""
+        echo "Configuration:"
+        echo "  Domain: ${{ inputs.domain }}"
+        echo "  Zone ID: $(echo "${{ inputs.current_zone }}" | head -c 8)***"
+        echo "  Certificate Type: Single Domain"
+        echo "  Max Wait: ${{ inputs.max_wait_seconds }}s"
+        echo "  Poll Interval: ${{ inputs.poll_interval_seconds }}s"
+        echo "  Account ID: $(echo "${{ inputs.cloudflare_account_id }}" | head -c 8)***"
+        echo "  API Token: [REDACTED]"
+        echo "::endgroup::"
+
+    - name: Ensure single certificate exists
+      id: ensure-cert
+      shell: bash
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare_api_token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare_account_id }}
+        ZONE_ID: ${{ inputs.current_zone }}
+        DOMAIN: ${{ inputs.domain }}
+        MAX_WAIT: ${{ inputs.max_wait_seconds }}
+        POLL_INTERVAL: ${{ inputs.poll_interval_seconds }}
+      run: |
+        echo "::group::Checking for existing single certificate"
+
+        # Mask sensitive values in logs
+        echo "::add-mask::${{ inputs.cloudflare_api_token }}"
+        echo "::add-mask::${{ inputs.cloudflare_account_id }}"
+        echo "::add-mask::${{ inputs.current_zone }}"
+
+        echo "Looking for certificate: ${DOMAIN}"
+        echo ""
+
+        # Query Cloudflare API for existing certificates
+        RESPONSE=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/ssl/certificate_packs" \
+          -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+          -H "Content-Type: application/json")
+
+        # Check for API errors
+        SUCCESS=$(echo "$RESPONSE" | jq -r '.success // false')
+        if [ "$SUCCESS" != "true" ]; then
+          ERROR_MSG=$(echo "$RESPONSE" | jq -r '.errors[0].message // "Unknown error"')
+          echo "::error::Failed to query Cloudflare API: ${ERROR_MSG}"
+          exit 1
+        fi
+
+        # Search for existing certificate (single domain only, no wildcard)
+        CERT_ID=$(echo "$RESPONSE" | jq -r --arg domain "${DOMAIN}" \
+          '.result[] | select(.hosts[]? == $domain and (.hosts | length == 1)) | .id' | head -1)
+
+        CERT_CREATED="false"
+
+        if [ -n "$CERT_ID" ] && [ "$CERT_ID" != "null" ]; then
+          echo "✓ Found existing single certificate"
+          echo "  Certificate ID: ${CERT_ID}"
+
+          # Get certificate status
+          CERT_STATUS=$(echo "$RESPONSE" | jq -r --arg id "${CERT_ID}" \
+            '.result[] | select(.id == $id) | .status' | head -1)
+          echo "  Current Status: ${CERT_STATUS}"
+        else
+          echo "⚠️  No existing single certificate found"
+          echo ""
+          echo "Creating new single certificate..."
+
+          # Create new certificate (single domain only)
+          CREATE_RESPONSE=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/ssl/certificate_packs/order" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"type\": \"advanced\",
+              \"hosts\": [
+                \"${DOMAIN}\"
+              ],
+              \"validation_method\": \"txt\",
+              \"validity_days\": 90,
+              \"certificate_authority\": \"lets_encrypt\"
+            }")
+
+          # Check creation success
+          CREATE_SUCCESS=$(echo "$CREATE_RESPONSE" | jq -r '.success // false')
+          if [ "$CREATE_SUCCESS" != "true" ]; then
+            ERROR_MSG=$(echo "$CREATE_RESPONSE" | jq -r '.errors[0].message // "Unknown error"')
+            echo "::error::Failed to create certificate: ${ERROR_MSG}"
+            echo ""
+            echo "Response details:"
+            echo "$CREATE_RESPONSE" | jq '.'
+            exit 1
+          fi
+
+          CERT_ID=$(echo "$CREATE_RESPONSE" | jq -r '.result.id')
+          CERT_STATUS=$(echo "$CREATE_RESPONSE" | jq -r '.result.status')
+          CERT_CREATED="true"
+
+          echo "✓ Certificate created successfully"
+          echo "  Certificate ID: ${CERT_ID}"
+          echo "  Initial Status: ${CERT_STATUS}"
+        fi
+
+        echo "::endgroup::"
+
+        # Wait for certificate to become active
+        if [ "$CERT_STATUS" != "active" ]; then
+          echo "::group::Waiting for certificate activation"
+          echo "Certificate is not yet active. Waiting..."
+          echo "  Current Status: ${CERT_STATUS}"
+          echo "  Max Wait Time: ${MAX_WAIT}s"
+          echo "  Poll Interval: ${POLL_INTERVAL}s"
+          echo ""
+
+          ELAPSED=0
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            sleep $POLL_INTERVAL
+            ELAPSED=$((ELAPSED + POLL_INTERVAL))
+
+            # Query certificate status
+            STATUS_RESPONSE=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/ssl/certificate_packs/${CERT_ID}" \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json")
+
+            STATUS_SUCCESS=$(echo "$STATUS_RESPONSE" | jq -r '.success // false')
+            if [ "$STATUS_SUCCESS" != "true" ]; then
+              echo "⚠️  Failed to query certificate status (attempt at ${ELAPSED}s)"
+              continue
+            fi
+
+            CERT_STATUS=$(echo "$STATUS_RESPONSE" | jq -r '.result.status')
+            echo "[$ELAPSED/$MAX_WAIT s] Status: ${CERT_STATUS}"
+
+            if [ "$CERT_STATUS" = "active" ]; then
+              echo ""
+              echo "✓ Certificate is now ACTIVE"
+              break
+            fi
+
+            if [ "$CERT_STATUS" = "failed" ] || [ "$CERT_STATUS" = "expired" ]; then
+              echo ""
+              echo "::error::Certificate entered failed state: ${CERT_STATUS}"
+              exit 1
+            fi
+          done
+
+          if [ "$CERT_STATUS" != "active" ]; then
+            echo ""
+            echo "::error::Certificate did not become active within ${MAX_WAIT} seconds"
+            echo "Final status: ${CERT_STATUS}"
+            exit 1
+          fi
+
+          echo "::endgroup::"
+        else
+          echo ""
+          echo "✓ Certificate is already ACTIVE"
+        fi
+
+        # Set outputs
+        echo "certificate_id=${CERT_ID}" >> $GITHUB_OUTPUT
+        echo "certificate_status=${CERT_STATUS}" >> $GITHUB_OUTPUT
+        echo "certificate_created=${CERT_CREATED}" >> $GITHUB_OUTPUT
+
+    - name: Certificate summary
+      shell: bash
+      run: |
+        echo "::group::Certificate Summary"
+        echo "========================================"
+        echo "🔒 Single SSL Certificate"
+        echo "========================================"
+        echo ""
+        echo "Certificate Details:"
+        echo "  Domain: ${{ inputs.domain }}"
+        echo "  Certificate ID: ${{ steps.ensure-cert.outputs.certificate_id }}"
+        echo "  Status: ${{ steps.ensure-cert.outputs.certificate_status }}"
+        echo "  Created New: ${{ steps.ensure-cert.outputs.certificate_created }}"
+        echo ""
+        echo "Zone Details:"
+        echo "  Zone ID: $(echo "${{ inputs.current_zone }}" | head -c 8)***"
+        echo ""
+        echo "Security:"
+        echo "  ✓ API credentials redacted from logs"
+        echo "  ✓ Certificate verification completed"
+        echo "  ✓ Idempotent operation"
+        echo ""
+
+        if [ "${{ steps.ensure-cert.outputs.certificate_created }}" = "true" ]; then
+          echo "✓ New single certificate created and activated"
+        else
+          echo "✓ Existing single certificate verified"
+        fi
+
+        echo "::endgroup::"

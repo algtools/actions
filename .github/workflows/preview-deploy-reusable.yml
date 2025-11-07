@@ -53,7 +53,7 @@ on:
         required: true
         type: string
       custom_domain:
-        description: "Domain for wildcard certificate e.g., dev.example.com for *.dev.example.com"
+        description: "Custom domain for preview deployment. SSL certificate must be pre-generated using generate-ssl-certificate workflow."
         required: true
         type: string
       wrangler_version:
@@ -151,20 +151,10 @@ on:
         required: false
         type: number
         default: 30
-      max_wait_seconds:
-        description: "Maximum time to wait for certificate activation in seconds (default: 300)"
-        required: false
-        type: number
-        default: 300
-      poll_interval_seconds:
-        description: "Interval between certificate status checks in seconds (default: 10)"
-        required: false
-        type: number
-        default: 10
 
     secrets:
       cloudflare_api_token:
-        description: "Cloudflare API token with Workers deployment and SSL certificate permissions"
+        description: "Cloudflare API token with Workers deployment permissions"
         required: true
       cloudflare_account_id:
         description: "Cloudflare account ID"

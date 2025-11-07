@@ -28,7 +28,7 @@ on:
         required: true
         type: string
       custom_domain:
-        description: "Domain for wildcard certificate (e.g., example.com for *.example.com)"
+        description: "Custom domain for the deployment (e.g., api.example.com). SSL certificate must be pre-generated using the generate-ssl-certificate workflow."
         required: true
         type: string
       wrangler_version:
@@ -41,16 +41,6 @@ on:
         required: false
         type: string
         default: "./worker-artifact"
-      max_wait_seconds:
-        description: "Maximum time to wait for certificate activation (in seconds)"
-        required: false
-        type: number
-        default: 300
-      poll_interval_seconds:
-        description: "Interval between certificate status checks (in seconds)"
-        required: false
-        type: number
-        default: 10
       sentry_release:
         description: "Enable Sentry release tracking (true/false). Requires sentry_auth_token, sentry_org, and sentry_project."
         required: false
@@ -83,7 +73,7 @@ on:
         default: "Release {0}"
     secrets:
       cloudflare_api_token:
-        description: "Cloudflare API token with Workers deployment and SSL certificate permissions"
+        description: "Cloudflare API token with Workers deployment permissions"
         required: true
       cloudflare_account_id:
         description: "Cloudflare account ID"
@@ -101,18 +91,6 @@ on:
       worker_version:
         description: "Version identifier of the deployed worker"
         value: ${{ jobs.deploy.outputs.worker_version }}
-      certificate_id:
-        description: "ID of the wildcard SSL certificate"
-        value: ${{ jobs.deploy.outputs.certificate_id }}
-      certificate_status:
-        description: "Status of the SSL certificate"
-        value: ${{ jobs.deploy.outputs.certificate_status }}
-      certificate_created:
-        description: "Whether a new certificate was created (true/false)"
-        value: ${{ jobs.deploy.outputs.certificate_created }}
-      wildcard_domain:
-        description: "Domain used for wildcard SSL certificate"
-        value: ${{ jobs.deploy.outputs.wildcard_domain }}
 
 permissions:
   contents: write
@@ -130,10 +108,6 @@ jobs:
       worker_url: ${{ steps.deploy-worker.outputs.worker_url }}
       deployment_status: ${{ steps.deploy-worker.outputs.deployment_status }}
       worker_version: ${{ steps.deploy-worker.outputs.worker_version }}
-      certificate_id: ${{ steps.ensure-cert.outputs.certificate_id }}
-      certificate_status: ${{ steps.ensure-cert.outputs.certificate_status }}
-      certificate_created: ${{ steps.ensure-cert.outputs.certificate_created }}
-      wildcard_domain: ${{ steps.wildcard-domain.outputs.wildcard_domain }}
       worker_name: ${{ steps.worker-name.outputs.name }}
 
     steps:
@@ -199,20 +173,6 @@ jobs:
           echo "  Sentry Release: ${{ inputs.sentry_release }}"
           echo "::endgroup::"
 
-      - name: Extract wildcard domain
-        id: wildcard-domain
-        run: |
-          # Extract parent domain for wildcard certificate
-          # e.g., "bff-template.algtools.algenium.dev" -> "algtools.algenium.dev"
-          CUSTOM_DOMAIN="${{ inputs.custom_domain }}"
-          WILDCARD_DOMAIN="${CUSTOM_DOMAIN#*.}"
-
-          echo "Custom domain: ${CUSTOM_DOMAIN}"
-          echo "Wildcard domain: ${WILDCARD_DOMAIN}"
-          echo "Wildcard pattern: *.${WILDCARD_DOMAIN}"
-
-          echo "wildcard_domain=${WILDCARD_DOMAIN}" >> "$GITHUB_OUTPUT"
-
       - name: Construct worker name
         id: worker-name
         run: |
@@ -242,17 +202,6 @@ jobs:
           echo "Worker name: ${WORKER_NAME}"
           echo "name=${WORKER_NAME}" >> "$GITHUB_OUTPUT"
           echo "::endgroup::"
-
-      - name: Ensure wildcard certificate
-        id: ensure-cert
-        uses: algtools/actions/.github/actions/ensure-wildcard-certificate@main
-        with:
-          domain: ${{ steps.wildcard-domain.outputs.wildcard_domain }}
-          current_zone: ${{ inputs.zone }}
-          cloudflare_api_token: ${{ secrets.cloudflare_api_token }}
-          cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
-          max_wait_seconds: ${{ inputs.max_wait_seconds }}
-          poll_interval_seconds: ${{ inputs.poll_interval_seconds }}
 
       - name: Deploy Cloudflare Worker from artifact
         id: deploy-worker

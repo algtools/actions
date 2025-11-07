@@ -56,7 +56,7 @@ on:
         type: string
         default: ""
       custom_domain:
-        description: "Domain for wildcard certificate e.g., dev.example.com for *.dev.example.com (required if deploy_to_dev is true)"
+        description: "Custom domain for deployment (required if deploy_to_dev is true). SSL certificate must be pre-generated."
         required: false
         type: string
         default: ""
@@ -65,19 +65,9 @@ on:
         required: false
         type: string
         default: "latest"
-      max_wait_seconds:
-        description: "Maximum time to wait for certificate activation in seconds (default: 300)"
-        required: false
-        type: number
-        default: 300
-      poll_interval_seconds:
-        description: "Interval between certificate status checks in seconds (default: 10)"
-        required: false
-        type: number
-        default: 10
     secrets:
       cloudflare_api_token:
-        description: "Cloudflare API token with Workers deployment and SSL certificate permissions (required if deploy_to_dev is true)"
+        description: "Cloudflare API token with Workers deployment permissions (required if deploy_to_dev is true)"
         required: false
       cloudflare_account_id:
         description: "Cloudflare account ID (required if deploy_to_dev is true)"
@@ -211,7 +201,7 @@ jobs:
           echo ""
           echo "Deployment Configuration:"
           echo "  Worker: ${{ inputs.worker_name }}"
-          echo "  Domain: *.${{ inputs.custom_domain }}"
+          echo "  Domain: ${{ inputs.custom_domain }}"
           echo "  Zone: $(echo "${{ inputs.zone }}" | head -c 8)***"
           echo "  Artifact: ${{ inputs.artifact_name }}"
           echo "::endgroup::"

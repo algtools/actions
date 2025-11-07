@@ -31,7 +31,13 @@ Deploys Cloudflare Workers from pre-built artifacts with secure credential handl
 
 ### [ensure-wildcard-certificate](/.github/actions/ensure-wildcard-certificate)
 
-Ensures a wildcard SSL certificate exists in Cloudflare ACM. Idempotent action that creates certificates only when needed and waits for activation.
+Ensures a wildcard SSL certificate exists in Cloudflare ACM. Idempotent action that creates certificates only when needed and waits for activation. Primarily used via the manual `generate-ssl-certificate` workflow.
+
+**Note**: Deployment workflows no longer automatically generate SSL certificates. Use the `generate-ssl-certificate` workflow to pre-generate certificates.
+
+### [ensure-single-certificate](/.github/actions/ensure-single-certificate)
+
+Ensures a single-domain SSL certificate exists in Cloudflare ACM. Similar to wildcard certificate action but generates certificates for a single domain only (without wildcard pattern).
 
 ### [sentry-release](/.github/actions/sentry-release)
 
@@ -71,11 +77,51 @@ Automatically bumps version using semantic-release based on conventional commits
 - `new_version`: New version number
 - `new_release_published`: Whether a new release was published
 
+## SSL Certificate Management
+
+**Important Update**: Deployment workflows no longer automatically generate SSL certificates. Certificates must be pre-generated using the manual `generate-ssl-certificate` workflow.
+
+### Why This Change?
+
+- ⚡ **Faster Deployments**: No more waiting for SSL certificate provisioning (saves 30-60 seconds per deployment)
+- 🎯 **Centralized Management**: All SSL certificates managed from one place
+- 🚫 **Reduced Failures**: SSL generation failures don't block deployments
+- 💰 **Cost Savings**: Fewer API calls to Cloudflare
+
+### Quick Start
+
+1. Navigate to **Actions** → **Generate SSL Certificate**
+2. Click **Run workflow**
+3. Enter your domain and zone ID
+4. Select certificate type (wildcard or single)
+5. Run the workflow
+
+**📚 Full Documentation**: [SSL Certificate Management Guide](docs/SSL_CERTIFICATE_MANAGEMENT.md)
+
+### [generate-ssl-certificate.yml](/.github/workflows/generate-ssl-certificate.yml)
+
+Manual workflow for generating SSL certificates on-demand. Supports both wildcard and single-domain certificates.
+
+**Features:**
+
+- Manual dispatch for on-demand certificate generation
+- Supports wildcard certificates (covers base + all subdomains)
+- Supports single certificates (specific domain only)
+- Idempotent operation (safe to run multiple times)
+- Detailed certificate information in workflow summary
+
+**When to Use:**
+
+- Setting up new environments
+- Adding new domains
+- Initial project setup
+- Certificate has expired (rare, auto-renews)
+
 ## Available Reusable Workflows
 
 ### [pr-build-reusable.yml](/.github/workflows/pr-build-reusable.yml)
 
-A complete PR build workflow that sets up Node.js, builds your project without secrets, uploads artifacts, and optionally deploys to Cloudflare Workers dev environment with automatic SSL certificate management. Perfect for pull request previews and automated testing.
+A complete PR build workflow that sets up Node.js, builds your project without secrets, uploads artifacts, and optionally deploys to Cloudflare Workers dev environment. Perfect for pull request previews and automated testing.
 
 **Features:**
 
@@ -84,8 +130,7 @@ A complete PR build workflow that sets up Node.js, builds your project without s
 - Automatic artifact upload with detailed metadata
 - Configurable retention and working directories
 - **Optional**: Deploy to Cloudflare Workers dev environment
-- **Optional**: Automatic wildcard SSL certificate management
-- **Optional**: PR preview deployments with secure HTTPS
+- **Note**: Requires pre-generated SSL certificates
 
 **Example Usage (Build Only):**
 
@@ -190,9 +235,9 @@ A comprehensive deployment workflow for deploying Cloudflare Workers to dev/qa/p
 
 **Features:**
 
-- Automatic wildcard SSL certificate management with Cloudflare ACM
 - Secure deployment from pre-built artifacts
 - Environment-specific configurations
+- **Note**: Requires pre-generated SSL certificates (see SSL Certificate Management section above)
 - GitHub Deployments tracking in repository UI
 - Optional GitHub Release creation for production deployments
 - Optional Sentry release integration for error tracking
