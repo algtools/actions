@@ -1,0 +1,61 @@
+name: "Provision Template - Reusable"
+
+on:
+  workflow_call:
+    inputs:
+      app_name:
+        description: "Name of the repository to create (e.g. acme-bff)"
+        required: true
+        type: string
+      slug:
+        description: "Slug used for environment configuration (e.g. janovi)"
+        required: true
+        type: string
+      sentry_project:
+        description: "Sentry project name (defaults to repository name if not provided)"
+        required: false
+        type: string
+        default: ""
+      version:
+        description: "Template release tag (use 'latest' for newest release)"
+        required: false
+        type: string
+        default: "latest"
+    secrets:
+      admin_token:
+        description: "Personal Access Token with repo and admin:org scopes"
+        required: true
+      sentry_token:
+        description: "Sentry authentication token (optional)"
+        required: false
+    outputs:
+      repository_url:
+        description: "URL of the created repository"
+        value: ${{ jobs.provision.outputs.repository_url }}
+      release_tag:
+        description: "Template version used"
+        value: ${{ jobs.provision.outputs.release_tag }}
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  provision:
+    name: Provision Template
+    runs-on: ubuntu-latest
+    outputs:
+      repository_url: ${{ steps.provision.outputs.repository_url }}
+      release_tag: ${{ steps.provision.outputs.release_tag }}
+    steps:
+      - name: Provision template repository
+        id: provision
+        uses: algtools/actions/.github/actions/provision-template@main
+        with:
+          source_repo: ${{ github.repository }}
+          app_name: ${{ inputs.app_name }}
+          slug: ${{ inputs.slug }}
+          sentry_project: ${{ inputs.sentry_project }}
+          version: ${{ inputs.version }}
+          admin_token: ${{ secrets.admin_token }}
+          github_token: ${{ github.token }}

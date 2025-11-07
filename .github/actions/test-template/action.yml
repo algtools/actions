@@ -1,0 +1,136 @@
+name: "Test Template"
+description: "Tests template packaging and provision regression"
+
+inputs:
+  working_directory:
+    description: "Directory containing the template"
+    required: false
+    default: "."
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 9
+
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: pnpm install --frozen-lockfile
+
+    - name: Run template packaging tests
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: |
+        echo "📦 Running template packaging tests..."
+        if [ -f "package.json" ]; then
+          # Check if test:template-packaging script exists
+          if jq -e '.scripts["test:template-packaging"]' package.json > /dev/null; then
+            pnpm run test:template-packaging
+          else
+            echo "⚠️  test:template-packaging script not found, skipping..."
+          fi
+        fi
+
+    - name: Run template pack
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: |
+        echo "📦 Packaging template..."
+        pnpm run template:pack
+
+    - name: Extract and validate template structure
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: |
+        set -euo pipefail
+
+        # Find latest tarball
+        if [ ! -d template-dist ] || [ -z "$(ls -A template-dist/*.tgz 2>/dev/null)" ]; then
+          echo "❌ No tarball found in template-dist/"
+          exit 1
+        fi
+
+        TARBALL=$(ls -t template-dist/*.tgz | head -n 1)
+        echo "📦 Found tarball: ${TARBALL}"
+
+        # Extract
+        mkdir -p .test-extract
+        tar -xzf "$TARBALL" -C .test-extract
+
+        # Find extracted directory - check if package.json is at root or in subdirectory
+        if [ -f .test-extract/package.json ]; then
+          EXTRACTED_DIR=".test-extract"
+        else
+          EXTRACTED_DIR=$(find .test-extract -mindepth 1 -maxdepth 1 -type d -exec test -f {}/package.json \; -print | head -n 1)
+        fi
+
+        if [ -z "$EXTRACTED_DIR" ]; then
+          echo "❌ Could not find extracted directory with package.json"
+          exit 1
+        fi
+
+        echo "✅ Extracted to: ${EXTRACTED_DIR}"
+
+        # Run validation using the action's validation script
+        echo "🔍 Running validation..."
+        npx tsx "${{ github.action_path }}/validateProvisionedApp.ts" "$EXTRACTED_DIR"
+
+    - name: Verify workflows are correct
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: |
+        set -euo pipefail
+
+        # Find extracted directory
+        if [ -f .test-extract/package.json ]; then
+          EXTRACTED_DIR=".test-extract"
+        else
+          EXTRACTED_DIR=$(find .test-extract -mindepth 1 -maxdepth 1 -type d -exec test -f {}/package.json \; -print | head -n 1)
+        fi
+
+        if [ -z "$EXTRACTED_DIR" ]; then
+          echo "❌ Could not find extracted directory with package.json"
+          exit 1
+        fi
+
+        echo "🔍 Verifying workflow configuration..."
+
+        # Check release-app.yml exists
+        if [ ! -f "$EXTRACTED_DIR/.github/workflows/release-app.yml" ]; then
+          echo "❌ Missing release-app.yml"
+          exit 1
+        fi
+
+        # Check template workflows are excluded
+        if [ -f "$EXTRACTED_DIR/.github/workflows/release-template.yml" ]; then
+          echo "❌ Should NOT have release-template.yml"
+          exit 1
+        fi
+
+        if [ -f "$EXTRACTED_DIR/.github/workflows/retry-release.yml" ]; then
+          echo "❌ Should NOT have retry-release.yml"
+          exit 1
+        fi
+
+        if [ -f "$EXTRACTED_DIR/.github/workflows/provision-template.yml" ]; then
+          echo "❌ Should NOT have provision-template.yml"
+          exit 1
+        fi
+
+        echo "✅ Workflow validation passed"
+
+    - name: Cleanup
+      if: always()
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: |
+        rm -rf .test-extract || true
+        echo "✅ Cleanup complete"

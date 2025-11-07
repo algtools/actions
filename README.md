@@ -77,6 +77,56 @@ Automatically bumps version using semantic-release based on conventional commits
 - `new_version`: New version number
 - `new_release_published`: Whether a new release was published
 
+### [provision-template](/.github/actions/provision-template)
+
+Provisions a new repository from a template release. Automates the entire process of creating a new repository with templated code, including downloading the template, initializing git, creating the remote repository, and configuring repository variables.
+
+**Features:**
+
+- Smart release resolution (latest or specific version)
+- Flexible archive formats (custom assets or GitHub source tarballs)
+- Secure token handling
+- Complete repository setup with variables
+
+**Inputs:**
+
+- `source_repo` (required): Source template repository (e.g., 'owner/repo')
+- `app_name` (required): Name of the repository to create
+- `slug` (required): URL-friendly slug for environment configuration
+- `sentry_project` (optional): Sentry project name (defaults to app_name)
+- `version` (optional): Template release tag (default: "latest")
+- `admin_token` (required): GitHub token with repo and admin:org scopes
+- `github_token` (required): Standard GitHub token for API calls
+
+**Outputs:**
+
+- `repository_url`: URL of the created repository
+- `release_tag`: Template version used for provisioning
+
+### [test-template](/.github/actions/test-template)
+
+Tests template packaging and provision regression. Validates that templates are properly packaged, extract correctly, and contain the expected files and workflows for provisioned applications.
+
+**Features:**
+
+- Template packaging tests
+- Structure validation
+- Workflow verification
+- Provision regression testing
+- Integrated with build-test-artifact workflow
+
+**Inputs:**
+
+- `working_directory` (optional): Directory containing the template (default: ".")
+
+**What It Tests:**
+
+- Template packaging process
+- Tarball extraction and structure
+- Correct workflows included/excluded
+- Provisioned app structure validation
+- Script presence and configuration
+
 ## SSL Certificate Management
 
 **Important Update**: Deployment workflows no longer automatically generate SSL certificates. Certificates must be pre-generated using the manual `generate-ssl-certificate` workflow.
