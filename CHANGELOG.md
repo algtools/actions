@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/algtools/actions/compare/v1.11.2...v1.12.0) (2025-11-07)
+
+
+### Features
+
+* introduce single-domain SSL certificate management action ([e00c1f5](https://github.com/algtools/actions/commit/e00c1f5dd09ea122d5b8c0e1fa2b6ba90af06e29))
+
 ## [1.11.2](https://github.com/algtools/actions/compare/v1.11.1...v1.11.2) (2025-11-07)
 
 
