@@ -113,15 +113,6 @@ on:
       wildcard_domain:
         description: "Domain used for wildcard SSL certificate"
         value: ${{ jobs.deploy.outputs.wildcard_domain }}
-      release_created:
-        description: "Whether a GitHub release was created"
-        value: ${{ jobs.release.outputs.created }}
-      release_tag:
-        description: "Tag name of the created release"
-        value: ${{ jobs.release.outputs.tag }}
-      release_version:
-        description: "Version of the created release"
-        value: ${{ jobs.release.outputs.version }}
 
 permissions:
   contents: write
