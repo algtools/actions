@@ -108,6 +108,43 @@ on:
         type: string
         default: "preview,api-docs,openapi-spec,health"
 
+      # Ephemeral Database configuration (optional)
+      enable_ephemeral_db:
+        description: "Enable ephemeral database management for migrations"
+        required: false
+        type: boolean
+        default: false
+      migrations_dir:
+        description: "Directory containing migration files (required if enable_ephemeral_db is true)"
+        required: false
+        type: string
+        default: "migrations"
+      database_binding:
+        description: "Database binding name in wrangler config"
+        required: false
+        type: string
+        default: "DB"
+      base_branch:
+        description: "Base branch to compare migrations against"
+        required: false
+        type: string
+        default: "origin/dev"
+      enable_seeding:
+        description: "Whether to seed the database after migrations"
+        required: false
+        type: boolean
+        default: true
+      seed_script:
+        description: "Script to generate seed SQL"
+        required: false
+        type: string
+        default: "pnpm run db:seed:sql"
+      seed_file:
+        description: "Path to generated seed SQL file"
+        required: false
+        type: string
+        default: "seeds.sql"
+
       # Miscellaneous
       retention_days:
         description: "Number of days to retain the artifact (1-90 days, default is repository/org setting)"
@@ -155,9 +192,6 @@ on:
       deployment_status:
         description: "Status of the deployment"
         value: ${{ jobs.deploy.outputs.deployment_status }}
-      certificate_id:
-        description: "ID of the wildcard SSL certificate"
-        value: ${{ jobs.deploy.outputs.certificate_id }}
 
       # Preview outputs
       preview_url:
@@ -184,6 +218,20 @@ on:
       comment_url:
         description: "URL of the PR comment"
         value: ${{ jobs.comment.outputs.comment_url }}
+
+      # Ephemeral Database outputs
+      database_created:
+        description: "Whether an ephemeral database was created"
+        value: ${{ jobs.manage-database.outputs.database_created }}
+      database_name:
+        description: "Name of the ephemeral database (empty if using dev database)"
+        value: ${{ jobs.manage-database.outputs.database_name }}
+      database_id:
+        description: "ID of the ephemeral database (empty if using dev database)"
+        value: ${{ jobs.manage-database.outputs.database_id }}
+      has_new_migrations:
+        description: "Whether new migrations were detected"
+        value: ${{ jobs.manage-database.outputs.has_new_migrations }}
 
 permissions:
   contents: read
@@ -261,9 +309,74 @@ jobs:
           retention_days: ${{ inputs.retention_days }}
           include_hidden_files: "true"
 
+  manage-database:
+    name: Manage Ephemeral Database
+    needs: build
+    if: inputs.enable_ephemeral_db == true
+    runs-on: ubuntu-latest
+    outputs:
+      has_new_migrations: ${{ steps.manage-db.outputs.has_new_migrations }}
+      new_migration_count: ${{ steps.manage-db.outputs.new_migration_count }}
+      new_migrations: ${{ steps.manage-db.outputs.new_migrations }}
+      database_created: ${{ steps.manage-db.outputs.database_created }}
+      database_name: ${{ steps.manage-db.outputs.database_name }}
+      database_id: ${{ steps.manage-db.outputs.database_id }}
+      migrations_applied: ${{ steps.manage-db.outputs.migrations_applied }}
+      seeding_status: ${{ steps.manage-db.outputs.seeding_status }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for git migration comparison
+
+      - name: Setup Node.js
+        uses: algtools/actions/.github/actions/setup-node@main
+        with:
+          node-version: ${{ inputs.node_version }}
+          working-directory: ${{ inputs.working_directory }}
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ inputs.working_directory }}
+
+      - name: Manage Ephemeral Database
+        id: manage-db
+        uses: algtools/actions/.github/actions/manage-ephemeral-database@main
+        with:
+          repository_name: ${{ github.event.repository.name }}
+          pr_number: ${{ github.event.pull_request.number }}
+          base_branch: ${{ inputs.base_branch }}
+          cloudflare_api_token: ${{ secrets.cloudflare_api_token }}
+          cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
+          migrations_dir: ${{ inputs.migrations_dir }}
+          working_directory: ${{ inputs.working_directory }}
+          wrangler_config: ${{ inputs.wrangler_config }}
+          database_binding: ${{ inputs.database_binding }}
+          enable_seeding: ${{ inputs.enable_seeding }}
+          seed_script: ${{ inputs.seed_script }}
+          seed_file: ${{ inputs.seed_file }}
+          wrangler_version: ${{ inputs.wrangler_version }}
+
+      - name: Re-upload artifact with updated config
+        if: steps.manage-db.outputs.database_created == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: |
+            ${{ inputs.working_directory }}
+          retention-days: ${{ inputs.retention_days }}
+          overwrite: true
+
   deploy:
     name: Deploy Preview
-    needs: build
+    needs: [build, manage-database]
+    if: |
+      always() &&
+      needs.build.result == 'success' &&
+      (inputs.enable_ephemeral_db == false || needs.manage-database.result == 'success' || needs.manage-database.result == 'skipped')
     runs-on: ubuntu-latest
     environment:
       name: "preview-${{ github.event.pull_request.number }}"
@@ -271,7 +384,6 @@ jobs:
     outputs:
       worker_url: ${{ steps.deploy-worker.outputs.worker_url }}
       deployment_status: ${{ steps.deploy-worker.outputs.deployment_status }}
-      certificate_id: ${{ steps.ensure-cert.outputs.certificate_id }}
       preview_url: ${{ steps.preview-url.outputs.url }}
       pr_number: ${{ steps.resolve-pr.outputs.number }}
       worker_name: ${{ steps.worker-name.outputs.name }}
@@ -346,6 +458,24 @@ jobs:
 
           echo "Worker name: ${WORKER_NAME}"
           echo "name=${WORKER_NAME}" >> "$GITHUB_OUTPUT"
+          echo "::endgroup::"
+
+      - name: Log database configuration
+        if: inputs.enable_ephemeral_db == true
+        run: |
+          echo "::group::Database Configuration"
+
+          if [ "${{ needs.manage-database.outputs.database_created }}" = "true" ]; then
+            echo "✓ Using ephemeral database"
+            echo "  Database Name: ${{ needs.manage-database.outputs.database_name }}"
+            echo "  Database ID: ${{ needs.manage-database.outputs.database_id }}"
+            echo "  New Migrations: ${{ needs.manage-database.outputs.new_migration_count }}"
+            echo ""
+            echo "The artifact includes updated wrangler config with ephemeral database settings"
+          else
+            echo "ℹ️  Using dev database (no new migrations detected)"
+          fi
+
           echo "::endgroup::"
 
       - name: Deploy to Cloudflare Workers
@@ -607,12 +737,13 @@ jobs:
 
   comment:
     name: Comment on PR
-    needs: [deploy, chromatic, api-docs]
+    needs: [deploy, chromatic, api-docs, manage-database]
     if: |
       always() &&
       needs.deploy.result == 'success' &&
       (inputs.enable_chromatic == false || needs.chromatic.result == 'success' || needs.chromatic.result == 'skipped') &&
-      (inputs.enable_api_docs == false || needs.api-docs.result == 'success' || needs.api-docs.result == 'skipped')
+      (inputs.enable_api_docs == false || needs.api-docs.result == 'success' || needs.api-docs.result == 'skipped') &&
+      (inputs.enable_ephemeral_db == false || needs.manage-database.result == 'success' || needs.manage-database.result == 'skipped')
     runs-on: ubuntu-latest
     outputs:
       comment_id: ${{ steps.comment-pr.outputs.comment_id }}
@@ -642,11 +773,13 @@ jobs:
             - **Environment**: `preview-${{ needs.deploy.outputs.pr_number }}`
             - **Commit**: `${{ github.event.pull_request.head.sha }}`
             - **Deployed**: <t:${{ github.event.pull_request.updated_at }}:R>
+            ${{ inputs.enable_ephemeral_db && needs.manage-database.outputs.database_created == 'true' && format('- **Database**: Ephemeral DB `{0}` (testing {1} new migration{2})', needs.manage-database.outputs.database_name, needs.manage-database.outputs.new_migration_count, needs.manage-database.outputs.new_migration_count > 1 && 's' || '') || inputs.enable_ephemeral_db && format('- **Database**: Dev database (no new migrations)') || '' }}
 
             <details>
             <summary>▶ Deployment Info</summary>
 
             This environment will be automatically cleaned up when the PR is closed or merged.
+            ${{ inputs.enable_ephemeral_db && needs.manage-database.outputs.database_created == 'true' && format('\n\n**Ephemeral Database**: A temporary database `{0}` was created to test new migrations. It will be automatically deleted when this PR is closed.', needs.manage-database.outputs.database_name) || '' }}
 
             </details>
 

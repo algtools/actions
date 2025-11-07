@@ -1,0 +1,561 @@
+name: "Manage Ephemeral D1 Database"
+description: "Manages ephemeral D1 databases for PR previews - detects migrations, creates/recreates databases, applies migrations and seeds"
+author: "Algenium Systems"
+
+inputs:
+  # Repository configuration
+  repository_name:
+    description: "Repository name (used for database naming)"
+    required: true
+  pr_number:
+    description: "Pull request number"
+    required: true
+  base_branch:
+    description: "Base branch to compare migrations against"
+    required: false
+    default: "origin/dev"
+
+  # Cloudflare credentials
+  cloudflare_api_token:
+    description: "Cloudflare API token with D1 database permissions"
+    required: true
+  cloudflare_account_id:
+    description: "Cloudflare account ID"
+    required: true
+
+  # Migration configuration
+  migrations_dir:
+    description: "Directory containing migration files (relative to working directory)"
+    required: false
+    default: "migrations"
+  working_directory:
+    description: "Working directory for running scripts"
+    required: false
+    default: "."
+
+  # Database configuration
+  wrangler_config:
+    description: "Path to wrangler.jsonc file to update (relative to working directory)"
+    required: false
+    default: "wrangler.jsonc"
+  database_binding:
+    description: "Database binding name in wrangler config"
+    required: false
+    default: "DB"
+
+  # Seeding configuration
+  enable_seeding:
+    description: "Whether to seed the database after migrations"
+    required: false
+    default: "true"
+  seed_script:
+    description: "Script to generate seed SQL (e.g., 'pnpm run db:seed:sql')"
+    required: false
+    default: "pnpm run db:seed:sql"
+  seed_file:
+    description: "Path to generated seed SQL file"
+    required: false
+    default: "seeds.sql"
+
+  # Wrangler configuration
+  wrangler_version:
+    description: 'Version of Wrangler to install (e.g., "3.78.0" or "latest")'
+    required: false
+    default: "latest"
+
+  # Action behavior
+  force_create:
+    description: "Force database creation even if no new migrations detected"
+    required: false
+    default: "false"
+  skip_comparison:
+    description: "Skip migration comparison and always create ephemeral database"
+    required: false
+    default: "false"
+
+outputs:
+  has_new_migrations:
+    description: "Whether new migrations were detected"
+    value: ${{ steps.check-migrations.outputs.has_new_migrations }}
+  new_migration_count:
+    description: "Number of new migrations detected"
+    value: ${{ steps.check-migrations.outputs.new_migration_count }}
+  new_migrations:
+    description: "Comma-separated list of new migration files"
+    value: ${{ steps.check-migrations.outputs.new_migrations }}
+  database_created:
+    description: "Whether an ephemeral database was created"
+    value: ${{ steps.create-or-skip.outputs.database_created }}
+  database_name:
+    description: "Name of the ephemeral database (empty if using dev database)"
+    value: ${{ steps.create-or-skip.outputs.database_name }}
+  database_id:
+    description: "ID of the ephemeral database (empty if using dev database)"
+    value: ${{ steps.create-or-skip.outputs.database_id }}
+  migrations_applied:
+    description: "Whether migrations were applied"
+    value: ${{ steps.apply-migrations.outputs.applied }}
+  seeding_status:
+    description: "Status of database seeding (success, skipped, or failed)"
+    value: ${{ steps.seed-database.outputs.status }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        echo "::group::Validating inputs"
+
+        if [ -z "${{ inputs.repository_name }}" ]; then
+          echo "::error::repository_name input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.pr_number }}" ]; then
+          echo "::error::pr_number input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.cloudflare_api_token }}" ]; then
+          echo "::error::cloudflare_api_token input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.cloudflare_account_id }}" ]; then
+          echo "::error::cloudflare_account_id input is required"
+          exit 1
+        fi
+
+        echo "✓ All required inputs validated"
+        echo ""
+        echo "Configuration:"
+        echo "  Repository: ${{ inputs.repository_name }}"
+        echo "  PR Number: ${{ inputs.pr_number }}"
+        echo "  Base Branch: ${{ inputs.base_branch }}"
+        echo "  Migrations Directory: ${{ inputs.migrations_dir }}"
+        echo "  Working Directory: ${{ inputs.working_directory }}"
+        echo "  Wrangler Config: ${{ inputs.wrangler_config }}"
+        echo "  Database Binding: ${{ inputs.database_binding }}"
+        echo "  Enable Seeding: ${{ inputs.enable_seeding }}"
+        echo "  Force Create: ${{ inputs.force_create }}"
+        echo "  Skip Comparison: ${{ inputs.skip_comparison }}"
+        echo "::endgroup::"
+
+    - name: Install Wrangler
+      shell: bash
+      run: |
+        echo "::group::Installing Wrangler"
+
+        if [ "${{ inputs.wrangler_version }}" = "latest" ]; then
+          echo "Installing latest version of Wrangler..."
+          npm install -g wrangler
+        else
+          echo "Installing Wrangler version ${{ inputs.wrangler_version }}..."
+          npm install -g wrangler@${{ inputs.wrangler_version }}
+        fi
+
+        WRANGLER_VERSION=$(wrangler --version)
+        echo ""
+        echo "✓ Wrangler installed successfully"
+        echo "  Version: $WRANGLER_VERSION"
+        echo "::endgroup::"
+
+    - name: Check for new migrations
+      id: check-migrations
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: |
+        echo "::group::Checking for new migrations"
+
+        SKIP_COMPARISON="${{ inputs.skip_comparison }}"
+
+        if [ "$SKIP_COMPARISON" = "true" ]; then
+          echo "⚠️  Skipping migration comparison (skip_comparison=true)"
+          echo "has_new_migrations=true" >> $GITHUB_OUTPUT
+          echo "new_migration_count=0" >> $GITHUB_OUTPUT
+          echo "new_migrations=force-create" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+          exit 0
+        fi
+
+        MIGRATIONS_DIR="${{ inputs.migrations_dir }}"
+        BASE_BRANCH="${{ inputs.base_branch }}"
+
+        echo "Comparing migrations between current branch and $BASE_BRANCH"
+        echo "Migrations directory: $MIGRATIONS_DIR"
+        echo ""
+
+        # Fetch latest from remote
+        git fetch origin
+
+        # Get local migrations (current branch)
+        if [ ! -d "$MIGRATIONS_DIR" ]; then
+          echo "⚠️  Migrations directory not found: $MIGRATIONS_DIR"
+          echo "has_new_migrations=false" >> $GITHUB_OUTPUT
+          echo "new_migration_count=0" >> $GITHUB_OUTPUT
+          echo "new_migrations=" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+          exit 0
+        fi
+
+        LOCAL_MIGRATIONS=$(find "$MIGRATIONS_DIR" -name "*.sql" -type f | sort)
+        LOCAL_COUNT=$(echo "$LOCAL_MIGRATIONS" | grep -c "." || echo 0)
+
+        # Get base branch migrations using git
+        BASE_MIGRATIONS=$(git ls-tree -r --name-only "$BASE_BRANCH" "$MIGRATIONS_DIR/" 2>/dev/null | grep "\.sql$" | sort || echo "")
+        BASE_COUNT=$(echo "$BASE_MIGRATIONS" | grep -c "." || echo 0)
+
+        echo "Local migrations: $LOCAL_COUNT"
+        echo "Base branch migrations: $BASE_COUNT"
+        echo ""
+
+        # Find new migrations (in local but not in base)
+        NEW_MIGRATIONS=""
+        if [ -n "$LOCAL_MIGRATIONS" ]; then
+          while IFS= read -r local_file; do
+            if [ -z "$local_file" ]; then continue; fi
+
+            local_basename=$(basename "$local_file")
+
+            # Check if this file exists in base branch
+            if ! echo "$BASE_MIGRATIONS" | grep -q "$local_basename"; then
+              if [ -z "$NEW_MIGRATIONS" ]; then
+                NEW_MIGRATIONS="$local_basename"
+              else
+                NEW_MIGRATIONS="$NEW_MIGRATIONS,$local_basename"
+              fi
+            fi
+          done <<< "$LOCAL_MIGRATIONS"
+        fi
+
+        # Count new migrations
+        if [ -z "$NEW_MIGRATIONS" ]; then
+          NEW_COUNT=0
+        else
+          NEW_COUNT=$(echo "$NEW_MIGRATIONS" | tr ',' '\n' | grep -c "." || echo 0)
+        fi
+
+        # Output results
+        if [ $NEW_COUNT -gt 0 ]; then
+          echo "📦 New migrations detected: $NEW_COUNT"
+          echo ""
+          echo "New migration files:"
+          echo "$NEW_MIGRATIONS" | tr ',' '\n' | sed 's/^/  - /'
+          echo ""
+          echo "✓ Ephemeral database will be created"
+          HAS_NEW="true"
+        else
+          echo "✅ No new migrations detected"
+          echo "✓ Will use dev database"
+          HAS_NEW="false"
+        fi
+
+        echo "has_new_migrations=$HAS_NEW" >> $GITHUB_OUTPUT
+        echo "new_migration_count=$NEW_COUNT" >> $GITHUB_OUTPUT
+        echo "new_migrations=$NEW_MIGRATIONS" >> $GITHUB_OUTPUT
+
+        echo "::endgroup::"
+
+    - name: Create or skip ephemeral database
+      id: create-or-skip
+      shell: bash
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare_api_token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare_account_id }}
+      run: |
+        echo "::group::Managing ephemeral database"
+
+        # Mask sensitive values
+        echo "::add-mask::${{ inputs.cloudflare_api_token }}"
+        echo "::add-mask::${{ inputs.cloudflare_account_id }}"
+
+        HAS_NEW_MIGRATIONS="${{ steps.check-migrations.outputs.has_new_migrations }}"
+        FORCE_CREATE="${{ inputs.force_create }}"
+        REPO_NAME="${{ inputs.repository_name }}"
+        PR_NUMBER="${{ inputs.pr_number }}"
+
+        # Determine database name
+        DB_NAME="${REPO_NAME}-${PR_NUMBER}"
+
+        # Decide whether to create database
+        if [ "$HAS_NEW_MIGRATIONS" = "true" ] || [ "$FORCE_CREATE" = "true" ]; then
+          echo "Creating ephemeral database: $DB_NAME"
+          echo ""
+
+          # Check if database already exists
+          echo "Checking for existing database..."
+          DB_LIST=$(wrangler d1 list 2>&1 || echo "")
+
+          if echo "$DB_LIST" | grep -q "$DB_NAME"; then
+            echo "⚠️  Database $DB_NAME already exists"
+            echo "🗑️  Deleting existing database to ensure clean state..."
+
+            wrangler d1 delete "$DB_NAME" --skip-confirmation || {
+              echo "::warning::Failed to delete existing database, will try to create anyway"
+            }
+
+            # Wait a moment for deletion to propagate
+            sleep 2
+          else
+            echo "✓ No existing database found"
+          fi
+
+          # Create new database
+          echo ""
+          echo "Creating new ephemeral database..."
+          CREATE_OUTPUT=$(wrangler d1 create "$DB_NAME" 2>&1)
+
+          if [ $? -ne 0 ]; then
+            echo "::error::Failed to create database"
+            echo "$CREATE_OUTPUT"
+            exit 1
+          fi
+
+          echo "$CREATE_OUTPUT"
+
+          # Extract database ID from output
+          # Wrangler output format: database_id = "uuid-here"
+          DB_ID=$(echo "$CREATE_OUTPUT" | grep -oP 'database_id\s*=\s*"\K[^"]+' || echo "")
+
+          if [ -z "$DB_ID" ]; then
+            echo "::error::Could not extract database ID from wrangler output"
+            echo "Output was: $CREATE_OUTPUT"
+            exit 1
+          fi
+
+          echo ""
+          echo "✓ Ephemeral database created successfully"
+          echo "  Name: $DB_NAME"
+          echo "  ID: $DB_ID"
+
+          echo "database_created=true" >> $GITHUB_OUTPUT
+          echo "database_name=$DB_NAME" >> $GITHUB_OUTPUT
+          echo "database_id=$DB_ID" >> $GITHUB_OUTPUT
+        else
+          echo "No new migrations detected and force_create=false"
+          echo "✓ Skipping ephemeral database creation (will use dev database)"
+
+          echo "database_created=false" >> $GITHUB_OUTPUT
+          echo "database_name=" >> $GITHUB_OUTPUT
+          echo "database_id=" >> $GITHUB_OUTPUT
+        fi
+
+        echo "::endgroup::"
+
+    - name: Configure wrangler for ephemeral database
+      if: steps.create-or-skip.outputs.database_created == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      env:
+        PR_DB_NAME: ${{ steps.create-or-skip.outputs.database_name }}
+        PR_DB_ID: ${{ steps.create-or-skip.outputs.database_id }}
+      run: |
+        echo "::group::Configuring wrangler.jsonc"
+
+        WRANGLER_CONFIG="${{ inputs.wrangler_config }}"
+        BINDING="${{ inputs.database_binding }}"
+
+        echo "Updating wrangler config: $WRANGLER_CONFIG"
+        echo "  Database Name: $PR_DB_NAME"
+        echo "  Database ID: $PR_DB_ID"
+        echo "  Binding: $BINDING"
+        echo ""
+
+        # Check if config script exists
+        if [ -f "scripts/configurePrDatabase.ts" ]; then
+          echo "Using configurePrDatabase.ts script..."
+          npx tsx scripts/configurePrDatabase.ts
+        else
+          echo "Using inline configuration..."
+
+          # Use Node.js to update the config
+          node -e "
+            const fs = require('fs');
+            const path = require('path');
+
+            const configPath = '$WRANGLER_CONFIG';
+            const dbName = process.env.PR_DB_NAME;
+            const dbId = process.env.PR_DB_ID;
+            const binding = '$BINDING';
+
+            if (!fs.existsSync(configPath)) {
+              console.error('wrangler config not found at:', configPath);
+              process.exit(1);
+            }
+
+            // Read and parse JSONC
+            let content = fs.readFileSync(configPath, 'utf-8');
+
+            // Strip comments
+            content = content.replace(/\/\*[\s\S]*?\*\//g, '');
+            content = content.replace(/,(\s*[}\]])/g, '\$1');
+
+            try {
+              const config = JSON.parse(content);
+
+              // Update root level d1_databases
+              if (!config.d1_databases) {
+                config.d1_databases = [];
+              }
+
+              const rootDbIndex = config.d1_databases.findIndex(db => db.binding === binding);
+              if (rootDbIndex >= 0) {
+                config.d1_databases[rootDbIndex].database_name = dbName;
+                config.d1_databases[rootDbIndex].database_id = dbId;
+                console.log('✓ Updated DB binding in root config');
+              } else {
+                config.d1_databases.push({
+                  binding: binding,
+                  database_name: dbName,
+                  database_id: dbId
+                });
+                console.log('✓ Added new DB binding to root config');
+              }
+
+              // Update preview environment if it exists
+              if (config.env && config.env.preview && config.env.preview.d1_databases) {
+                const previewDbIndex = config.env.preview.d1_databases.findIndex(db => db.binding === binding);
+                if (previewDbIndex >= 0) {
+                  config.env.preview.d1_databases[previewDbIndex].database_name = dbName;
+                  config.env.preview.d1_databases[previewDbIndex].database_id = dbId;
+                  console.log('✓ Updated DB binding in preview environment');
+                }
+              }
+
+              // Write back as JSON
+              fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
+              console.log('✓ Configuration updated successfully');
+            } catch (error) {
+              console.error('Failed to update config:', error.message);
+              process.exit(1);
+            }
+          " || exit 1
+        fi
+
+        echo ""
+        echo "✓ Wrangler config updated"
+        echo "::endgroup::"
+
+    - name: Apply migrations
+      id: apply-migrations
+      if: steps.create-or-skip.outputs.database_created == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare_api_token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare_account_id }}
+      run: |
+        echo "::group::Applying migrations"
+
+        BINDING="${{ inputs.database_binding }}"
+        MIGRATIONS_DIR="${{ inputs.migrations_dir }}"
+
+        if [ ! -d "$MIGRATIONS_DIR" ]; then
+          echo "⚠️  No migrations directory found: $MIGRATIONS_DIR"
+          echo "applied=false" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+          exit 0
+        fi
+
+        MIGRATION_COUNT=$(find "$MIGRATIONS_DIR" -name "*.sql" -type f | wc -l)
+
+        if [ "$MIGRATION_COUNT" -eq 0 ]; then
+          echo "⚠️  No migration files found in $MIGRATIONS_DIR"
+          echo "applied=false" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+          exit 0
+        fi
+
+        echo "Applying $MIGRATION_COUNT migration(s) to ephemeral database..."
+        echo "Binding: $BINDING"
+        echo ""
+
+        # Apply migrations
+        wrangler d1 migrations apply "$BINDING" --remote || {
+          echo "::error::Failed to apply migrations"
+          exit 1
+        }
+
+        echo ""
+        echo "✓ Migrations applied successfully"
+        echo "applied=true" >> $GITHUB_OUTPUT
+        echo "::endgroup::"
+
+    - name: Seed database
+      id: seed-database
+      if: steps.create-or-skip.outputs.database_created == 'true' && inputs.enable_seeding == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare_api_token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare_account_id }}
+      run: |
+        echo "::group::Seeding database"
+
+        BINDING="${{ inputs.database_binding }}"
+        SEED_SCRIPT="${{ inputs.seed_script }}"
+        SEED_FILE="${{ inputs.seed_file }}"
+
+        # Check if seed script command is available
+        if ! command -v ${SEED_SCRIPT%% *} &> /dev/null; then
+          echo "⚠️  Seed script command not available: $SEED_SCRIPT"
+          echo "status=skipped" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+          exit 0
+        fi
+
+        # Generate seed SQL
+        echo "Generating seed SQL..."
+        eval "$SEED_SCRIPT" || {
+          echo "::warning::Failed to generate seed SQL"
+          echo "status=failed" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+          exit 0
+        }
+
+        if [ ! -f "$SEED_FILE" ]; then
+          echo "⚠️  Seed file not found: $SEED_FILE"
+          echo "status=failed" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+          exit 0
+        fi
+
+        # Apply seed SQL
+        echo ""
+        echo "Applying seed data..."
+        wrangler d1 execute "$BINDING" --remote --file="$SEED_FILE" || {
+          echo "::warning::Failed to apply seed data"
+          echo "status=failed" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+          exit 0
+        }
+
+        echo ""
+        echo "✓ Database seeded successfully"
+        echo "status=success" >> $GITHUB_OUTPUT
+        echo "::endgroup::"
+
+    - name: Summary
+      shell: bash
+      run: |
+        echo "::group::Ephemeral Database Summary"
+        echo "=========================================="
+        echo "Ephemeral Database Management Complete"
+        echo "=========================================="
+        echo ""
+
+        HAS_NEW="${{ steps.check-migrations.outputs.has_new_migrations }}"
+        DB_CREATED="${{ steps.create-or-skip.outputs.database_created }}"
+
+        if [ "$DB_CREATED" = "true" ]; then
+          echo "✓ Ephemeral database created"
+          echo "  Name: ${{ steps.create-or-skip.outputs.database_name }}"
+          echo "  ID: ${{ steps.create-or-skip.outputs.database_id }}"
+          echo "  New Migrations: ${{ steps.check-migrations.outputs.new_migration_count }}"
+          echo "  Migrations Applied: ${{ steps.apply-migrations.outputs.applied }}"
+          echo "  Seeding Status: ${{ steps.seed-database.outputs.status || 'disabled' }}"
+        else
+          echo "ℹ️  No ephemeral database created"
+          echo "  Reason: No new migrations detected"
+          echo "  Will use: Dev database"
+        fi
+
+        echo "::endgroup::"

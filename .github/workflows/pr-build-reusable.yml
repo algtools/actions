@@ -104,12 +104,6 @@ on:
       deployment_status:
         description: "Status of the deployment (only if deploy_to_dev is true)"
         value: ${{ jobs.deploy.outputs.deployment_status }}
-      certificate_id:
-        description: "ID of the wildcard SSL certificate (only if deploy_to_dev is true)"
-        value: ${{ jobs.deploy.outputs.certificate_id }}
-      certificate_status:
-        description: "Status of the SSL certificate (only if deploy_to_dev is true)"
-        value: ${{ jobs.deploy.outputs.certificate_status }}
 
 permissions:
   contents: read
@@ -185,8 +179,6 @@ jobs:
     outputs:
       worker_url: ${{ steps.deploy-worker.outputs.worker_url }}
       deployment_status: ${{ steps.deploy-worker.outputs.deployment_status }}
-      certificate_id: ${{ steps.ensure-cert.outputs.certificate_id }}
-      certificate_status: ${{ steps.ensure-cert.outputs.certificate_status }}
 
     steps:
       - name: Validate deployment inputs
@@ -247,16 +239,9 @@ jobs:
             echo "- **URL**: ${{ steps.deploy-worker.outputs.worker_url }}"
             echo "- **Status**: ${{ steps.deploy-worker.outputs.deployment_status }}"
             echo "- **Version**: \`${{ steps.deploy-worker.outputs.worker_version }}\`"
-            echo ""
-            echo "### SSL Certificate"
-            echo "- **Domain**: \`*.${{ inputs.custom_domain }}\`"
-            echo "- **Certificate ID**: \`${{ steps.ensure-cert.outputs.certificate_id }}\`"
-            echo "- **Status**: ${{ steps.ensure-cert.outputs.certificate_status }}"
-            echo "- **Created New**: ${{ steps.ensure-cert.outputs.certificate_created }}"
-            echo ""
             echo "### Artifact"
             echo "- **Name**: \`${{ inputs.artifact_name }}\`"
             echo "- **ID**: \`${{ needs.build.outputs.artifact_id }}\`"
             echo ""
-            echo "✓ PR preview deployed successfully to dev environment with SSL"
+            echo "✓ PR preview deployed successfully to dev environment"
           } >> "$GITHUB_STEP_SUMMARY"

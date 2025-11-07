@@ -162,40 +162,6 @@ jobs:
           echo ""
           echo "✓ Deployment validation logic verified"
 
-  test-ssl-integration:
-    name: Test SSL Certificate Integration
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Verify SSL certificate action integration
-        run: |
-          echo "Verifying SSL certificate integration..."
-
-          # Check for ensure-wildcard-certificate action
-          if ! grep -q "ensure-wildcard-certificate" .github/workflows/pr-build-reusable.yml; then
-            echo "❌ Missing ensure-wildcard-certificate action"
-            exit 1
-          fi
-          echo "✓ ensure-wildcard-certificate action present"
-
-          # Check certificate outputs
-          if ! grep -q "certificate_id" .github/workflows/pr-build-reusable.yml; then
-            echo "❌ Missing certificate_id output"
-            exit 1
-          fi
-          echo "✓ certificate_id output present"
-
-          if ! grep -q "certificate_status" .github/workflows/pr-build-reusable.yml; then
-            echo "❌ Missing certificate_status output"
-            exit 1
-          fi
-          echo "✓ certificate_status output present"
-
-          echo ""
-          echo "✓ SSL certificate integration verified"
-
   test-worker-deployment-integration:
     name: Test Worker Deployment Integration
     runs-on: ubuntu-latest
