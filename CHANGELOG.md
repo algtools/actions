@@ -1,3 +1,10 @@
+## [1.11.1](https://github.com/algtools/actions/compare/v1.11.0...v1.11.1) (2025-11-07)
+
+
+### Bug Fixes
+
+* correct string formatting for database description in preview deploy workflow ([e7a1663](https://github.com/algtools/actions/commit/e7a1663e152a77a355808a13151756836d4dc819))
+
 # [1.11.0](https://github.com/algtools/actions/compare/v1.10.2...v1.11.0) (2025-11-07)
 
 
