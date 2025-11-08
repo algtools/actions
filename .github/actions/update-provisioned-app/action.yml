@@ -1,0 +1,435 @@
+name: "Update Provisioned App"
+description: "Updates an already provisioned app with the latest or specific template version by creating a PR"
+
+inputs:
+  source_repo:
+    description: "Source template repository (e.g., 'owner/repo')"
+    required: true
+  target_repo:
+    description: "Target repository to update (e.g., 'owner/app-name')"
+    required: true
+  version:
+    description: "Template release tag (use 'latest' for newest release)"
+    required: false
+    default: "latest"
+  base_branch:
+    description: "Base branch to create PR against (default: main)"
+    required: false
+    default: "main"
+  branch_name:
+    description: "Name for the update branch (default: update-template-{version})"
+    required: false
+    default: ""
+  pr_title:
+    description: "Title for the pull request (default: chore: update template to {version})"
+    required: false
+    default: ""
+  pr_body:
+    description: "Body for the pull request (default: auto-generated)"
+    required: false
+    default: ""
+  github_token:
+    description: "GitHub token with repo permissions"
+    required: true
+
+outputs:
+  pr_url:
+    description: "URL of the created pull request"
+    value: ${{ steps.create-pr.outputs.pr_url }}
+  pr_number:
+    description: "Number of the created pull request"
+    value: ${{ steps.create-pr.outputs.pr_number }}
+  release_tag:
+    description: "Template version used for the update"
+    value: ${{ steps.release-info.outputs.release_tag }}
+  branch_name:
+    description: "Name of the branch created"
+    value: ${{ steps.create-branch.outputs.branch_name }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Mask sensitive tokens
+      shell: bash
+      run: |
+        echo "::add-mask::${{ inputs.github_token }}"
+
+    - name: Resolve release information
+      id: release-info
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        VERSION_INPUT: ${{ inputs.version }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+      run: |
+        set -euo pipefail
+
+        VERSION="${VERSION_INPUT:-latest}"
+
+        # Get repository owner and name
+        IFS='/' read -r OWNER REPO <<< "${SOURCE_REPO}"
+
+        if [ "${VERSION}" = "latest" ]; then
+          echo "Fetching latest release..."
+          RELEASE_DATA=$(gh api "/repos/${SOURCE_REPO}/releases/latest")
+        else
+          echo "Fetching release with tag: ${VERSION}"
+          RELEASE_DATA=$(gh api "/repos/${SOURCE_REPO}/releases/tags/${VERSION}")
+        fi
+
+        RELEASE_TAG=$(echo "${RELEASE_DATA}" | jq -r '.tag_name')
+        echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+
+        # Look for custom template asset first (e.g., bff-template-v1.2.1.tar.gz)
+        ASSET_NAME=$(echo "${RELEASE_DATA}" | jq -r '.assets[] | select(.name | endswith(".tar.gz") or endswith(".tgz")) | .name' | head -n 1)
+
+        if [ -n "${ASSET_NAME}" ]; then
+          echo "Found custom template asset: ${ASSET_NAME}"
+          echo "asset_name=${ASSET_NAME}" >> $GITHUB_OUTPUT
+          echo "use_source_tarball=false" >> $GITHUB_OUTPUT
+        else
+          echo "No custom template asset found, using source tarball"
+          # GitHub source tarballs don't include 'v' prefix in filename
+          VERSION_NO_V="${RELEASE_TAG#v}"
+          ASSET_NAME="${REPO}-${VERSION_NO_V}.tar.gz"
+          echo "asset_name=${ASSET_NAME}" >> $GITHUB_OUTPUT
+          echo "use_source_tarball=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Download template archive
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
+        ASSET_NAME: ${{ steps.release-info.outputs.asset_name }}
+        USE_SOURCE_TARBALL: ${{ steps.release-info.outputs.use_source_tarball }}
+      run: |
+        set -euo pipefail
+        mkdir -p dist
+
+        if [ "${USE_SOURCE_TARBALL}" = "true" ]; then
+          echo "Downloading source tarball from ${SOURCE_REPO} (tag: ${RELEASE_TAG})"
+          curl -L \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${SOURCE_REPO}/tarball/${RELEASE_TAG}" \
+            -o "dist/${ASSET_NAME}"
+
+          # Verify the downloaded file is a valid tarball
+          if ! gzip -t "dist/${ASSET_NAME}" 2>/dev/null; then
+            echo "Error: Downloaded file is not a valid gzip archive"
+            echo "File contents (first 200 bytes):"
+            head -c 200 "dist/${ASSET_NAME}"
+            exit 1
+          fi
+        else
+          echo "Downloading custom asset: ${ASSET_NAME}"
+          gh release download "${RELEASE_TAG}" \
+            --repo "${SOURCE_REPO}" \
+            --pattern "${ASSET_NAME}" \
+            --dir dist \
+            --clobber
+        fi
+
+    - name: Extract template archive
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p extracted
+
+        TARBALL=$(find dist -maxdepth 1 -type f -name '*.tar.gz' -o -name '*.tgz' | head -n 1)
+        if [ -z "${TARBALL}" ]; then
+          echo 'Unable to locate downloaded tarball.' >&2
+          exit 1
+        fi
+
+        tar -xzf "${TARBALL}" -C extracted
+
+        # Find the template directory
+        if [ -d extracted/package ]; then
+          mv extracted/package template
+        else
+          FIRST_DIR=$(find extracted -mindepth 1 -maxdepth 1 -type d | head -n 1)
+          if [ -z "${FIRST_DIR}" ]; then
+            echo 'Extracted archive did not contain a directory.' >&2
+            exit 1
+          fi
+          mv "${FIRST_DIR}" template
+        fi
+
+    - name: Clone target repository
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        TARGET_REPO: ${{ inputs.target_repo }}
+        BASE_BRANCH: ${{ inputs.base_branch }}
+      run: |
+        set -euo pipefail
+
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+        # Clone the target repository
+        echo "Cloning target repository: ${TARGET_REPO}"
+        git clone "https://x-access-token:${GH_TOKEN}@github.com/${TARGET_REPO}.git" target-repo
+        cd target-repo
+
+        # Fetch all branches
+        git fetch origin
+
+        # Try to checkout base branch, fallback to main if it doesn't exist
+        if git show-ref --verify --quiet "refs/remotes/origin/${BASE_BRANCH}"; then
+          echo "Checking out base branch: ${BASE_BRANCH}"
+          git checkout -b "${BASE_BRANCH}" "origin/${BASE_BRANCH}"
+        elif git show-ref --verify --quiet "refs/remotes/origin/main"; then
+          echo "Base branch ${BASE_BRANCH} not found, using main instead"
+          git checkout -b main "origin/main"
+          BASE_BRANCH="main"
+        else
+          echo "Warning: Neither ${BASE_BRANCH} nor main branch found, creating new branch"
+          git checkout -b "${BASE_BRANCH}"
+        fi
+
+    - name: Determine branch name
+      id: create-branch
+      shell: bash
+      working-directory: target-repo
+      env:
+        BRANCH_NAME_INPUT: ${{ inputs.branch_name }}
+        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
+      run: |
+        set -euo pipefail
+
+        if [ -n "${BRANCH_NAME_INPUT}" ]; then
+          BRANCH_NAME="${BRANCH_NAME_INPUT}"
+        else
+          # Default: update-template-{version}
+          VERSION_SLUG=$(echo "${RELEASE_TAG}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
+          BRANCH_NAME="update-template-${VERSION_SLUG}"
+        fi
+
+        echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+
+    - name: Create update branch
+      shell: bash
+      working-directory: target-repo
+      env:
+        BRANCH_NAME: ${{ steps.create-branch.outputs.branch_name }}
+      run: |
+        set -euo pipefail
+
+        # Check if branch already exists
+        if git show-ref --verify --quiet refs/heads/"${BRANCH_NAME}"; then
+          echo "Branch ${BRANCH_NAME} already exists, checking it out"
+          git checkout "${BRANCH_NAME}"
+          git pull origin "${BRANCH_NAME}" || true
+        else
+          echo "Creating new branch: ${BRANCH_NAME}"
+          git checkout -b "${BRANCH_NAME}"
+        fi
+
+    - name: Apply template changes
+      shell: bash
+      working-directory: target-repo
+      env:
+        TEMPLATE_DIR: ../template
+      run: |
+        set -euo pipefail
+
+        echo "Applying template changes..."
+
+        # Files/directories to exclude from template update
+        EXCLUDE_PATTERNS=(
+          ".git"
+          "node_modules"
+          ".next"
+          "dist"
+          "build"
+          ".env"
+          ".env.local"
+          ".env.*.local"
+          "*.log"
+          ".DS_Store"
+          ".idea"
+          ".vscode"
+          "coverage"
+          ".nyc_output"
+          "pnpm-lock.yaml"
+          "package-lock.json"
+          "yarn.lock"
+        )
+
+        # Build rsync exclude string
+        EXCLUDE_ARGS=()
+        for pattern in "${EXCLUDE_PATTERNS[@]}"; do
+          EXCLUDE_ARGS+=("--exclude=${pattern}")
+        done
+
+        # Use rsync to copy template files, excluding specified patterns
+        rsync -av "${EXCLUDE_ARGS[@]}" "${TEMPLATE_DIR}/" . || {
+          echo "Warning: rsync failed, trying alternative method with cp"
+          # Fallback: use find and cp
+          find "${TEMPLATE_DIR}" -type f | while read -r file; do
+            rel_path="${file#${TEMPLATE_DIR}/}"
+            # Skip excluded patterns
+            skip=false
+            for pattern in "${EXCLUDE_PATTERNS[@]}"; do
+              if [[ "${rel_path}" == *"${pattern}"* ]]; then
+                skip=true
+                break
+              fi
+            done
+            if [ "${skip}" = "false" ]; then
+              mkdir -p "$(dirname "${rel_path}")"
+              cp "${file}" "${rel_path}" || true
+            fi
+          done
+        }
+
+        echo "Template changes applied"
+
+    - name: Check for changes
+      id: check-changes
+      shell: bash
+      working-directory: target-repo
+      run: |
+        set -euo pipefail
+
+        # Check if there are any changes
+        if git diff --quiet && git diff --cached --quiet; then
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+          echo "No changes detected, template is already up to date"
+        else
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+          echo "Changes detected:"
+          git status --short
+        fi
+
+    - name: Commit changes
+      if: steps.check-changes.outputs.has_changes == 'true'
+      shell: bash
+      working-directory: target-repo
+      env:
+        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
+      run: |
+        set -euo pipefail
+
+        git add -A
+        git commit -m "chore: update template to ${RELEASE_TAG}" || {
+          echo "Warning: Commit failed (might be empty or no changes)"
+          exit 0
+        }
+
+    - name: Push branch
+      if: steps.check-changes.outputs.has_changes == 'true'
+      shell: bash
+      working-directory: target-repo
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        BRANCH_NAME: ${{ steps.create-branch.outputs.branch_name }}
+      run: |
+        set -euo pipefail
+
+        git push -u origin "${BRANCH_NAME}" || {
+          echo "Error: Failed to push branch"
+          exit 1
+        }
+
+    - name: Create pull request
+      id: create-pr
+      if: steps.check-changes.outputs.has_changes == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        TARGET_REPO: ${{ inputs.target_repo }}
+        BASE_BRANCH: ${{ inputs.base_branch }}
+        BRANCH_NAME: ${{ steps.create-branch.outputs.branch_name }}
+        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
+        PR_TITLE_INPUT: ${{ inputs.pr_title }}
+        PR_BODY_INPUT: ${{ inputs.pr_body }}
+      run: |
+        set -euo pipefail
+
+        # Determine PR title
+        if [ -n "${PR_TITLE_INPUT}" ]; then
+          PR_TITLE="${PR_TITLE_INPUT}"
+        else
+          PR_TITLE="chore: update template to ${RELEASE_TAG}"
+        fi
+
+        # Determine PR body
+        if [ -n "${PR_BODY_INPUT}" ]; then
+          PR_BODY="${PR_BODY_INPUT}"
+        else
+          PR_BODY="This PR updates the provisioned app to template version \`${RELEASE_TAG}\`.
+
+## Changes
+- Updated template files from \`${RELEASE_TAG}\`
+- Preserved local customizations (node_modules, .env files, etc.)
+
+## Review Checklist
+- [ ] Review changes for conflicts
+- [ ] Test the application
+- [ ] Verify dependencies are up to date
+- [ ] Check for any breaking changes"
+        fi
+
+        # Check if PR already exists
+        EXISTING_PR=$(gh pr list \
+          --repo "${TARGET_REPO}" \
+          --head "${BRANCH_NAME}" \
+          --base "${BASE_BRANCH}" \
+          --json number,url \
+          --jq '.[0] // empty' 2>/dev/null || echo "")
+
+        if [ -n "${EXISTING_PR}" ]; then
+          PR_NUMBER=$(echo "${EXISTING_PR}" | jq -r '.number')
+          PR_URL=$(echo "${EXISTING_PR}" | jq -r '.url')
+          echo "Pull request already exists: ${PR_URL}"
+          echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+          echo "pr_url=${PR_URL}" >> $GITHUB_OUTPUT
+        else
+          # Create new PR
+          PR=$(gh pr create \
+            --repo "${TARGET_REPO}" \
+            --title "${PR_TITLE}" \
+            --body "${PR_BODY}" \
+            --base "${BASE_BRANCH}" \
+            --head "${BRANCH_NAME}" \
+            --json number,url) || {
+            echo "Error: Failed to create pull request"
+            exit 1
+          }
+
+          PR_NUMBER=$(echo "${PR}" | jq -r '.number')
+          PR_URL=$(echo "${PR}" | jq -r '.url')
+          echo "Created pull request: ${PR_URL}"
+          echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+          echo "pr_url=${PR_URL}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Generate summary
+      shell: bash
+      env:
+        TARGET_REPO: ${{ inputs.target_repo }}
+        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
+        BRANCH_NAME: ${{ steps.create-branch.outputs.branch_name }}
+        HAS_CHANGES: ${{ steps.check-changes.outputs.has_changes }}
+        PR_URL: ${{ steps.create-pr.outputs.pr_url }}
+        PR_NUMBER: ${{ steps.create-pr.outputs.pr_number }}
+      run: |
+        {
+          echo '## Update Summary'
+          echo
+          echo "- **Target Repository**: ${TARGET_REPO}"
+          echo "- **Template Version**: ${RELEASE_TAG}"
+          echo "- **Branch**: ${BRANCH_NAME}"
+          if [ "${HAS_CHANGES}" = "true" ]; then
+            echo "- **Pull Request**: [#${PR_NUMBER}](${PR_URL})"
+            echo "- **Status**: ✅ Changes detected and PR created"
+          else
+            echo "- **Status**: ℹ️ No changes detected, template is already up to date"
+          fi
+        } >> "${GITHUB_STEP_SUMMARY}"
