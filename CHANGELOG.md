@@ -1,3 +1,10 @@
+# [1.18.0](https://github.com/algtools/actions/compare/v1.17.1...v1.18.0) (2025-11-08)
+
+
+### Features
+
+* new approach to the package system, added all scripts and duties to actions ([4d89da2](https://github.com/algtools/actions/commit/4d89da297bddd2ac4e7c7848e148de8a810915d2))
+
 ## [1.17.1](https://github.com/algtools/actions/compare/v1.17.0...v1.17.1) (2025-11-08)
 
 
