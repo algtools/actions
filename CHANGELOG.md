@@ -1,3 +1,10 @@
+# [1.16.0](https://github.com/algtools/actions/compare/v1.15.6...v1.16.0) (2025-11-08)
+
+
+### Features
+
+* add dev and qa branch creation and repository ruleset configuration to template action ([facd5d4](https://github.com/algtools/actions/commit/facd5d483fce7a8d4dd49035af4ded33496e192b))
+
 ## [1.15.6](https://github.com/algtools/actions/compare/v1.15.5...v1.15.6) (2025-11-08)
 
 
