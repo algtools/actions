@@ -1,3 +1,10 @@
+## [1.15.1](https://github.com/algtools/actions/compare/v1.15.0...v1.15.1) (2025-11-08)
+
+
+### Bug Fixes
+
+* enhance template release workflow with admin token support and standardized descriptions ([30fd485](https://github.com/algtools/actions/commit/30fd48599ed6a9c097283aee97d44641db99d867))
+
 # [1.15.0](https://github.com/algtools/actions/compare/v1.14.5...v1.15.0) (2025-11-08)
 
 
