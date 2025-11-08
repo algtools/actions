@@ -1,3 +1,10 @@
+## [1.15.4](https://github.com/algtools/actions/compare/v1.15.3...v1.15.4) (2025-11-08)
+
+
+### Bug Fixes
+
+* add copy-transform-utility action and transformTemplateToApp utility ([b665c25](https://github.com/algtools/actions/commit/b665c25f7204c7548ea2b691a92eada1187d59c0))
+
 ## [1.15.3](https://github.com/algtools/actions/compare/v1.15.2...v1.15.3) (2025-11-08)
 
 
