@@ -1,3 +1,10 @@
+## [1.19.2](https://github.com/algtools/actions/compare/v1.19.1...v1.19.2) (2025-11-08)
+
+
+### Bug Fixes
+
+* update directory navigation in GitHub action to improve script execution ([b32ef7a](https://github.com/algtools/actions/commit/b32ef7ac48945e2e94e34f6de47ffff13d6a5ea2))
+
 ## [1.19.1](https://github.com/algtools/actions/compare/v1.19.0...v1.19.1) (2025-11-08)
 
 
