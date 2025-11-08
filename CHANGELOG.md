@@ -1,3 +1,10 @@
+## [1.19.7](https://github.com/algtools/actions/compare/v1.19.6...v1.19.7) (2025-11-08)
+
+
+### Bug Fixes
+
+* improve file exclusion logic in template packaging ([8b201af](https://github.com/algtools/actions/commit/8b201afb7f51aec22e5474f0ae2bd465c47516f4))
+
 ## [1.19.6](https://github.com/algtools/actions/compare/v1.19.5...v1.19.6) (2025-11-08)
 
 
