@@ -34,13 +34,24 @@ export function readTemplateConfig(templateRoot: string): string[] {
 
   try {
     const configContent = fs.readFileSync(configPath, 'utf-8');
-    const excludePatterns = JSON.parse(configContent) as unknown;
+    // Trim whitespace and check for empty content
+    const trimmedContent = configContent.trim();
+    if (!trimmedContent) {
+      console.warn(`⚠️  .template-app/exclude.json is empty, using default exclusion patterns`);
+      return DEFAULT_EXCLUDE_PATTERNS;
+    }
+
+    const excludePatterns = JSON.parse(trimmedContent) as unknown;
 
     // Validate that it's an array of strings
     if (!Array.isArray(excludePatterns)) {
       console.warn(
         `⚠️  .template-app/exclude.json is not an array, using default exclusion patterns`,
       );
+      console.warn(`   Config path: ${configPath}`);
+      console.warn(`   Parsed content type: ${typeof excludePatterns}`);
+      console.warn(`   Parsed content: ${JSON.stringify(excludePatterns)}`);
+      console.warn(`   Raw content (first 200 chars): ${trimmedContent.substring(0, 200)}`);
       return DEFAULT_EXCLUDE_PATTERNS;
     }
 
