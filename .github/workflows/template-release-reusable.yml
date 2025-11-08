@@ -54,6 +54,20 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Checkout actions repository
+        uses: actions/checkout@v4
+        with:
+          repository: algtools/actions
+          path: /tmp/actions-repo
+          token: ${{ secrets.gh_token }}
+
+      - name: Copy transform utility
+        run: |
+          echo "📋 Copying transform utility..."
+          mkdir -p ${{ inputs.working_directory }}/scripts
+          cp /tmp/actions-repo/.github/actions/test-template/transformTemplateToApp.ts ${{ inputs.working_directory }}/scripts/transformTemplateToApp.ts
+          echo "✅ Transform utility copied"
+
       - name: Bump Version
         id: bump
         uses: algtools/actions/.github/actions/bump-version@main
