@@ -726,7 +726,7 @@ name: Weekly Template Update
 
 on:
   schedule:
-    - cron: '0 0 * * 1'  # Every Monday
+    - cron: '0 0 * * 1' # Every Monday
 
 jobs:
   update:

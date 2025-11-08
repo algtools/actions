@@ -101,25 +101,25 @@ jobs:
 
 ## Inputs
 
-| Input         | Description                                                      | Required | Default                    |
-| ------------- | ---------------------------------------------------------------- | -------- | -------------------------- |
-| `source_repo` | Source template repository (e.g., 'owner/repo')                 | Yes      | -                          |
-| `target_repo` | Target repository to update (e.g., 'owner/app-name')              | Yes      | -                          |
-| `version`     | Template release tag (use 'latest' for newest release)          | No       | `"latest"`                 |
-| `base_branch` | Base branch to create PR against                                 | No       | `"main"`                   |
-| `branch_name` | Name for the update branch (default: update-template-{version}) | No       | `""`                       |
-| `pr_title`    | Title for the pull request                                       | No       | `"chore: update template to {version}"` |
-| `pr_body`     | Body for the pull request (default: auto-generated)             | No       | `""`                       |
-| `github_token`| GitHub token with repo permissions                              | Yes      | -                          |
+| Input          | Description                                                     | Required | Default                                 |
+| -------------- | --------------------------------------------------------------- | -------- | --------------------------------------- |
+| `source_repo`  | Source template repository (e.g., 'owner/repo')                 | Yes      | -                                       |
+| `target_repo`  | Target repository to update (e.g., 'owner/app-name')            | Yes      | -                                       |
+| `version`      | Template release tag (use 'latest' for newest release)          | No       | `"latest"`                              |
+| `base_branch`  | Base branch to create PR against                                | No       | `"main"`                                |
+| `branch_name`  | Name for the update branch (default: update-template-{version}) | No       | `""`                                    |
+| `pr_title`     | Title for the pull request                                      | No       | `"chore: update template to {version}"` |
+| `pr_body`      | Body for the pull request (default: auto-generated)             | No       | `""`                                    |
+| `github_token` | GitHub token with repo permissions                              | Yes      | -                                       |
 
 ## Outputs
 
-| Output        | Description                            |
-| ------------- | -------------------------------------- |
-| `pr_url`      | URL of the created pull request        |
-| `pr_number`   | Number of the created pull request     |
-| `release_tag` | Template version used for the update   |
-| `branch_name` | Name of the branch created             |
+| Output        | Description                          |
+| ------------- | ------------------------------------ |
+| `pr_url`      | URL of the created pull request      |
+| `pr_number`   | Number of the created pull request   |
+| `release_tag` | Template version used for the update |
+| `branch_name` | Name of the branch created           |
 
 ## How It Works
 
@@ -150,6 +150,7 @@ The action automatically excludes the following from template updates to preserv
 ## Branch Naming
 
 By default, branches are named `update-template-{version}` where `{version}` is the release tag (normalized). For example:
+
 - `update-template-v1-2-3` for version `v1.2.3`
 - `update-template-latest` for version `latest`
 
@@ -177,7 +178,7 @@ name: Weekly Template Update
 
 on:
   schedule:
-    - cron: '0 0 * * 1'  # Every Monday
+    - cron: '0 0 * * 1' # Every Monday
 
 jobs:
   update:
