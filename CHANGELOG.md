@@ -1,3 +1,16 @@
+# [1.15.0](https://github.com/algtools/actions/compare/v1.14.5...v1.15.0) (2025-11-08)
+
+
+### Bug Fixes
+
+* format README and update workflow to include transform utility copying ([ad33d16](https://github.com/algtools/actions/commit/ad33d160458c4bbc2a73448936ae9f40e843d656))
+
+
+### Features
+
+* Add update-provisioned-app action and workflow ([d74ef28](https://github.com/algtools/actions/commit/d74ef28524bde5e6a6c456e2f74f66a4d1c26788))
+* Improve PR body generation in update-provisioned-app action ([67139bc](https://github.com/algtools/actions/commit/67139bccebd463ace7f8eea32b5478b1bccdffdf))
+
 ## [1.14.5](https://github.com/algtools/actions/compare/v1.14.4...v1.14.5) (2025-11-08)
 
 
