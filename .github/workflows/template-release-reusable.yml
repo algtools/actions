@@ -58,14 +58,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: algtools/actions
-          path: /tmp/actions-repo
+          path: actions-repo
           token: ${{ secrets.gh_token }}
 
       - name: Copy transform utility
         run: |
           echo "📋 Copying transform utility..."
           mkdir -p ${{ inputs.working_directory }}/scripts
-          cp /tmp/actions-repo/.github/actions/test-template/transformTemplateToApp.ts ${{ inputs.working_directory }}/scripts/transformTemplateToApp.ts
+          cp actions-repo/.github/actions/test-template/transformTemplateToApp.ts ${{ inputs.working_directory }}/scripts/transformTemplateToApp.ts
           echo "✅ Transform utility copied"
 
       - name: Bump Version
