@@ -53,7 +53,7 @@ runs:
           DRAFT_FLAG="--draft"
         fi
 
-        tsx index.ts \
+        pnpm exec tsx index.ts \
           "${{ inputs.template_name }}" \
           "${{ inputs.version }}" \
           "${{ inputs.working_directory }}/${{ inputs.tarball_path }}" \
