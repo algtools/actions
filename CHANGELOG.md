@@ -1,3 +1,10 @@
+## [1.19.5](https://github.com/algtools/actions/compare/v1.19.4...v1.19.5) (2025-11-08)
+
+
+### Bug Fixes
+
+* update working directory handling and path resolution in template packaging action ([1249ad1](https://github.com/algtools/actions/commit/1249ad13dd49ef49b4679626ad45300af26d8346))
+
 ## [1.19.4](https://github.com/algtools/actions/compare/v1.19.3...v1.19.4) (2025-11-08)
 
 
