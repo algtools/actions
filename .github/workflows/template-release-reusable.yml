@@ -56,30 +56,28 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Set token for actions repo checkout
-        id: set-token
-        run: |
-          if [ -n "${{ secrets.admin_token }}" ]; then
-            echo "token=${{ secrets.admin_token }}" >> "$GITHUB_OUTPUT"
-            echo "Using admin_token for actions repository checkout"
-          else
-            echo "token=${{ github.token }}" >> "$GITHUB_OUTPUT"
-            echo "Using github.token for actions repository checkout"
-          fi
-
-      - name: Checkout actions repository
-        uses: actions/checkout@v4
-        with:
-          repository: algtools/actions
-          ref: main
-          path: actions-repo
-          token: ${{ steps.set-token.outputs.token }}
-
       - name: Copy transform utility
         run: |
           echo "📋 Copying transform utility..."
           mkdir -p ${{ inputs.working_directory }}/scripts
-          cp actions-repo/.github/actions/test-template/transformTemplateToApp.ts ${{ inputs.working_directory }}/scripts/transformTemplateToApp.ts
+
+          # Determine which token to use
+          TOKEN="${{ secrets.admin_token }}"
+          if [ -z "$TOKEN" ]; then
+            TOKEN="${{ secrets.gh_token }}"
+          fi
+
+          # Download file using GitHub API with authentication
+          echo "Downloading transform utility from GitHub API..."
+          curl -f -H "Authorization: token ${TOKEN}" \
+            -H "Accept: application/vnd.github.v3.raw" \
+            -L "https://api.github.com/repos/algtools/actions/contents/.github/actions/test-template/transformTemplateToApp.ts?ref=main" \
+            -o ${{ inputs.working_directory }}/scripts/transformTemplateToApp.ts
+
+          if [ ! -f "${{ inputs.working_directory }}/scripts/transformTemplateToApp.ts" ]; then
+            echo "❌ Failed to download transform utility"
+            exit 1
+          fi
           echo "✅ Transform utility copied"
 
       - name: Bump Version
