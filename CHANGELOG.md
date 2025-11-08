@@ -1,3 +1,10 @@
+# [1.19.0](https://github.com/algtools/actions/compare/v1.18.1...v1.19.0) (2025-11-08)
+
+
+### Features
+
+* add GitHub action to create template releases with tarball asset ([796d749](https://github.com/algtools/actions/commit/796d749864df9b21be5d121267cf801a67e6ad6b))
+
 ## [1.18.1](https://github.com/algtools/actions/compare/v1.18.0...v1.18.1) (2025-11-08)
 
 
