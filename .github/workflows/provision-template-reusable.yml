@@ -7,12 +7,18 @@ on:
         description: "Name of the repository to create (e.g. acme-bff)"
         required: true
         type: string
-      slug:
-        description: "Slug used for environment configuration (e.g. janovi)"
-        required: true
-        type: string
       sentry_project:
         description: "Sentry project name (defaults to repository name if not provided)"
+        required: false
+        type: string
+        default: ""
+      sentry_dsn:
+        description: "Sentry DSN for error monitoring (optional)"
+        required: false
+        type: string
+        default: ""
+      chromatic_project_token:
+        description: "Chromatic project token for visual regression testing (optional, web-template only)"
         required: false
         type: string
         default: ""
@@ -54,8 +60,9 @@ jobs:
         with:
           source_repo: ${{ github.repository }}
           app_name: ${{ inputs.app_name }}
-          slug: ${{ inputs.slug }}
           sentry_project: ${{ inputs.sentry_project }}
+          sentry_dsn: ${{ inputs.sentry_dsn }}
+          chromatic_project_token: ${{ inputs.chromatic_project_token }}
           version: ${{ inputs.version }}
           admin_token: ${{ secrets.admin_token }}
           github_token: ${{ github.token }}

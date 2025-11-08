@@ -5,13 +5,27 @@ echo "Running pre-commit checks..."
 # Run lint-staged for formatted files
 npx lint-staged
 
-# Run actionlint on all workflow files (skip if not installed)
-echo "🔍 Validating workflow files..."
-if command -v actionlint >/dev/null 2>&1; then
-  pnpm run lint:workflows
-else
-  echo "⚠️  actionlint not found, skipping workflow validation"
-  echo "   (Install actionlint locally for workflow validation)"
+# Check if any workflow files are staged
+STAGED_WORKFLOWS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(yml|yaml)$' | grep -E '\.github/workflows/|\.github/actions/' || true)
+
+# Run actionlint on workflow files if any are staged (skip if not installed)
+if [ -n "$STAGED_WORKFLOWS" ]; then
+  echo "🔍 Validating workflow files..."
+  if command -v actionlint >/dev/null 2>&1; then
+    # Run actionlint on all workflow files (not just staged, to catch dependencies)
+    pnpm run lint:workflows
+    if [ $? -ne 0 ]; then
+      echo "❌ Workflow validation failed. Please fix the errors above."
+      exit 1
+    fi
+  else
+    echo "⚠️  actionlint not found, skipping workflow validation"
+    echo "   Install actionlint for local validation:"
+    echo "   - Windows: choco install actionlint"
+    echo "   - macOS: brew install actionlint"
+    echo "   - Go: go install github.com/rhysd/actionlint/cmd/actionlint@latest"
+    echo "   CI will still validate workflows on push/PR"
+  fi
 fi
 
 echo "✅ All pre-commit checks passed!"
