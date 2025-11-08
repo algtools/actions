@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { readTemplateConfig } from './readTemplateConfig';
 
 interface PackageJson {
   scripts?: Record<string, string>;
@@ -8,112 +9,25 @@ interface PackageJson {
 }
 
 /**
- * Helper to create GitHub Actions expression syntax
+ * Copy directory recursively
  */
-function ghaExpr(expr: string): string {
-  return '${{ ' + expr + ' }}';
-}
+function copyDirectorySync(source: string, destination: string): void {
+  if (!fs.existsSync(destination)) {
+    fs.mkdirSync(destination, { recursive: true });
+  }
 
-/**
- * Generate release-app.yml workflow content
- */
-function generateReleaseAppWorkflow(): string {
-  return `name: Release App
+  const entries = fs.readdirSync(source, { withFileTypes: true });
 
-on:
-  push:
-    branches:
-      - main
-      - qa
-  workflow_dispatch:
-    inputs:
-      dry_run:
-        description: 'Dry run mode'
-        required: false
-        type: boolean
-        default: false
+  for (const entry of entries) {
+    const sourcePath = path.join(source, entry.name);
+    const destPath = path.join(destination, entry.name);
 
-permissions:
-  contents: write
-  issues: write
-  pull-requests: write
-  packages: read
-  deployments: write
-
-jobs:
-  # Check if this is a template repository
-  check-template:
-    name: Check Template
-    runs-on: ubuntu-latest
-    outputs:
-      is_template: ${ghaExpr('steps.check.outputs.is_template')}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Check if template repository
-        id: check
-        run: |
-          if [ -f "scripts/templatePack.ts" ]; then
-            echo "is_template=true" >> $GITHUB_OUTPUT
-            echo "This is a template repository"
-          else
-            echo "is_template=false" >> $GITHUB_OUTPUT
-            echo "This is a provisioned app"
-          fi
-
-  # Release app tarball
-  release-app:
-    name: Release App
-    needs: check-template
-    if: ${ghaExpr('needs.check-template.outputs.is_template')} == 'false'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Check skip CI
-        id: check-skip
-        run: |
-          if [[ "${ghaExpr('github.event.head_commit.message')}" == *"[skip ci]"* ]]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-          else
-            echo "skip=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Setup Node.js
-        if: steps.check-skip.outputs.skip != 'true' || github.event_name == 'workflow_dispatch'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-
-      - name: Install pnpm
-        if: steps.check-skip.outputs.skip != 'true' || github.event_name == 'workflow_dispatch'
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Install dependencies
-        if: steps.check-skip.outputs.skip != 'true' || github.event_name == 'workflow_dispatch'
-        run: pnpm install --frozen-lockfile
-
-      - name: Run semantic-release
-        if: steps.check-skip.outputs.skip != 'true' || github.event_name == 'workflow_dispatch'
-        env:
-          GITHUB_TOKEN: ${ghaExpr('secrets.GITHUB_TOKEN')}
-          NPM_TOKEN: ${ghaExpr('secrets.NPM_TOKEN')}
-        run: |
-          if [ "${ghaExpr('inputs.dry_run')}" = "true" ]; then
-            pnpm exec semantic-release --dry-run
-          else
-            pnpm exec semantic-release
-          fi
-`;
+    if (entry.isDirectory()) {
+      copyDirectorySync(sourcePath, destPath);
+    } else {
+      fs.copyFileSync(sourcePath, destPath);
+    }
+  }
 }
 
 /**
@@ -285,9 +199,21 @@ packApp().catch((error) => {
 }
 
 /**
+ * Check if a file path matches an exclude pattern
+ */
+function matchesExcludePattern(filePath: string, pattern: string): boolean {
+  if (pattern.startsWith('.')) {
+    const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`[/\\\\]${escapedPattern}([/\\\\]|$)`);
+    return regex.test(filePath) || filePath.endsWith(pattern) || filePath === pattern;
+  }
+  return filePath.includes(pattern);
+}
+
+/**
  * Transform template structure to app structure
  * @param buildDir - Path to the build directory (where tokenized template is)
- * @param templateRoot - Path to the template root (for copying existing appPack.ts if it exists)
+ * @param templateRoot - Path to the template root (for reading exclude.json and include folder)
  * @param templateType - Type of template ('web', 'core', or 'bff')
  */
 export function transformTemplateToApp(
@@ -301,6 +227,9 @@ export function transformTemplateToApp(
   const scriptsDir = path.join(buildDir, 'scripts');
   const packageJsonPath = path.join(buildDir, 'package.json');
 
+  // Read exclude patterns from template root
+  const excludePatterns = templateRoot ? readTemplateConfig(templateRoot) : [];
+
   // Ensure workflows directory exists
   if (!fs.existsSync(workflowsDir)) {
     fs.mkdirSync(workflowsDir, { recursive: true });
@@ -313,38 +242,68 @@ export function transformTemplateToApp(
     console.log('  ✓ Created scripts directory');
   }
 
-  // 1. Transform release-template.yml to release-app.yml (if it exists and release-app.yml doesn't)
-  const releaseTemplatePath = path.join(workflowsDir, 'release-template.yml');
-  const releaseAppPath = path.join(workflowsDir, 'release-app.yml');
+  // 1. Copy files from .template-app/include/ to build directory root
+  if (templateRoot) {
+    const includeDir = path.join(templateRoot, '.template-app', 'include');
+    if (fs.existsSync(includeDir)) {
+      console.log('  📋 Copying files from .template-app/include/...');
+      copyDirectorySync(includeDir, buildDir);
+      console.log('  ✓ Copied files from include folder');
 
-  if (fs.existsSync(releaseTemplatePath) && !fs.existsSync(releaseAppPath)) {
-    const releaseAppContent = generateReleaseAppWorkflow();
-    fs.writeFileSync(releaseAppPath, releaseAppContent, 'utf-8');
-    fs.unlinkSync(releaseTemplatePath);
-    console.log('  ✓ Transformed release-template.yml to release-app.yml');
-  } else if (fs.existsSync(releaseAppPath)) {
-    console.log('  ✓ release-app.yml already exists');
-  } else if (!fs.existsSync(releaseTemplatePath) && !fs.existsSync(releaseAppPath)) {
-    // If neither exists, create release-app.yml from scratch
-    const releaseAppContent = generateReleaseAppWorkflow();
-    fs.writeFileSync(releaseAppPath, releaseAppContent, 'utf-8');
-    console.log('  ✓ Created release-app.yml');
-  }
+      // Specifically ensure release-app.yml is in the right place
+      const includeReleaseApp = path.join(includeDir, '.github', 'workflows', 'release-app.yml');
+      const targetReleaseApp = path.join(workflowsDir, 'release-app.yml');
+      if (fs.existsSync(includeReleaseApp) && !fs.existsSync(targetReleaseApp)) {
+        fs.copyFileSync(includeReleaseApp, targetReleaseApp);
+        console.log('  ✓ Copied release-app.yml from include folder');
+      }
 
-  // 2. Remove template-specific workflows
-  const templateWorkflows = ['retry-release.yml', 'provision-template.yml'];
-  for (const workflow of templateWorkflows) {
-    const workflowPath = path.join(workflowsDir, workflow);
-    if (fs.existsSync(workflowPath)) {
-      fs.unlinkSync(workflowPath);
-      console.log(`  ✓ Removed ${workflow}`);
+      // Ensure .cursorrules is in the right place
+      const includeCursorRules = path.join(includeDir, '.cursorrules');
+      const targetCursorRules = path.join(buildDir, '.cursorrules');
+      if (fs.existsSync(includeCursorRules)) {
+        // Remove existing .cursorrules if it exists (template dev version)
+        if (fs.existsSync(targetCursorRules)) {
+          fs.unlinkSync(targetCursorRules);
+        }
+        fs.copyFileSync(includeCursorRules, targetCursorRules);
+        console.log('  ✓ Copied .cursorrules from include folder');
+      }
+    } else {
+      console.log('  ⚠️  .template-app/include/ folder not found, skipping include copy');
     }
   }
 
-  // 3. Ensure appPack.ts exists
+  // 2. Remove template-specific workflows using exclude patterns
+  if (fs.existsSync(workflowsDir)) {
+    const workflowFiles = fs.readdirSync(workflowsDir);
+    for (const workflowFile of workflowFiles) {
+      const workflowPath = path.join(workflowsDir, workflowFile);
+      const relativePath = `.github/workflows/${workflowFile}`;
+
+      // Check if this workflow should be excluded
+      const shouldExclude = excludePatterns.some((pattern) =>
+        matchesExcludePattern(relativePath, pattern),
+      );
+
+      if (shouldExclude && fs.statSync(workflowPath).isFile()) {
+        fs.unlinkSync(workflowPath);
+        console.log(`  ✓ Removed ${workflowFile}`);
+      }
+    }
+  }
+
+  // 3. Remove .template-app/ folder from build directory (it shouldn't appear in final package)
+  const templateAppDir = path.join(buildDir, '.template-app');
+  if (fs.existsSync(templateAppDir)) {
+    fs.rmSync(templateAppDir, { recursive: true, force: true });
+    console.log('  ✓ Removed .template-app/ folder from build');
+  }
+
+  // 4. Ensure appPack.ts exists
   const appPackPath = path.join(scriptsDir, 'appPack.ts');
   if (!fs.existsSync(appPackPath)) {
-    // Check if source template has appPack.ts (for bff-template)
+    // Check if source template has appPack.ts
     if (templateRoot) {
       const sourceAppPackPath = path.join(templateRoot, 'scripts', 'appPack.ts');
       if (fs.existsSync(sourceAppPackPath)) {
@@ -366,7 +325,7 @@ export function transformTemplateToApp(
     console.log('  ✓ appPack.ts already exists');
   }
 
-  // 4. Update package.json to ensure app:pack script exists
+  // 5. Update package.json to ensure app:pack script exists
   if (fs.existsSync(packageJsonPath)) {
     const packageJson: PackageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
 

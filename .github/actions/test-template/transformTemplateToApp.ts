@@ -285,9 +285,76 @@ packApp().catch((error) => {
 }
 
 /**
+ * Check if a file path matches an exclude pattern
+ */
+function matchesExcludePattern(filePath: string, pattern: string): boolean {
+  if (pattern.startsWith('.')) {
+    const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`[/\\\\]${escapedPattern}([/\\\\]|$)`);
+    return regex.test(filePath) || filePath.endsWith(pattern) || filePath === pattern;
+  }
+  return filePath.includes(pattern);
+}
+
+/**
+ * Read exclude patterns from .template-app/exclude.json
+ */
+function readExcludePatterns(templateRoot: string): string[] {
+  const configPath = path.join(templateRoot, '.template-app', 'exclude.json');
+  const defaultPatterns = [
+    '.github/workflows/release-template.yml',
+    '.github/workflows/retry-release.yml',
+    '.github/workflows/provision-template.yml',
+    '.cursorrules',
+    'scripts/templateWrap.ts',
+    'scripts/templateTokenize.ts',
+    'scripts/templatePack.ts',
+    'scripts/templateRelease.ts',
+  ];
+
+  if (!fs.existsSync(configPath)) {
+    return defaultPatterns;
+  }
+
+  try {
+    const configContent = fs.readFileSync(configPath, 'utf-8');
+    const excludePatterns = JSON.parse(configContent) as unknown;
+    if (Array.isArray(excludePatterns) && excludePatterns.every((p) => typeof p === 'string')) {
+      return excludePatterns as string[];
+    }
+  } catch {
+    // Fall through to default
+  }
+
+  return defaultPatterns;
+}
+
+/**
+ * Copy directory recursively
+ */
+function copyDirectorySync(source: string, destination: string): void {
+  if (!fs.existsSync(destination)) {
+    fs.mkdirSync(destination, { recursive: true });
+  }
+
+  const entries = fs.readdirSync(source, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const sourcePath = path.join(source, entry.name);
+    const destPath = path.join(destination, entry.name);
+
+    if (entry.isDirectory()) {
+      copyDirectorySync(sourcePath, destPath);
+    } else {
+      fs.copyFileSync(sourcePath, destPath);
+    }
+  }
+}
+
+/**
  * Transform template structure to app structure
  * @param buildDir - Path to the build directory (where tokenized template is)
- * @param templateRoot - Path to the template root (for copying existing appPack.ts if it exists)
+ * @param templateRoot - Path to the template root (for reading exclude.json and include folder)
  * @param templateType - Type of template ('web', 'core', or 'bff')
  */
 export function transformTemplateToApp(
@@ -301,6 +368,9 @@ export function transformTemplateToApp(
   const scriptsDir = path.join(buildDir, 'scripts');
   const packageJsonPath = path.join(buildDir, 'package.json');
 
+  // Read exclude patterns from template root
+  const excludePatterns = templateRoot ? readExcludePatterns(templateRoot) : [];
+
   // Ensure workflows directory exists
   if (!fs.existsSync(workflowsDir)) {
     fs.mkdirSync(workflowsDir, { recursive: true });
@@ -313,35 +383,80 @@ export function transformTemplateToApp(
     console.log('  ✓ Created scripts directory');
   }
 
-  // 1. Transform release-template.yml to release-app.yml (if it exists and release-app.yml doesn't)
-  const releaseTemplatePath = path.join(workflowsDir, 'release-template.yml');
-  const releaseAppPath = path.join(workflowsDir, 'release-app.yml');
+  // 1. Copy files from .template-app/include/ to build directory root
+  if (templateRoot) {
+    const includeDir = path.join(templateRoot, '.template-app', 'include');
+    if (fs.existsSync(includeDir)) {
+      console.log('  📋 Copying files from .template-app/include/...');
+      copyDirectorySync(includeDir, buildDir);
+      console.log('  ✓ Copied files from include folder');
 
-  if (fs.existsSync(releaseTemplatePath) && !fs.existsSync(releaseAppPath)) {
-    const releaseAppContent = generateReleaseAppWorkflow();
-    fs.writeFileSync(releaseAppPath, releaseAppContent, 'utf-8');
-    fs.unlinkSync(releaseTemplatePath);
-    console.log('  ✓ Transformed release-template.yml to release-app.yml');
-  } else if (fs.existsSync(releaseAppPath)) {
-    console.log('  ✓ release-app.yml already exists');
-  } else if (!fs.existsSync(releaseTemplatePath) && !fs.existsSync(releaseAppPath)) {
-    // If neither exists, create release-app.yml from scratch
-    const releaseAppContent = generateReleaseAppWorkflow();
-    fs.writeFileSync(releaseAppPath, releaseAppContent, 'utf-8');
-    console.log('  ✓ Created release-app.yml');
-  }
+      // Specifically ensure release-app.yml is in the right place
+      const includeReleaseApp = path.join(includeDir, '.github', 'workflows', 'release-app.yml');
+      const targetReleaseApp = path.join(workflowsDir, 'release-app.yml');
+      if (fs.existsSync(includeReleaseApp) && !fs.existsSync(targetReleaseApp)) {
+        fs.copyFileSync(includeReleaseApp, targetReleaseApp);
+        console.log('  ✓ Copied release-app.yml from include folder');
+      }
 
-  // 2. Remove template-specific workflows
-  const templateWorkflows = ['retry-release.yml', 'provision-template.yml'];
-  for (const workflow of templateWorkflows) {
-    const workflowPath = path.join(workflowsDir, workflow);
-    if (fs.existsSync(workflowPath)) {
-      fs.unlinkSync(workflowPath);
-      console.log(`  ✓ Removed ${workflow}`);
+      // Ensure .cursorrules is in the right place
+      const includeCursorRules = path.join(includeDir, '.cursorrules');
+      const targetCursorRules = path.join(buildDir, '.cursorrules');
+      if (fs.existsSync(includeCursorRules)) {
+        // Remove existing .cursorrules if it exists (template dev version)
+        if (fs.existsSync(targetCursorRules)) {
+          fs.unlinkSync(targetCursorRules);
+        }
+        fs.copyFileSync(includeCursorRules, targetCursorRules);
+        console.log('  ✓ Copied .cursorrules from include folder');
+      }
+    } else {
+      console.log('  ⚠️  .template-app/include/ folder not found, using fallback');
+      // Fallback: Generate release-app.yml if include folder doesn't exist
+      const releaseAppPath = path.join(workflowsDir, 'release-app.yml');
+      if (!fs.existsSync(releaseAppPath)) {
+        const releaseAppContent = generateReleaseAppWorkflow();
+        fs.writeFileSync(releaseAppPath, releaseAppContent, 'utf-8');
+        console.log('  ✓ Created release-app.yml (fallback)');
+      }
+    }
+  } else {
+    // Fallback: Generate release-app.yml if templateRoot not provided
+    const releaseAppPath = path.join(workflowsDir, 'release-app.yml');
+    if (!fs.existsSync(releaseAppPath)) {
+      const releaseAppContent = generateReleaseAppWorkflow();
+      fs.writeFileSync(releaseAppPath, releaseAppContent, 'utf-8');
+      console.log('  ✓ Created release-app.yml (fallback)');
     }
   }
 
-  // 3. Ensure appPack.ts exists
+  // 2. Remove template-specific workflows using exclude patterns
+  if (fs.existsSync(workflowsDir)) {
+    const workflowFiles = fs.readdirSync(workflowsDir);
+    for (const workflowFile of workflowFiles) {
+      const workflowPath = path.join(workflowsDir, workflowFile);
+      const relativePath = `.github/workflows/${workflowFile}`;
+
+      // Check if this workflow should be excluded
+      const shouldExclude = excludePatterns.some((pattern) =>
+        matchesExcludePattern(relativePath, pattern),
+      );
+
+      if (shouldExclude && fs.statSync(workflowPath).isFile()) {
+        fs.unlinkSync(workflowPath);
+        console.log(`  ✓ Removed ${workflowFile}`);
+      }
+    }
+  }
+
+  // 3. Remove .template-app/ folder from build directory (it shouldn't appear in final package)
+  const templateAppDir = path.join(buildDir, '.template-app');
+  if (fs.existsSync(templateAppDir)) {
+    fs.rmSync(templateAppDir, { recursive: true, force: true });
+    console.log('  ✓ Removed .template-app/ folder from build');
+  }
+
+  // 4. Ensure appPack.ts exists
   const appPackPath = path.join(scriptsDir, 'appPack.ts');
   if (!fs.existsSync(appPackPath)) {
     // Check if source template has appPack.ts (for bff-template)
@@ -366,7 +481,7 @@ export function transformTemplateToApp(
     console.log('  ✓ appPack.ts already exists');
   }
 
-  // 4. Update package.json to ensure app:pack script exists
+  // 5. Update package.json to ensure app:pack script exists
   if (fs.existsSync(packageJsonPath)) {
     const packageJson: PackageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
 

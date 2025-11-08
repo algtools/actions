@@ -1,0 +1,53 @@
+name: "Template Pack Utility"
+description: "Wraps, tokenizes, transforms, and prepares template for packaging"
+inputs:
+  working_directory:
+    description: "Directory containing the template"
+    required: true
+  template_name:
+    description: "Name of the template (e.g., bff-template)"
+    required: true
+  template_type:
+    description: "Type of template ('web', 'core', or 'bff')"
+    required: false
+    default: "bff"
+outputs:
+  build_dir:
+    description: "Path to build directory"
+    value: ${{ steps.pack.outputs.build_dir }}
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 9
+
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: pnpm install --frozen-lockfile
+
+    - name: Copy template pack utility
+      shell: bash
+      run: |
+        mkdir -p "${{ inputs.working_directory }}/.github/actions/template-pack-utility"
+        # Copy all files from action directory
+        cp -r "${{ github.action_path }}"/* "${{ inputs.working_directory }}/.github/actions/template-pack-utility/" 2>/dev/null || true
+        # Ensure action.yml is not copied (it's not needed)
+        rm -f "${{ inputs.working_directory }}/.github/actions/template-pack-utility/action.yml" 2>/dev/null || true
+
+    - name: Run template packaging
+      id: pack
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: |
+        BUILD_DIR="${{ inputs.working_directory }}/.template-build"
+        echo "build_dir=${BUILD_DIR}" >> $GITHUB_OUTPUT
+        cd .github/actions/template-pack-utility
+        tsx index.ts "${{ inputs.working_directory }}" "${{ inputs.template_name }}" "${{ inputs.template_type }}"

@@ -230,18 +230,28 @@ runs:
           git checkout -b "${BRANCH_NAME}"
         fi
 
-    - name: Apply template changes
+    - name: Read template exclude patterns
+      id: exclude-patterns
       shell: bash
-      working-directory: target-repo
       env:
         TEMPLATE_DIR: ../template
       run: |
         set -euo pipefail
 
-        echo "Applying template changes..."
+        # Template-specific excludes (files that shouldn't be in apps)
+        TEMPLATE_SPECIFIC_EXCLUDES=(
+          ".github/workflows/release-template.yml"
+          ".github/workflows/retry-release.yml"
+          ".github/workflows/provision-template.yml"
+          ".cursorrules"
+          "scripts/templateWrap.ts"
+          "scripts/templateTokenize.ts"
+          "scripts/templatePack.ts"
+          "scripts/templateRelease.ts"
+        )
 
-        # Files/directories to exclude from template update
-        EXCLUDE_PATTERNS=(
+        # User/build file excludes (should never be overwritten)
+        USER_FILE_EXCLUDES=(
           ".git"
           "node_modules"
           ".next"
@@ -259,6 +269,69 @@ runs:
           "pnpm-lock.yaml"
           "package-lock.json"
           "yarn.lock"
+        )
+
+        # Try to read exclude.json from template (may not exist if .template-app was removed)
+        EXCLUDE_CONFIG="${TEMPLATE_DIR}/.template-app/exclude.json"
+        if [ -f "${EXCLUDE_CONFIG}" ]; then
+          echo "Reading exclude patterns from .template-app/exclude.json"
+          if command -v jq &> /dev/null; then
+            TEMPLATE_EXCLUDES=$(jq -r '.[]' "${EXCLUDE_CONFIG}" 2>/dev/null || echo "")
+            if [ -n "${TEMPLATE_EXCLUDES}" ]; then
+              # Use template-specific excludes from config
+              TEMPLATE_SPECIFIC_EXCLUDES=()
+              while IFS= read -r pattern; do
+                TEMPLATE_SPECIFIC_EXCLUDES+=("${pattern}")
+              done <<< "${TEMPLATE_EXCLUDES}"
+            fi
+          fi
+        else
+          echo "No .template-app/exclude.json found, using default template-specific excludes"
+        fi
+
+        # Combine all excludes
+        EXCLUDE_PATTERNS=("${TEMPLATE_SPECIFIC_EXCLUDES[@]}" "${USER_FILE_EXCLUDES[@]}")
+
+        # Convert array to JSON for output
+        EXCLUDE_JSON=$(printf '%s\n' "${EXCLUDE_PATTERNS[@]}" | jq -R . | jq -s . 2>/dev/null || echo "[]")
+        echo "exclude_patterns=${EXCLUDE_JSON}" >> $GITHUB_OUTPUT
+        echo "exclude_count=${#EXCLUDE_PATTERNS[@]}" >> $GITHUB_OUTPUT
+
+    - name: Apply template changes
+      shell: bash
+      working-directory: target-repo
+      env:
+        TEMPLATE_DIR: ../template
+        EXCLUDE_PATTERNS_JSON: ${{ steps.exclude-patterns.outputs.exclude_patterns }}
+      run: |
+        set -euo pipefail
+
+        echo "Applying template changes..."
+
+        # Parse exclude patterns from JSON
+        if command -v jq &> /dev/null && [ -n "${EXCLUDE_PATTERNS_JSON}" ]; then
+          EXCLUDE_PATTERNS=($(echo "${EXCLUDE_PATTERNS_JSON}" | jq -r '.[]' 2>/dev/null || echo ""))
+        else
+          # Fallback to default patterns
+          EXCLUDE_PATTERNS=(
+            ".git"
+            "node_modules"
+            ".next"
+            "dist"
+            "build"
+            ".env"
+            ".env.local"
+            ".env.*.local"
+            "*.log"
+            ".DS_Store"
+            ".idea"
+            ".vscode"
+            "coverage"
+            ".nyc_output"
+            "pnpm-lock.yaml"
+            "package-lock.json"
+            "yarn.lock"
+          )
         )
 
         # Build rsync exclude string

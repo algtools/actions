@@ -1,5 +1,5 @@
 name: "Package Template"
-description: "Wraps, tokenizes, and packages a template into a tarball"
+description: "Wraps, tokenizes, transforms, and packages a template into a tarball"
 inputs:
   working_directory:
     description: "Directory containing the template"
@@ -10,6 +10,10 @@ inputs:
   version:
     description: "Version to package"
     required: true
+  template_type:
+    description: "Type of template ('web', 'core', or 'bff')"
+    required: false
+    default: "bff"
 outputs:
   tarball_path:
     description: "Path to generated tarball"
@@ -20,41 +24,35 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
+    - name: Run template pack utility
+      uses: algtools/actions/.github/actions/template-pack-utility@main
       with:
-        node-version: "20"
+        working_directory: ${{ inputs.working_directory }}
+        template_name: ${{ inputs.template_name }}
+        template_type: ${{ inputs.template_type }}
 
-    - name: Install pnpm
-      uses: pnpm/action-setup@v2
-      with:
-        version: 9
-
-    - name: Install dependencies
-      shell: bash
-      working-directory: ${{ inputs.working_directory }}
-      run: pnpm install --frozen-lockfile
-
-    - name: Wrap template files
-      shell: bash
-      working-directory: ${{ inputs.working_directory }}
-      run: pnpm run template:wrap
-
-    - name: Tokenize template
-      shell: bash
-      working-directory: ${{ inputs.working_directory }}
-      run: pnpm run template:tokenize
-
-    - name: Pack template
+    - name: Create tarball
       id: pack
       shell: bash
       working-directory: ${{ inputs.working_directory }}
       run: |
-        pnpm run template:pack
+        set -euo pipefail
+
+        BUILD_DIR="${{ inputs.working_directory }}/.template-build"
+        DIST_DIR="${{ inputs.working_directory }}/template-dist"
         TARBALL_NAME="${{ inputs.template_name }}-v${{ inputs.version }}.tgz"
         TARBALL_PATH="template-dist/${TARBALL_NAME}"
+
+        # Create dist directory
+        mkdir -p "${DIST_DIR}"
+
+        # Create tarball from build directory
+        cd "${BUILD_DIR}"
+        tar -czf "../${TARBALL_PATH}" .
+
         echo "tarball_path=${TARBALL_PATH}" >> $GITHUB_OUTPUT
         echo "tarball_name=${TARBALL_NAME}" >> $GITHUB_OUTPUT
+        echo "✅ Created tarball: ${TARBALL_NAME}"
 
     - name: Format generated files
       shell: bash
