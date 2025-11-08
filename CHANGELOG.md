@@ -1,3 +1,10 @@
+## [1.19.1](https://github.com/algtools/actions/compare/v1.19.0...v1.19.1) (2025-11-08)
+
+
+### Bug Fixes
+
+* update command to use pnpm exec for executing scripts in GitHub actions ([ce61bac](https://github.com/algtools/actions/commit/ce61bac192159da679c66395b58b5ab9d1498f1e))
+
 # [1.19.0](https://github.com/algtools/actions/compare/v1.18.1...v1.19.0) (2025-11-08)
 
 
