@@ -1,3 +1,10 @@
+## [1.19.8](https://github.com/algtools/actions/compare/v1.19.7...v1.19.8) (2025-11-08)
+
+
+### Bug Fixes
+
+* enhance pattern matching and error handling in file exclusion logic ([be06164](https://github.com/algtools/actions/commit/be06164288ed714ef08bb242bc24067fed278da0))
+
 ## [1.19.7](https://github.com/algtools/actions/compare/v1.19.6...v1.19.7) (2025-11-08)
 
 
