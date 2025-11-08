@@ -202,12 +202,64 @@ packApp().catch((error) => {
  * Check if a file path matches an exclude pattern
  */
 function matchesExcludePattern(filePath: string, pattern: string): boolean {
-  if (pattern.startsWith('.')) {
-    const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`[/\\\\]${escapedPattern}([/\\\\]|$)`);
-    return regex.test(filePath) || filePath.endsWith(pattern) || filePath === pattern;
+  // Normalize path separators
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  const normalizedPattern = pattern.replace(/\\/g, '/');
+
+  if (normalizedPattern.startsWith('.')) {
+    const escapedPattern = normalizedPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Match pattern at start, after /, or at end, and also match wrapped versions (e.g., .cursorrules.-packed)
+    const regex = new RegExp(`(^|[/\\\\])${escapedPattern}([/\\\\]|$|\\..*$)`);
+    return regex.test(normalizedPath) || normalizedPath.endsWith(normalizedPattern);
   }
-  return filePath.includes(pattern);
+
+  // For paths with slashes, match anywhere in the path
+  if (normalizedPattern.includes('/')) {
+    return normalizedPath.includes(normalizedPattern);
+  }
+
+  return normalizedPath.includes(normalizedPattern);
+}
+
+/**
+ * Recursively remove excluded files from build directory
+ */
+function removeExcludedFiles(dir: string, excludePatterns: string[], buildDirRoot: string): void {
+  if (!fs.existsSync(dir)) {
+    return;
+  }
+
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    const relativePath = path.relative(buildDirRoot, fullPath).replace(/\\/g, '/');
+
+    // Check if this file/directory should be excluded
+    const shouldExclude = excludePatterns.some((pattern) =>
+      matchesExcludePattern(relativePath, pattern),
+    );
+
+    if (shouldExclude) {
+      try {
+        if (entry.isDirectory()) {
+          fs.rmSync(fullPath, { recursive: true, force: true });
+          console.log(`    ✓ Removed directory: ${relativePath}`);
+        } else {
+          fs.unlinkSync(fullPath);
+          console.log(`    ✓ Removed file: ${relativePath}`);
+        }
+      } catch (error) {
+        console.warn(`    ⚠️  Failed to remove ${relativePath}: ${error}`);
+      }
+      continue;
+    }
+
+    // Recursively process subdirectories
+    if (entry.isDirectory()) {
+      removeExcludedFiles(fullPath, excludePatterns, buildDirRoot);
+    }
+  }
 }
 
 /**
@@ -274,7 +326,12 @@ export function transformTemplateToApp(
     }
   }
 
-  // 2. Remove template-specific workflows using exclude patterns
+  // 2. Remove all excluded files from build directory
+  console.log('  🗑️  Removing excluded files...');
+  removeExcludedFiles(buildDir, excludePatterns, buildDir);
+  console.log('  ✓ Cleanup complete');
+
+  // 3. Remove template-specific workflows using exclude patterns (double-check)
   if (fs.existsSync(workflowsDir)) {
     const workflowFiles = fs.readdirSync(workflowsDir);
     for (const workflowFile of workflowFiles) {
@@ -293,14 +350,14 @@ export function transformTemplateToApp(
     }
   }
 
-  // 3. Remove .template-app/ folder from build directory (it shouldn't appear in final package)
+  // 4. Remove .template-app/ folder from build directory (it shouldn't appear in final package)
   const templateAppDir = path.join(buildDir, '.template-app');
   if (fs.existsSync(templateAppDir)) {
     fs.rmSync(templateAppDir, { recursive: true, force: true });
     console.log('  ✓ Removed .template-app/ folder from build');
   }
 
-  // 4. Ensure appPack.ts exists
+  // 5. Ensure appPack.ts exists
   const appPackPath = path.join(scriptsDir, 'appPack.ts');
   if (!fs.existsSync(appPackPath)) {
     // Check if source template has appPack.ts
@@ -325,7 +382,7 @@ export function transformTemplateToApp(
     console.log('  ✓ appPack.ts already exists');
   }
 
-  // 5. Update package.json to ensure app:pack script exists
+  // 6. Update package.json to ensure app:pack script exists
   if (fs.existsSync(packageJsonPath)) {
     const packageJson: PackageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
 

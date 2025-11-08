@@ -27,6 +27,7 @@ const WRAP_EXCLUDE_PATTERNS = [
   'coverage',
   '.git',
   '.template-manifest.json',
+  '.template-app/exclude.json',
   'pnpm-lock.yaml',
   '.template-build',
   'template-dist',

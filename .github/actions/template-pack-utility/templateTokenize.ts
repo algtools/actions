@@ -82,13 +82,15 @@ function shouldExclude(filePath: string, excludePatterns: string[], templateRoot
     '.git',
     'pnpm-lock.yaml',
     '.template-build',
+    'template-dist',
+    'app-dist',
   ];
 
   // Check standard exclusions first
   for (const pattern of standardExcludes) {
     if (pattern.startsWith('.')) {
       const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regex = new RegExp(`[/\\\\]${escapedPattern}([/\\\\]|$)`);
+      const regex = new RegExp(`[/\\\\]${escapedPattern}([/\\\\]|$|\\..*$)`);
       if (regex.test(filePath) || filePath.endsWith(pattern) || filePath === pattern) {
         return true;
       }
@@ -99,12 +101,38 @@ function shouldExclude(filePath: string, excludePatterns: string[], templateRoot
 
   // Check config-based exclusions
   return excludePatterns.some((pattern) => {
-    if (pattern.startsWith('.')) {
-      const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regex = new RegExp(`[/\\\\]${escapedPattern}([/\\\\]|$)`);
-      return regex.test(filePath) || filePath.endsWith(pattern) || filePath === pattern;
+    // Normalize path separators for comparison
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    const normalizedPattern = pattern.replace(/\\/g, '/');
+
+    // For patterns starting with '.', match at path boundaries or end of path
+    // Also match wrapped versions (e.g., .cursorrules.-packed)
+    if (normalizedPattern.startsWith('.')) {
+      const escapedPattern = normalizedPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Match pattern at start, after /, or at end, and also match wrapped versions
+      const regex = new RegExp(`(^|[/\\\\])${escapedPattern}([/\\\\]|$|\\..*$)`);
+      if (regex.test(normalizedPath) || normalizedPath.endsWith(normalizedPattern)) {
+        return true;
+      }
     }
-    return filePath.includes(pattern);
+
+    // For workflow patterns, match the full path
+    if (normalizedPattern.includes('/')) {
+      // Match exact path or path ending with pattern
+      if (
+        normalizedPath === normalizedPattern ||
+        normalizedPath.endsWith('/' + normalizedPattern)
+      ) {
+        return true;
+      }
+      // Also match if pattern appears anywhere in the path
+      if (normalizedPath.includes(normalizedPattern)) {
+        return true;
+      }
+    }
+
+    // General pattern matching
+    return normalizedPath.includes(normalizedPattern);
   });
 }
 
