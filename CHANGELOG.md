@@ -1,3 +1,10 @@
+# [1.17.0](https://github.com/algtools/actions/compare/v1.16.0...v1.17.0) (2025-11-08)
+
+
+### Features
+
+* enhance template provisioning, extra params and package.json update on pack ([e60582c](https://github.com/algtools/actions/commit/e60582c8c5c628992d23212640c52436385ebbf7))
+
 # [1.16.0](https://github.com/algtools/actions/compare/v1.15.6...v1.16.0) (2025-11-08)
 
 
