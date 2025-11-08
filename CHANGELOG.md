@@ -1,3 +1,10 @@
+## [1.19.3](https://github.com/algtools/actions/compare/v1.19.2...v1.19.3) (2025-11-08)
+
+
+### Bug Fixes
+
+* adjust working directory for template packaging in GitHub action to streamline execution ([fa82c80](https://github.com/algtools/actions/commit/fa82c80e0abe960ef0eda4c42d8166e8b7edda3e))
+
 ## [1.19.2](https://github.com/algtools/actions/compare/v1.19.1...v1.19.2) (2025-11-08)
 
 
