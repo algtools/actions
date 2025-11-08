@@ -1,3 +1,10 @@
+## [1.18.1](https://github.com/algtools/actions/compare/v1.18.0...v1.18.1) (2025-11-08)
+
+
+### Bug Fixes
+
+* ensure proper quoting in output redirection for template type in workflow ([83f0046](https://github.com/algtools/actions/commit/83f004619695311677c0e2c1744cf7f86000bb4a))
+
 # [1.18.0](https://github.com/algtools/actions/compare/v1.17.1...v1.18.0) (2025-11-08)
 
 
