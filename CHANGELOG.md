@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/algtools/actions/compare/v1.13.1...v1.14.0) (2025-11-08)
+
+
+### Features
+
+* add script copying utility to template action ([2c01b3f](https://github.com/algtools/actions/commit/2c01b3fec8aae7d54045b235be897fe1192e05e9))
+
 ## [1.13.1](https://github.com/algtools/actions/compare/v1.13.0...v1.13.1) (2025-11-07)
 
 
