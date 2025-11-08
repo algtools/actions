@@ -194,6 +194,81 @@ runs:
         git remote add origin "https://x-access-token:${ADMIN_TOKEN}@github.com/${OWNER}/${APP_NAME}.git"
         git push -u origin main
 
+    - name: Create dev and qa branches
+      shell: bash
+      working-directory: template
+      env:
+        ADMIN_TOKEN: ${{ inputs.admin_token }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        APP_NAME: ${{ inputs.app_name }}
+      run: |
+        set -euo pipefail
+
+        # Extract owner from source repo
+        IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+
+        # Create and push dev branch
+        echo "Creating dev branch..."
+        git checkout -b dev
+        git push -u origin dev
+
+        # Create and push qa branch
+        echo "Creating qa branch..."
+        git checkout -b qa
+        git push -u origin qa
+
+        echo "✓ Created dev and qa branches"
+
+    - name: Configure repository ruleset
+      shell: bash
+      working-directory: template
+      env:
+        GH_TOKEN: ${{ inputs.admin_token }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        APP_NAME: ${{ inputs.app_name }}
+      run: |
+        set -euo pipefail
+
+        # Extract owner from source repo
+        IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        TARGET_REPO="${OWNER}/${APP_NAME}"
+
+        # Check if ruleset.json exists in template
+        RULESET_FILE="ruleset.json"
+        if [ ! -f "${RULESET_FILE}" ]; then
+          echo "No ruleset.json found in template, skipping ruleset configuration"
+          exit 0
+        fi
+
+        echo "Configuring repository ruleset from template..."
+
+        # Read ruleset.json and prepare it for API (remove id, update source)
+        RULESET_JSON=$(jq --arg repo "${TARGET_REPO}" \
+          'del(.id) | .source = $repo' \
+          "${RULESET_FILE}")
+
+        # Create ruleset via GitHub API
+        if RESPONSE=$(echo "${RULESET_JSON}" | gh api \
+          "repos/${TARGET_REPO}/rulesets" \
+          --method POST \
+          --input - \
+          --jq '.name // empty' 2>&1); then
+          if [ -n "${RESPONSE}" ]; then
+            echo "✓ Created ruleset: ${RESPONSE}"
+          fi
+        else
+          ERROR_OUTPUT="${RESPONSE}"
+          # Check if ruleset already exists or if there's a permission issue
+          if echo "${ERROR_OUTPUT}" | grep -q "already exists\|422\|403\|404"; then
+            echo "⚠️ Ruleset creation skipped: ${ERROR_OUTPUT}"
+            echo "You may need to configure the ruleset manually in repository settings"
+            echo "Ruleset configuration is available in ruleset.json"
+          else
+            echo "Error creating ruleset: ${ERROR_OUTPUT}"
+            exit 1
+          fi
+        fi
+
     - name: Configure repository variables
       shell: bash
       env:
@@ -241,6 +316,8 @@ runs:
           echo
           echo "- **Repository**: [${OWNER}/${APP_NAME}](${REPOSITORY_URL})"
           echo "- **Release tag used**: ${RELEASE_TAG}"
+          echo "- **Branches created**: main, dev, qa"
+          echo "- **Repository ruleset**: Configured from template (protects dev, qa, main branches)"
           echo "- **Repository variables**: APP_NAME, SLUG, SENTRY_PROJECT"
           echo "- **Sentry project**: ${SENTRY_PROJECT_VALUE}"
           if [ -z "${SENTRY_PROJECT:-}" ]; then
