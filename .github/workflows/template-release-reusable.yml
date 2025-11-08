@@ -118,11 +118,11 @@ jobs:
         run: |
           TEMPLATE_NAME="${{ inputs.template_name }}"
           if [[ "${TEMPLATE_NAME}" == *"web"* ]]; then
-            echo "template_type=web" >> $GITHUB_OUTPUT
+            echo "template_type=web" >> "$GITHUB_OUTPUT"
           elif [[ "${TEMPLATE_NAME}" == *"core"* ]]; then
-            echo "template_type=core" >> $GITHUB_OUTPUT
+            echo "template_type=core" >> "$GITHUB_OUTPUT"
           else
-            echo "template_type=bff" >> $GITHUB_OUTPUT
+            echo "template_type=bff" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Package Template
