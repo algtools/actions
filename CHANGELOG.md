@@ -1,3 +1,10 @@
+## [1.14.2](https://github.com/algtools/actions/compare/v1.14.1...v1.14.2) (2025-11-08)
+
+
+### Bug Fixes
+
+* ensure directories exist and create release-app.yml if missing in transformTemplateToApp ([f21dd49](https://github.com/algtools/actions/commit/f21dd4998f2598a2c947036c73aaf102a52f912a))
+
 ## [1.14.1](https://github.com/algtools/actions/compare/v1.14.0...v1.14.1) (2025-11-08)
 
 
