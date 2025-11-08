@@ -1,3 +1,10 @@
+## [1.17.1](https://github.com/algtools/actions/compare/v1.17.0...v1.17.1) (2025-11-08)
+
+
+### Bug Fixes
+
+* implement template repository check in workflow to conditionally release app ([d4454a7](https://github.com/algtools/actions/commit/d4454a72fda2c5b1e801ce95c6645ca792f0ca7f))
+
 # [1.17.0](https://github.com/algtools/actions/compare/v1.16.0...v1.17.0) (2025-11-08)
 
 
