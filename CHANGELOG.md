@@ -1,3 +1,10 @@
+## [1.19.6](https://github.com/algtools/actions/compare/v1.19.5...v1.19.6) (2025-11-08)
+
+
+### Bug Fixes
+
+* enhance error handling for empty or invalid exclude.json in template packaging action ([8604ae3](https://github.com/algtools/actions/commit/8604ae338f6b3caa5892b3f28bb1286877db2068))
+
 ## [1.19.5](https://github.com/algtools/actions/compare/v1.19.4...v1.19.5) (2025-11-08)
 
 
