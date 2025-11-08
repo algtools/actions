@@ -1,3 +1,10 @@
+## [1.19.4](https://github.com/algtools/actions/compare/v1.19.3...v1.19.4) (2025-11-08)
+
+
+### Bug Fixes
+
+* replace pnpm exec with npx for script execution in GitHub action ([3180b38](https://github.com/algtools/actions/commit/3180b38fc48cb5eeab707ec68c0627b8d058bf29))
+
 ## [1.19.3](https://github.com/algtools/actions/compare/v1.19.2...v1.19.3) (2025-11-08)
 
 
