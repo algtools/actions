@@ -67,18 +67,52 @@ jobs:
             TOKEN="${{ secrets.gh_token }}"
           fi
 
-          # Download file using GitHub API with authentication
-          echo "Downloading transform utility from GitHub API..."
-          curl -f -H "Authorization: token ${TOKEN}" \
+          # Try multiple approaches to download the file
+          FILE_PATH="${{ inputs.working_directory }}/scripts/transformTemplateToApp.ts"
+
+          # Method 1: Try with ref=main
+          echo "Attempting download with ref=main..."
+          if curl -f -s -H "Authorization: token ${TOKEN}" \
             -H "Accept: application/vnd.github.v3.raw" \
             -L "https://api.github.com/repos/algtools/actions/contents/.github/actions/test-template/transformTemplateToApp.ts?ref=main" \
-            -o ${{ inputs.working_directory }}/scripts/transformTemplateToApp.ts
+            -o "${FILE_PATH}" 2>&1; then
+            echo "✅ Downloaded successfully with ref=main"
+          else
+            echo "⚠️  Failed with ref=main, trying without ref (default branch)..."
+            # Method 2: Try without ref (uses default branch)
+            if curl -f -s -H "Authorization: token ${TOKEN}" \
+              -H "Accept: application/vnd.github.v3.raw" \
+              -L "https://api.github.com/repos/algtools/actions/contents/.github/actions/test-template/transformTemplateToApp.ts" \
+              -o "${FILE_PATH}" 2>&1; then
+              echo "✅ Downloaded successfully from default branch"
+            else
+              echo "❌ All download methods failed"
+              echo "Checking API response..."
+              curl -v -H "Authorization: token ${TOKEN}" \
+                -H "Accept: application/vnd.github.v3.raw" \
+                "https://api.github.com/repos/algtools/actions/contents/.github/actions/test-template/transformTemplateToApp.ts" 2>&1 | head -20
+              exit 1
+            fi
+          fi
 
-          if [ ! -f "${{ inputs.working_directory }}/scripts/transformTemplateToApp.ts" ]; then
-            echo "❌ Failed to download transform utility"
+          if [ ! -f "${FILE_PATH}" ]; then
+            echo "❌ File was not downloaded"
             exit 1
           fi
-          echo "✅ Transform utility copied"
+
+          # Verify file is not empty and contains expected content
+          if [ ! -s "${FILE_PATH}" ]; then
+            echo "❌ Downloaded file is empty"
+            exit 1
+          fi
+
+          if ! grep -q "transformTemplateToApp" "${FILE_PATH}"; then
+            echo "❌ Downloaded file doesn't contain expected content"
+            head -5 "${FILE_PATH}"
+            exit 1
+          fi
+
+          echo "✅ Transform utility copied and verified"
 
       - name: Bump Version
         id: bump
