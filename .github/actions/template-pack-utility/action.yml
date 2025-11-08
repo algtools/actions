@@ -49,5 +49,5 @@ runs:
       run: |
         BUILD_DIR="${{ inputs.working_directory }}/.template-build"
         echo "build_dir=${BUILD_DIR}" >> "$GITHUB_OUTPUT"
-        cd .github/actions/template-pack-utility
-        pnpm exec tsx index.ts "${{ inputs.working_directory }}" "${{ inputs.template_name }}" "${{ inputs.template_type }}"
+        UTILITY_DIR="${{ inputs.working_directory }}/.github/actions/template-pack-utility"
+        cd "${UTILITY_DIR}" && pnpm exec tsx index.ts "${{ inputs.working_directory }}" "${{ inputs.template_name }}" "${{ inputs.template_type }}"
