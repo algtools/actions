@@ -45,8 +45,12 @@ runs:
     - name: Run template packaging
       id: pack
       shell: bash
-      working-directory: ${{ inputs.working_directory }}/.github/actions/template-pack-utility
+      working-directory: ${{ inputs.working_directory }}
       run: |
         BUILD_DIR="${{ inputs.working_directory }}/.template-build"
         echo "build_dir=${BUILD_DIR}" >> "$GITHUB_OUTPUT"
-        npx tsx index.ts "${{ inputs.working_directory }}" "${{ inputs.template_name }}" "${{ inputs.template_type }}"
+        UTILITY_DIR="${{ inputs.working_directory }}/.github/actions/template-pack-utility"
+        # Use absolute path for template root to avoid path resolution issues
+        TEMPLATE_ROOT="$(cd "${{ inputs.working_directory }}" && pwd)"
+        cd "${UTILITY_DIR}"
+        npx tsx index.ts "${TEMPLATE_ROOT}" "${{ inputs.template_name }}" "${{ inputs.template_type }}"
