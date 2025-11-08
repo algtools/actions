@@ -363,17 +363,7 @@ runs:
         if [ -n "${PR_BODY_INPUT}" ]; then
           PR_BODY="${PR_BODY_INPUT}"
         else
-          PR_BODY="This PR updates the provisioned app to template version \`${RELEASE_TAG}\`.
-
-## Changes
-- Updated template files from \`${RELEASE_TAG}\`
-- Preserved local customizations (node_modules, .env files, etc.)
-
-## Review Checklist
-- [ ] Review changes for conflicts
-- [ ] Test the application
-- [ ] Verify dependencies are up to date
-- [ ] Check for any breaking changes"
+          PR_BODY="This PR updates the provisioned app to template version \`${RELEASE_TAG}\`."$'\n\n'"## Changes"$'\n'"- Updated template files from \`${RELEASE_TAG}\`"$'\n'"- Preserved local customizations (node_modules, .env files, etc.)"$'\n\n'"## Review Checklist"$'\n'"- [ ] Review changes for conflicts"$'\n'"- [ ] Test the application"$'\n'"- [ ] Verify dependencies are up to date"$'\n'"- [ ] Check for any breaking changes"
         fi
 
         # Check if PR already exists
