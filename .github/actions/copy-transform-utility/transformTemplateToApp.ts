@@ -41,10 +41,12 @@ permissions:
   deployments: write
 
 jobs:
-  # Release app tarball
-  release-app:
-    name: Release App
+  # Check if this is a template repository
+  check-template:
+    name: Check Template
     runs-on: ubuntu-latest
+    outputs:
+      is_template: ${ghaExpr('steps.check.outputs.is_template')}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -52,19 +54,30 @@ jobs:
           fetch-depth: 0
 
       - name: Check if template repository
-        id: check-template
+        id: check
         run: |
           if [ -f "scripts/templatePack.ts" ]; then
             echo "is_template=true" >> $GITHUB_OUTPUT
-            echo "This is a template repository - skipping app release"
+            echo "This is a template repository"
           else
             echo "is_template=false" >> $GITHUB_OUTPUT
-            echo "This is a provisioned app - proceeding with release"
+            echo "This is a provisioned app"
           fi
+
+  # Release app tarball
+  release-app:
+    name: Release App
+    needs: check-template
+    if: ${ghaExpr('needs.check-template.outputs.is_template')} == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Check skip CI
         id: check-skip
-        if: steps.check-template.outputs.is_template == 'false'
         run: |
           if [[ "${ghaExpr('github.event.head_commit.message')}" == *"[skip ci]"* ]]; then
             echo "skip=true" >> $GITHUB_OUTPUT
@@ -73,24 +86,24 @@ jobs:
           fi
 
       - name: Setup Node.js
-        if: steps.check-template.outputs.is_template == 'false' && (steps.check-skip.outputs.skip != 'true' || github.event_name == 'workflow_dispatch')
+        if: steps.check-skip.outputs.skip != 'true' || github.event_name == 'workflow_dispatch'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
 
       - name: Install pnpm
-        if: steps.check-template.outputs.is_template == 'false' && (steps.check-skip.outputs.skip != 'true' || github.event_name == 'workflow_dispatch')
+        if: steps.check-skip.outputs.skip != 'true' || github.event_name == 'workflow_dispatch'
         uses: pnpm/action-setup@v4
         with:
           version: 9
 
       - name: Install dependencies
-        if: steps.check-template.outputs.is_template == 'false' && (steps.check-skip.outputs.skip != 'true' || github.event_name == 'workflow_dispatch')
+        if: steps.check-skip.outputs.skip != 'true' || github.event_name == 'workflow_dispatch'
         run: pnpm install --frozen-lockfile
 
       - name: Run semantic-release
-        if: steps.check-template.outputs.is_template == 'false' && (steps.check-skip.outputs.skip != 'true' || github.event_name == 'workflow_dispatch')
+        if: steps.check-skip.outputs.skip != 'true' || github.event_name == 'workflow_dispatch'
         env:
           GITHUB_TOKEN: ${ghaExpr('secrets.GITHUB_TOKEN')}
           NPM_TOKEN: ${ghaExpr('secrets.NPM_TOKEN')}
