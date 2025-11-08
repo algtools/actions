@@ -1,3 +1,10 @@
+## [1.15.5](https://github.com/algtools/actions/compare/v1.15.4...v1.15.5) (2025-11-08)
+
+
+### Bug Fixes
+
+* update permissions for pull requests in template release workflow ([4eb1931](https://github.com/algtools/actions/commit/4eb19319c9db1393ef82f1c526539ba8f9fbd2fd))
+
 ## [1.15.4](https://github.com/algtools/actions/compare/v1.15.3...v1.15.4) (2025-11-08)
 
 
