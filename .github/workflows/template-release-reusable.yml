@@ -60,7 +60,7 @@ jobs:
           repository: algtools/actions
           ref: main
           path: actions-repo
-          token: ${{ secrets.gh_token }}
+          token: ${{ github.token }}
 
       - name: Copy transform utility
         run: |

@@ -103,6 +103,37 @@ Provisions a new repository from a template release. Automates the entire proces
 - `repository_url`: URL of the created repository
 - `release_tag`: Template version used for provisioning
 
+### [update-provisioned-app](/.github/actions/update-provisioned-app)
+
+Updates an already provisioned app with the latest or specific template version by creating a pull request. Automates the process of downloading a template release, applying changes to an existing repository, and creating a PR for review.
+
+**Features:**
+
+- Smart release resolution (latest or specific version)
+- Flexible archive formats (custom assets or GitHub source tarballs)
+- Branch management with configurable naming
+- Automatic PR creation or update
+- Smart exclusions to preserve local customizations
+- Change detection (skips PR if no changes)
+
+**Inputs:**
+
+- `source_repo` (required): Source template repository (e.g., 'owner/repo')
+- `target_repo` (required): Target repository to update (e.g., 'owner/app-name')
+- `version` (optional): Template release tag (default: "latest")
+- `base_branch` (optional): Base branch to create PR against (default: "main")
+- `branch_name` (optional): Name for the update branch (default: update-template-{version})
+- `pr_title` (optional): Title for the pull request
+- `pr_body` (optional): Body for the pull request
+- `github_token` (required): GitHub token with repo permissions
+
+**Outputs:**
+
+- `pr_url`: URL of the created pull request
+- `pr_number`: Number of the created pull request
+- `release_tag`: Template version used for the update
+- `branch_name`: Name of the branch created
+
 ### [test-template](/.github/actions/test-template)
 
 Tests template packaging and provision regression. Validates that templates are properly packaged, extract correctly, and contain the expected files and workflows for provisioned applications.
@@ -621,6 +652,116 @@ git commit --allow-empty -m "feat!: BREAKING CHANGE: force major"
 
 # Force minor version
 git commit --allow-empty -m "feat: force minor version"
+```
+
+---
+
+### [update-provisioned-app-reusable.yml](/.github/workflows/update-provisioned-app-reusable.yml)
+
+A reusable workflow for updating an already provisioned app with the latest or specific template version. Automates the process of downloading a template release, applying changes to an existing repository, and creating a pull request for review.
+
+**Features:**
+
+- Smart release resolution (latest or specific version)
+- Flexible archive formats (custom assets or GitHub source tarballs)
+- Branch management with configurable naming
+- Automatic PR creation or update
+- Smart exclusions to preserve local customizations
+- Change detection (skips PR if no changes)
+
+**Example Usage:**
+
+```yaml
+name: Update My App
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Template version'
+        required: false
+        type: string
+        default: 'latest'
+
+jobs:
+  update:
+    uses: algtools/actions/.github/workflows/update-provisioned-app-reusable.yml@main
+    with:
+      target_repo: 'owner/my-app'
+      version: ${{ inputs.version }}
+      base_branch: 'main'
+    secrets:
+      github_token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+**Required Inputs:**
+
+- `target_repo` (required): Target repository to update (e.g., 'owner/app-name')
+
+**Optional Inputs:**
+
+- `version` (optional): Template release tag (default: "latest")
+- `base_branch` (optional): Base branch to create PR against (default: "main")
+- `branch_name` (optional): Name for the update branch (default: update-template-{version})
+- `pr_title` (optional): Title for the pull request
+- `pr_body` (optional): Body for the pull request
+
+**Required Secrets:**
+
+- `github_token`: GitHub token with repo permissions
+
+**Outputs:**
+
+- `pr_url`: URL of the created pull request
+- `pr_number`: Number of the created pull request
+- `release_tag`: Template version used for the update
+- `branch_name`: Name of the branch created
+
+**Scheduled Updates:**
+
+You can set up scheduled updates to keep apps up to date:
+
+```yaml
+name: Weekly Template Update
+
+on:
+  schedule:
+    - cron: '0 0 * * 1' # Every Monday
+
+jobs:
+  update:
+    uses: algtools/actions/.github/workflows/update-provisioned-app-reusable.yml@main
+    with:
+      target_repo: 'owner/my-app'
+      version: 'latest'
+    secrets:
+      github_token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+**Update Multiple Apps:**
+
+```yaml
+name: Update All Apps
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-app-1:
+    uses: algtools/actions/.github/workflows/update-provisioned-app-reusable.yml@main
+    with:
+      target_repo: 'owner/app-1'
+      version: 'latest'
+    secrets:
+      github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  update-app-2:
+    uses: algtools/actions/.github/workflows/update-provisioned-app-reusable.yml@main
+    with:
+      target_repo: 'owner/app-2'
+      version: 'latest'
+    secrets:
+      github_token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ---
