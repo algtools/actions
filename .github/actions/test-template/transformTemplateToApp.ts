@@ -288,6 +288,18 @@ export function transformTemplateToApp(
   const scriptsDir = path.join(buildDir, 'scripts');
   const packageJsonPath = path.join(buildDir, 'package.json');
 
+  // Ensure workflows directory exists
+  if (!fs.existsSync(workflowsDir)) {
+    fs.mkdirSync(workflowsDir, { recursive: true });
+    console.log('  ✓ Created .github/workflows directory');
+  }
+
+  // Ensure scripts directory exists
+  if (!fs.existsSync(scriptsDir)) {
+    fs.mkdirSync(scriptsDir, { recursive: true });
+    console.log('  ✓ Created scripts directory');
+  }
+
   // 1. Transform release-template.yml to release-app.yml (if it exists and release-app.yml doesn't)
   const releaseTemplatePath = path.join(workflowsDir, 'release-template.yml');
   const releaseAppPath = path.join(workflowsDir, 'release-app.yml');
@@ -299,6 +311,11 @@ export function transformTemplateToApp(
     console.log('  ✓ Transformed release-template.yml to release-app.yml');
   } else if (fs.existsSync(releaseAppPath)) {
     console.log('  ✓ release-app.yml already exists');
+  } else if (!fs.existsSync(releaseTemplatePath) && !fs.existsSync(releaseAppPath)) {
+    // If neither exists, create release-app.yml from scratch
+    const releaseAppContent = generateReleaseAppWorkflow();
+    fs.writeFileSync(releaseAppPath, releaseAppContent, 'utf-8');
+    console.log('  ✓ Created release-app.yml');
   }
 
   // 2. Remove template-specific workflows
