@@ -33,7 +33,7 @@ on:
         type: string
         default: ""
     secrets:
-      github_token:
+      repo_token:
         description: "GitHub token with repo permissions"
         required: true
     outputs:
@@ -75,4 +75,4 @@ jobs:
           branch_name: ${{ inputs.branch_name }}
           pr_title: ${{ inputs.pr_title }}
           pr_body: ${{ inputs.pr_body }}
-          github_token: ${{ secrets.github_token }}
+          github_token: ${{ secrets.repo_token }}

@@ -520,7 +520,7 @@ jobs:
       branch: ${{ github.ref_name }}
       retention_days: ${{ github.ref_name == 'main' && 90 || github.ref_name == 'qa' && 60 || 30 }}
     secrets:
-      github_token: ${{ secrets.GITHUB_TOKEN }}
+      repo_token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 **Required Inputs:**
@@ -691,7 +691,7 @@ jobs:
       version: ${{ inputs.version }}
       base_branch: 'main'
     secrets:
-      github_token: ${{ secrets.GITHUB_TOKEN }}
+      repo_token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 **Required Inputs:**
@@ -735,7 +735,7 @@ jobs:
       target_repo: 'owner/my-app'
       version: 'latest'
     secrets:
-      github_token: ${{ secrets.GITHUB_TOKEN }}
+      repo_token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 **Update Multiple Apps:**
@@ -753,7 +753,7 @@ jobs:
       target_repo: 'owner/app-1'
       version: 'latest'
     secrets:
-      github_token: ${{ secrets.GITHUB_TOKEN }}
+      repo_token: ${{ secrets.GITHUB_TOKEN }}
 
   update-app-2:
     uses: algtools/actions/.github/workflows/update-provisioned-app-reusable.yml@main
@@ -761,7 +761,7 @@ jobs:
       target_repo: 'owner/app-2'
       version: 'latest'
     secrets:
-      github_token: ${{ secrets.GITHUB_TOKEN }}
+      repo_token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ---
