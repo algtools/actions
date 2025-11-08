@@ -25,6 +25,15 @@ runs:
       working-directory: ${{ inputs.working_directory }}
       run: pnpm install --frozen-lockfile
 
+    - name: Copy transform utility to template
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: |
+        echo "📋 Copying transform utility..."
+        mkdir -p scripts
+        cp "${{ github.action_path }}/transformTemplateToApp.ts" scripts/transformTemplateToApp.ts
+        echo "✅ Transform utility copied"
+
     - name: Run template packaging tests
       shell: bash
       working-directory: ${{ inputs.working_directory }}
@@ -38,15 +47,6 @@ runs:
             echo "⚠️  test:template-packaging script not found, skipping..."
           fi
         fi
-
-    - name: Copy transform utility to template
-      shell: bash
-      working-directory: ${{ inputs.working_directory }}
-      run: |
-        echo "📋 Copying transform utility..."
-        mkdir -p scripts
-        cp "${{ github.action_path }}/transformTemplateToApp.ts" scripts/transformTemplateToApp.ts
-        echo "✅ Transform utility copied"
 
     - name: Run template pack
       shell: bash
