@@ -24,6 +24,8 @@ on:
     secrets:
       gh_token:
         required: true
+      admin_token:
+        required: false
     outputs:
       version:
         description: "Version that was released"
@@ -54,13 +56,24 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Set token for actions repo checkout
+        id: set-token
+        run: |
+          if [ -n "${{ secrets.admin_token }}" ]; then
+            echo "token=${{ secrets.admin_token }}" >> "$GITHUB_OUTPUT"
+            echo "Using admin_token for actions repository checkout"
+          else
+            echo "token=${{ github.token }}" >> "$GITHUB_OUTPUT"
+            echo "Using github.token for actions repository checkout"
+          fi
+
       - name: Checkout actions repository
         uses: actions/checkout@v4
         with:
           repository: algtools/actions
           ref: main
           path: actions-repo
-          token: ${{ github.token }}
+          token: ${{ steps.set-token.outputs.token }}
 
       - name: Copy transform utility
         run: |
