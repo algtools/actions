@@ -1,3 +1,10 @@
+## [1.14.4](https://github.com/algtools/actions/compare/v1.14.3...v1.14.4) (2025-11-08)
+
+
+### Bug Fixes
+
+* update path for actions repository in template release workflow ([6d27e4c](https://github.com/algtools/actions/commit/6d27e4c8caf113d7618fddcf7a7411538e88317b))
+
 ## [1.14.3](https://github.com/algtools/actions/compare/v1.14.2...v1.14.3) (2025-11-08)
 
 
