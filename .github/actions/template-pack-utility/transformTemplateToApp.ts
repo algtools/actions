@@ -206,6 +206,34 @@ function matchesExcludePattern(filePath: string, pattern: string): boolean {
   const normalizedPath = filePath.replace(/\\/g, '/');
   const normalizedPattern = pattern.replace(/\\/g, '/');
 
+  // For patterns with slashes (like .github/workflows/release-template.yml)
+  // Check if the pattern appears in the path
+  if (normalizedPattern.includes('/')) {
+    // Exact match or path ends with pattern
+    if (normalizedPath === normalizedPattern || normalizedPath.endsWith('/' + normalizedPattern)) {
+      return true;
+    }
+    // Pattern appears anywhere in the path
+    if (normalizedPath.includes(normalizedPattern)) {
+      return true;
+    }
+    // Also check if path ends with just the filename part
+    const patternFileName = normalizedPattern.split('/').pop();
+    if (patternFileName && normalizedPath.endsWith('/' + patternFileName)) {
+      // Check if the directory structure matches
+      const pathParts = normalizedPath.split('/');
+      const patternParts = normalizedPattern.split('/');
+      // Check if the last N parts of the path match the pattern
+      if (pathParts.length >= patternParts.length) {
+        const pathSuffix = pathParts.slice(-patternParts.length).join('/');
+        if (pathSuffix === normalizedPattern) {
+          return true;
+        }
+      }
+    }
+  }
+
+  // For patterns starting with '.', match at path boundaries
   if (normalizedPattern.startsWith('.')) {
     const escapedPattern = normalizedPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     // Match pattern at start, after /, or at end, and also match wrapped versions (e.g., .cursorrules.-packed)
@@ -213,11 +241,7 @@ function matchesExcludePattern(filePath: string, pattern: string): boolean {
     return regex.test(normalizedPath) || normalizedPath.endsWith(normalizedPattern);
   }
 
-  // For paths with slashes, match anywhere in the path
-  if (normalizedPattern.includes('/')) {
-    return normalizedPath.includes(normalizedPattern);
-  }
-
+  // General pattern matching
   return normalizedPath.includes(normalizedPattern);
 }
 
@@ -229,36 +253,48 @@ function removeExcludedFiles(dir: string, excludePatterns: string[], buildDirRoo
     return;
   }
 
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
 
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    const relativePath = path.relative(buildDirRoot, fullPath).replace(/\\/g, '/');
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      // Use forward slashes for consistent path matching
+      const relativePath = path.relative(buildDirRoot, fullPath).replace(/\\/g, '/');
 
-    // Check if this file/directory should be excluded
-    const shouldExclude = excludePatterns.some((pattern) =>
-      matchesExcludePattern(relativePath, pattern),
-    );
+      // Ensure relative path starts with ./ for root-level files/dirs, or keep as-is
+      const normalizedRelativePath = relativePath || entry.name;
 
-    if (shouldExclude) {
-      try {
-        if (entry.isDirectory()) {
-          fs.rmSync(fullPath, { recursive: true, force: true });
-          console.log(`    ✓ Removed directory: ${relativePath}`);
-        } else {
-          fs.unlinkSync(fullPath);
-          console.log(`    ✓ Removed file: ${relativePath}`);
+      // Check if this file/directory should be excluded
+      const shouldExclude = excludePatterns.some((pattern) => {
+        const matches = matchesExcludePattern(normalizedRelativePath, pattern);
+        if (matches) {
+          console.log(`    🎯 Pattern "${pattern}" matches "${normalizedRelativePath}"`);
         }
-      } catch (error) {
-        console.warn(`    ⚠️  Failed to remove ${relativePath}: ${error}`);
-      }
-      continue;
-    }
+        return matches;
+      });
 
-    // Recursively process subdirectories
-    if (entry.isDirectory()) {
-      removeExcludedFiles(fullPath, excludePatterns, buildDirRoot);
+      if (shouldExclude) {
+        try {
+          if (entry.isDirectory()) {
+            fs.rmSync(fullPath, { recursive: true, force: true });
+            console.log(`    ✓ Removed directory: ${normalizedRelativePath}`);
+          } else {
+            fs.unlinkSync(fullPath);
+            console.log(`    ✓ Removed file: ${normalizedRelativePath}`);
+          }
+        } catch (error) {
+          console.warn(`    ⚠️  Failed to remove ${normalizedRelativePath}: ${error}`);
+        }
+        continue;
+      }
+
+      // Recursively process subdirectories (including hidden ones like .github)
+      if (entry.isDirectory()) {
+        removeExcludedFiles(fullPath, excludePatterns, buildDirRoot);
+      }
     }
+  } catch (error) {
+    console.warn(`    ⚠️  Error reading directory ${dir}: ${error}`);
   }
 }
 
@@ -328,26 +364,40 @@ export function transformTemplateToApp(
 
   // 2. Remove all excluded files from build directory
   console.log('  🗑️  Removing excluded files...');
+  console.log(`    Exclusion patterns: ${excludePatterns.join(', ')}`);
   removeExcludedFiles(buildDir, excludePatterns, buildDir);
   console.log('  ✓ Cleanup complete');
 
   // 3. Remove template-specific workflows using exclude patterns (double-check)
   if (fs.existsSync(workflowsDir)) {
     const workflowFiles = fs.readdirSync(workflowsDir);
+    console.log(`  🔍 Checking ${workflowFiles.length} workflow files...`);
     for (const workflowFile of workflowFiles) {
       const workflowPath = path.join(workflowsDir, workflowFile);
       const relativePath = `.github/workflows/${workflowFile}`;
 
       // Check if this workflow should be excluded
-      const shouldExclude = excludePatterns.some((pattern) =>
-        matchesExcludePattern(relativePath, pattern),
-      );
+      const shouldExclude = excludePatterns.some((pattern) => {
+        const matches = matchesExcludePattern(relativePath, pattern);
+        if (matches) {
+          console.log(`    🎯 Pattern "${pattern}" matches workflow "${relativePath}"`);
+        }
+        return matches;
+      });
 
       if (shouldExclude && fs.statSync(workflowPath).isFile()) {
-        fs.unlinkSync(workflowPath);
-        console.log(`  ✓ Removed ${workflowFile}`);
+        try {
+          fs.unlinkSync(workflowPath);
+          console.log(`  ✓ Removed workflow: ${workflowFile}`);
+        } catch (error) {
+          console.warn(`  ⚠️  Failed to remove ${workflowFile}: ${error}`);
+        }
+      } else if (fs.statSync(workflowPath).isFile()) {
+        console.log(`    ℹ️  Keeping workflow: ${workflowFile} (not in exclude list)`);
       }
     }
+  } else {
+    console.log('  ℹ️  No workflows directory found');
   }
 
   // 4. Remove .template-app/ folder from build directory (it shouldn't appear in final package)
