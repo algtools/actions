@@ -1,3 +1,10 @@
+## [1.14.5](https://github.com/algtools/actions/compare/v1.14.4...v1.14.5) (2025-11-08)
+
+
+### Bug Fixes
+
+* standardize description formatting in template release workflow ([fdb8c58](https://github.com/algtools/actions/commit/fdb8c58c04fbb7b1c3697a00e47b445c02fcfded))
+
 ## [1.14.4](https://github.com/algtools/actions/compare/v1.14.3...v1.14.4) (2025-11-08)
 
 
