@@ -58,6 +58,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: algtools/actions
+          ref: main
           path: actions-repo
           token: ${{ secrets.gh_token }}
 
