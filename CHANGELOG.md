@@ -1,3 +1,24 @@
+## [1.14.5](https://github.com/algtools/actions/compare/v1.14.4...v1.14.5) (2025-11-08)
+
+
+### Bug Fixes
+
+* standardize description formatting in template release workflow ([fdb8c58](https://github.com/algtools/actions/commit/fdb8c58c04fbb7b1c3697a00e47b445c02fcfded))
+
+## [1.14.4](https://github.com/algtools/actions/compare/v1.14.3...v1.14.4) (2025-11-08)
+
+
+### Bug Fixes
+
+* update path for actions repository in template release workflow ([6d27e4c](https://github.com/algtools/actions/commit/6d27e4c8caf113d7618fddcf7a7411538e88317b))
+
+## [1.14.3](https://github.com/algtools/actions/compare/v1.14.2...v1.14.3) (2025-11-08)
+
+
+### Bug Fixes
+
+* enhance template release workflow by adding checkout and copy steps for transform utility ([a7c0916](https://github.com/algtools/actions/commit/a7c09167322ebc348348104150bd18fac14f9274))
+
 ## [1.14.2](https://github.com/algtools/actions/compare/v1.14.1...v1.14.2) (2025-11-08)
 
 

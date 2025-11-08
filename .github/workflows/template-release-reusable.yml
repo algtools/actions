@@ -60,7 +60,6 @@ jobs:
           repository: algtools/actions
           ref: main
           path: actions-repo
-          # Use default GITHUB_TOKEN which has access to repos in same org
           token: ${{ github.token }}
 
       - name: Copy transform utility
