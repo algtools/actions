@@ -1,6 +1,6 @@
 {
   "name": "@algtools/actions",
-  "version": "1.14.0",
+  "version": "1.14.1",
   "description": "Algenium common Github actions for all projects",
   "main": "index.js",
   "scripts": {
