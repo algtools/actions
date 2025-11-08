@@ -1,3 +1,11 @@
+## [1.15.6](https://github.com/algtools/actions/compare/v1.15.5...v1.15.6) (2025-11-08)
+
+
+### Bug Fixes
+
+* update pull request permissions to write in template release workflow ([7387f92](https://github.com/algtools/actions/commit/7387f9253ba2be6fe20b3a2860be6668f7f50d30))
+* update token references from github_token to repo_token in workflows and README ([d7fc2b0](https://github.com/algtools/actions/commit/d7fc2b0fd4ebd5c54fb19c0ed92924bc90306ff7))
+
 ## [1.15.5](https://github.com/algtools/actions/compare/v1.15.4...v1.15.5) (2025-11-08)
 
 
