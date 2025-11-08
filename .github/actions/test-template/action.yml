@@ -34,6 +34,68 @@ runs:
         cp "${{ github.action_path }}/transformTemplateToApp.ts" scripts/transformTemplateToApp.ts
         echo "✅ Transform utility copied"
 
+    - name: Get template info
+      id: template-info
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: |
+        set -euo pipefail
+
+        if [ ! -f "package.json" ]; then
+          echo "❌ package.json not found"
+          exit 1
+        fi
+
+        TEMPLATE_NAME=$(jq -r '.name' package.json)
+        TEMPLATE_VERSION=$(jq -r '.version' package.json)
+        TEMPLATE_TYPE=$(jq -r '.algtools.kind // "bff"' package.json)
+
+        # Normalize template type
+        if [ "${TEMPLATE_TYPE}" != "web" ] && [ "${TEMPLATE_TYPE}" != "core" ]; then
+          TEMPLATE_TYPE="bff"
+        fi
+
+        echo "template_name=${TEMPLATE_NAME}" >> "$GITHUB_OUTPUT"
+        echo "template_version=${TEMPLATE_VERSION}" >> "$GITHUB_OUTPUT"
+        echo "template_type=${TEMPLATE_TYPE}" >> "$GITHUB_OUTPUT"
+
+        echo "📋 Template info:"
+        echo "  Name: ${TEMPLATE_NAME}"
+        echo "  Version: ${TEMPLATE_VERSION}"
+        echo "  Type: ${TEMPLATE_TYPE}"
+
+    - name: Run template pack utility
+      uses: algtools/actions/.github/actions/template-pack-utility@main
+      with:
+        working_directory: ${{ inputs.working_directory }}
+        template_name: ${{ steps.template-info.outputs.template_name }}
+        template_type: ${{ steps.template-info.outputs.template_type }}
+
+    - name: Create tarball
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: |
+        set -euo pipefail
+
+        BUILD_DIR="${{ inputs.working_directory }}/.template-build"
+        DIST_DIR="${{ inputs.working_directory }}/template-dist"
+        TARBALL_NAME="${{ steps.template-info.outputs.template_name }}-v${{ steps.template-info.outputs.template_version }}.tgz"
+        TARBALL_PATH="template-dist/${TARBALL_NAME}"
+
+        if [ ! -d "${BUILD_DIR}" ]; then
+          echo "❌ Build directory not found: ${BUILD_DIR}"
+          exit 1
+        fi
+
+        # Create dist directory
+        mkdir -p "${DIST_DIR}"
+
+        # Create tarball from build directory
+        cd "${BUILD_DIR}"
+        tar -czf "../${TARBALL_PATH}" .
+
+        echo "✅ Created tarball: ${TARBALL_NAME}"
+
     - name: Run template packaging tests
       shell: bash
       working-directory: ${{ inputs.working_directory }}
@@ -47,13 +109,6 @@ runs:
             echo "⚠️  test:template-packaging script not found, skipping..."
           fi
         fi
-
-    - name: Run template pack
-      shell: bash
-      working-directory: ${{ inputs.working_directory }}
-      run: |
-        echo "📦 Packaging template..."
-        pnpm run template:pack
 
     - name: Extract and validate template structure
       shell: bash

@@ -1,0 +1,60 @@
+name: "Create Template Release"
+description: "Creates a GitHub release for a template with tarball asset"
+
+inputs:
+  template_name:
+    description: "Name of the template (e.g., bff-template)"
+    required: true
+  version:
+    description: "Version to release"
+    required: true
+  tarball_path:
+    description: "Path to the tarball file relative to working_directory"
+    required: true
+  working_directory:
+    description: "Working directory containing the template"
+    required: false
+    default: "."
+  draft:
+    description: "Create as draft release"
+    required: false
+    default: "false"
+  github_token:
+    description: "GitHub token for creating releases"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+
+    - name: Copy release utility
+      shell: bash
+      run: |
+        mkdir -p "${{ inputs.working_directory }}/.github/actions/create-template-release"
+        cp -r "${{ github.action_path }}"/* "${{ inputs.working_directory }}/.github/actions/create-template-release/" 2>/dev/null || true
+        rm -f "${{ inputs.working_directory }}/.github/actions/create-template-release/action.yml" 2>/dev/null || true
+
+    - name: Create GitHub Release
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+      run: |
+        set -euo pipefail
+
+        cd .github/actions/create-template-release
+
+        DRAFT_FLAG=""
+        if [ "${{ inputs.draft }}" = "true" ]; then
+          DRAFT_FLAG="--draft"
+        fi
+
+        tsx index.ts \
+          "${{ inputs.template_name }}" \
+          "${{ inputs.version }}" \
+          "${{ inputs.working_directory }}/${{ inputs.tarball_path }}" \
+          ${DRAFT_FLAG}
