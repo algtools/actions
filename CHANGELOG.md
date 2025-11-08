@@ -1,3 +1,10 @@
+## [1.15.3](https://github.com/algtools/actions/compare/v1.15.2...v1.15.3) (2025-11-08)
+
+
+### Bug Fixes
+
+* enhance transform utility download process in template release workflow ([b66b479](https://github.com/algtools/actions/commit/b66b4798cc4625c271e75e74b7d9861928d4a1c6))
+
 ## [1.15.2](https://github.com/algtools/actions/compare/v1.15.1...v1.15.2) (2025-11-08)
 
 
