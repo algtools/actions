@@ -230,10 +230,10 @@ runs:
         # Try to checkout base branch, fallback to main if it doesn't exist
         if git show-ref --verify --quiet "refs/remotes/origin/${BASE_BRANCH}"; then
           echo "Checking out base branch: ${BASE_BRANCH}"
-          git checkout -b "${BASE_BRANCH}" "origin/${BASE_BRANCH}"
+          git checkout "${BASE_BRANCH}" || git checkout -B "${BASE_BRANCH}" "origin/${BASE_BRANCH}"
         elif git show-ref --verify --quiet "refs/remotes/origin/main"; then
           echo "Base branch ${BASE_BRANCH} not found, using main instead"
-          git checkout -b main "origin/main"
+          git checkout main || git checkout -B main "origin/main"
           BASE_BRANCH="main"
         else
           echo "Warning: Neither ${BASE_BRANCH} nor main branch found, creating new branch"
