@@ -31,37 +31,6 @@ runs:
         template_name: ${{ inputs.template_name }}
         template_type: ${{ inputs.template_type }}
 
-    - name: Format generated files in build directory
-      shell: bash
-      working-directory: ${{ inputs.working_directory }}
-      run: |
-        echo "🎨 Formatting files in build directory..."
-        BUILD_DIR="./.template-build"
-
-        if [ -d "${BUILD_DIR}" ]; then
-          # Copy prettier config to build directory
-          if [ -f ".prettierrc.cjs" ]; then
-            cp .prettierrc.cjs "${BUILD_DIR}/.prettierrc.cjs"
-            echo "  ✓ Copied prettier config"
-          fi
-          if [ -f ".prettierignore" ]; then
-            cp .prettierignore "${BUILD_DIR}/.prettierignore"
-            echo "  ✓ Copied prettier ignore"
-          fi
-
-          # Run prettier from template root (where node_modules is) targeting build directory
-          echo "  🔧 Running prettier on build directory..."
-          # Use the prettier config from build directory but run from template root where node_modules is
-          pnpm exec prettier --write "${BUILD_DIR}" --config "${BUILD_DIR}/.prettierrc.cjs" --ignore-path "${BUILD_DIR}/.prettierignore" --log-level=warn || {
-            echo "  ⚠️  Prettier encountered issues, but continuing..."
-          }
-
-          echo "  ✓ Prettier config will be included in package for consistency"
-          echo "✅ Build directory formatted"
-        else
-          echo "⚠️  Build directory not found, skipping formatting"
-        fi
-
     - name: Create tarball
       id: pack
       shell: bash
