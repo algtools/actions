@@ -1,3 +1,10 @@
+## [1.20.13](https://github.com/algtools/actions/compare/v1.20.12...v1.20.13) (2025-11-10)
+
+
+### Bug Fixes
+
+* add formatting step for generated files in package action ([26669d4](https://github.com/algtools/actions/commit/26669d4104739e6ee5a0417a0023b797628790f6))
+
 ## [1.20.12](https://github.com/algtools/actions/compare/v1.20.11...v1.20.12) (2025-11-10)
 
 
