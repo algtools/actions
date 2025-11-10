@@ -77,6 +77,8 @@ jobs:
         with:
           working_directory: ${{ inputs.working_directory }}
           github_token: ${{ secrets.gh_token }}
+          template_name: ${{ inputs.template_name }}
+          version: ${{ steps.get-version.outputs.version }}
 
       - name: Determine template type
         id: template-type
@@ -107,3 +109,18 @@ jobs:
           name: ${{ steps.package.outputs.tarball_name }}
           path: ${{ inputs.working_directory }}/${{ steps.package.outputs.tarball_path }}
           retention-days: ${{ inputs.retention_days }}
+
+      - name: Upload Tarball to GitHub Release
+        working-directory: ${{ inputs.working_directory }}
+        env:
+          GH_TOKEN: ${{ secrets.gh_token }}
+        run: |
+          VERSION="v${{ steps.get-version.outputs.version }}"
+          TARBALL_PATH="${{ steps.package.outputs.tarball_path }}"
+
+          echo "Uploading ${TARBALL_PATH} to release ${VERSION}..."
+
+          # Upload tarball to the release created by semantic-release
+          gh release upload "${VERSION}" "${TARBALL_PATH}" --clobber
+
+          echo "✅ Tarball uploaded to GitHub Release"
