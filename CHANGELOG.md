@@ -1,3 +1,10 @@
+## [1.20.6](https://github.com/algtools/actions/compare/v1.20.5...v1.20.6) (2025-11-10)
+
+
+### Bug Fixes
+
+* remove existing template workflows before copying app workflows in transformTemplateToApp ([d0a19ce](https://github.com/algtools/actions/commit/d0a19cec9c327821def2db8625dc643b58025b6c))
+
 ## [1.20.5](https://github.com/algtools/actions/compare/v1.20.4...v1.20.5) (2025-11-10)
 
 
