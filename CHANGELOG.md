@@ -1,3 +1,10 @@
+## [1.20.20](https://github.com/algtools/actions/compare/v1.20.19...v1.20.20) (2025-11-10)
+
+
+### Bug Fixes
+
+* add validation for template-update.yml and template-updates.yml ([bfce57e](https://github.com/algtools/actions/commit/bfce57ed2d18ad57f227075609004dc7b9fb76d6))
+
 ## [1.20.19](https://github.com/algtools/actions/compare/v1.20.18...v1.20.19) (2025-11-10)
 
 
