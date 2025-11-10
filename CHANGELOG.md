@@ -1,3 +1,10 @@
+## [1.20.5](https://github.com/algtools/actions/compare/v1.20.4...v1.20.5) (2025-11-10)
+
+
+### Bug Fixes
+
+* avoid interactive prompt during rebase in update-template-manifest action ([573566c](https://github.com/algtools/actions/commit/573566c735aa9f7cf43f1f9d5b93f785a8253d18))
+
 ## [1.20.4](https://github.com/algtools/actions/compare/v1.20.3...v1.20.4) (2025-11-10)
 
 
