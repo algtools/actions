@@ -1,3 +1,10 @@
+## [1.20.25](https://github.com/algtools/actions/compare/v1.20.24...v1.20.25) (2025-11-10)
+
+
+### Bug Fixes
+
+* improve branch checkout logic in GitHub Actions to handle branches more gracefully ([a3f2cc1](https://github.com/algtools/actions/commit/a3f2cc1b5b8c2ae9d1ea367a6dd08ffb94c8b4d6))
+
 ## [1.20.24](https://github.com/algtools/actions/compare/v1.20.23...v1.20.24) (2025-11-10)
 
 
