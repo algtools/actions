@@ -60,9 +60,20 @@ runs:
           git add "${MANIFEST_FILE}"
           git commit -m "chore: update template manifest checksums [skip ci]" --no-verify
 
-          # Pull latest changes with rebase to avoid conflicts
+          # Pull latest changes with rebase, auto-resolving conflicts by keeping our version
           echo "🔄 Pulling latest changes..."
-          git pull --rebase origin "$(git branch --show-current)"
+          if ! git pull --rebase origin "$(git branch --show-current)"; then
+            echo "⚠️  Rebase conflict detected, resolving automatically..."
+
+            # During rebase, --theirs means our commit being applied (the complete manifest update)
+            git checkout --theirs "${MANIFEST_FILE}"
+            git add "${MANIFEST_FILE}"
+
+            # Continue the rebase
+            git rebase --continue
+
+            echo "✓ Conflict resolved automatically"
+          fi
 
           echo "📤 Pushing changes..."
           git push
