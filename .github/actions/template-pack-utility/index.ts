@@ -1,8 +1,28 @@
 /* eslint-disable no-console */
 import * as path from 'node:path';
+import { execSync } from 'node:child_process';
 import { wrapTemplate } from './templateWrap';
 import { tokenizeTemplate } from './templateTokenize';
 import { transformTemplateToApp } from './transformTemplateToApp';
+
+/**
+ * Format files with Prettier to ensure consistency
+ */
+function formatFiles(directory: string, description: string): void {
+  try {
+    console.log(`🎨 Formatting ${description} with Prettier...`);
+
+    // Run prettier on the directory
+    execSync('pnpm exec prettier --write . --log-level=warn', {
+      cwd: directory,
+      stdio: 'inherit',
+    });
+
+    console.log(`✅ ${description} formatted\n`);
+  } catch (error) {
+    console.warn(`⚠️  Prettier formatting of ${description} failed, continuing anyway:`, error);
+  }
+}
 
 /**
  * Main entry point for template packaging
@@ -28,6 +48,12 @@ async function main(): Promise<void> {
     console.log('='.repeat(50) + '\n');
     wrapTemplate(templateRoot);
 
+    // Step 1.5: Format wrapped files with Prettier
+    console.log('\n' + '='.repeat(50));
+    console.log('Step 1.5: Formatting wrapped files');
+    console.log('='.repeat(50) + '\n');
+    formatFiles(templateRoot, 'source template files');
+
     // Step 2: Tokenize template
     console.log('\n' + '='.repeat(50));
     console.log('Step 2: Tokenizing template');
@@ -39,6 +65,12 @@ async function main(): Promise<void> {
     console.log('Step 3: Transforming template to app');
     console.log('='.repeat(50) + '\n');
     transformTemplateToApp(buildDir, templateRoot, templateType);
+
+    // Step 4: Format build directory files
+    console.log('\n' + '='.repeat(50));
+    console.log('Step 4: Formatting build directory');
+    console.log('='.repeat(50) + '\n');
+    formatFiles(buildDir, 'build directory files');
 
     console.log('\n' + '='.repeat(50));
     console.log('✨ Template packaging preparation completed!');
