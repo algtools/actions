@@ -53,6 +53,22 @@ export function validateProvisionedApp(appRoot: string = process.cwd()): Validat
     results.push({ passed: false, message: '❌ Should NOT have provision-template.yml' });
   }
 
+  // Should have template-update.yml
+  const templateUpdatePath = path.join(workflowsDir, 'template-update.yml');
+  if (fs.existsSync(templateUpdatePath)) {
+    results.push({ passed: true, message: '✅ Has template-update.yml workflow' });
+  } else {
+    results.push({ passed: false, message: '❌ Missing template-update.yml workflow' });
+  }
+
+  // Check template update configuration
+  const templateUpdatesConfigPath = path.join(appRoot, '.github', 'template-updates.yml');
+  if (fs.existsSync(templateUpdatesConfigPath)) {
+    results.push({ passed: true, message: '✅ Has template-updates.yml configuration' });
+  } else {
+    results.push({ passed: false, message: '❌ Missing template-updates.yml configuration' });
+  }
+
   // Check scripts
   const scriptsDir = path.join(appRoot, 'scripts');
   const appPackPath = path.join(scriptsDir, 'appPack.ts');
