@@ -31,8 +31,9 @@ runs:
 
         echo "🔄 Regenerating template manifest..."
 
-        # Run the manifest update script
-        tsx "${{ github.action_path }}/updateManifest.ts" "${{ inputs.working_directory }}"
+        # Run the manifest update script using npx from the action directory
+        cd "${{ github.action_path }}"
+        npx tsx ./updateManifest.ts "${{ inputs.working_directory }}"
 
     - name: Commit updated manifest
       shell: bash
