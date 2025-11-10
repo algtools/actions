@@ -49,13 +49,12 @@ runs:
             echo "  ✓ Copied prettier ignore"
           fi
 
-          # Run prettier FROM inside the build directory
-          echo "  🔧 Running prettier on all files..."
-          cd "${BUILD_DIR}"
-          pnpm exec prettier --write . --log-level=warn || {
+          # Run prettier from template root (where node_modules is) targeting build directory
+          echo "  🔧 Running prettier on build directory..."
+          # Use the prettier config from build directory but run from template root where node_modules is
+          pnpm exec prettier --write "${BUILD_DIR}" --config "${BUILD_DIR}/.prettierrc.cjs" --ignore-path "${BUILD_DIR}/.prettierignore" --log-level=warn || {
             echo "  ⚠️  Prettier encountered issues, but continuing..."
           }
-          cd ..
 
           echo "  ✓ Prettier config will be included in package for consistency"
           echo "✅ Build directory formatted"
