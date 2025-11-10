@@ -187,6 +187,32 @@ runs:
           echo "✓ Updated package.json: name=${APP_NAME}, version=0.0.1"
         fi
 
+    - name: Replace template tokens
+      shell: bash
+      working-directory: template
+      env:
+        SOURCE_REPO: ${{ inputs.source_repo }}
+      run: |
+        set -euo pipefail
+
+        echo "Replacing template tokens..."
+
+        # Replace {{SOURCE_REPO}} in template-updates.yml
+        TEMPLATE_UPDATES_FILE=".github/template-updates.yml"
+        if [ -f "${TEMPLATE_UPDATES_FILE}" ]; then
+          if [ "$(uname)" = "Darwin" ]; then
+            sed -i '' "s|{{SOURCE_REPO}}|${SOURCE_REPO}|g" "${TEMPLATE_UPDATES_FILE}"
+          else
+            sed -i "s|{{SOURCE_REPO}}|${SOURCE_REPO}|g" "${TEMPLATE_UPDATES_FILE}"
+          fi
+          echo "✓ Replaced {{SOURCE_REPO}} with ${SOURCE_REPO} in ${TEMPLATE_UPDATES_FILE}"
+        else
+          echo "  ℹ️ No template-updates.yml found, skipping token replacement"
+        fi
+
+        # Add other token replacements here in the future if needed
+        echo "✓ Token replacement completed"
+
     - name: Initialize repository contents
       shell: bash
       working-directory: template
