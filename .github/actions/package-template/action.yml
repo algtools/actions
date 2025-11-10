@@ -51,9 +51,6 @@ runs:
           echo "  🔧 Running prettier on build directory..."
           pnpm exec prettier --write "${BUILD_DIR}" --log-level=warn || true
 
-          # Remove config files from build directory
-          rm -f "${BUILD_DIR}/.prettierrc.cjs" "${BUILD_DIR}/.prettierignore" || true
-
           echo "✅ Build directory formatted"
         else
           echo "⚠️  Build directory not found, skipping formatting"
