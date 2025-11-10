@@ -1,0 +1,60 @@
+name: "Update Template Manifest"
+description: "Updates .template-manifest.json with current version and fresh checksums"
+inputs:
+  working_directory:
+    description: "Directory containing the template"
+    required: true
+  github_token:
+    description: "GitHub token for committing changes"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+
+    - name: Install dependencies for manifest update
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: |
+        if [ ! -d "node_modules" ]; then
+          npm install
+        fi
+
+    - name: Update manifest with fresh checksums
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: |
+        set -euo pipefail
+
+        echo "🔄 Regenerating template manifest..."
+
+        # Run the manifest update script
+        tsx "${{ github.action_path }}/updateManifest.ts" "${{ inputs.working_directory }}"
+
+    - name: Commit updated manifest
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+      run: |
+        set -euo pipefail
+
+        MANIFEST_FILE=".template-manifest.json"
+
+        # Configure git
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        # Check if there are changes
+        if git diff --quiet "${MANIFEST_FILE}"; then
+          echo "✓ No changes to manifest"
+        else
+          echo "📝 Committing updated manifest..."
+          git add "${MANIFEST_FILE}"
+          git commit -m "chore: update template manifest checksums [skip ci]" --no-verify
+          git push
+          echo "✅ Manifest committed and pushed"
+        fi

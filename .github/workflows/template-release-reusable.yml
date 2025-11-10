@@ -72,45 +72,11 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Current version: ${VERSION}"
 
-      - name: Update template-manifest.json
-        working-directory: ${{ inputs.working_directory }}
-        run: |
-          set -euo pipefail
-
-          MANIFEST_FILE=".template-manifest.json"
-          if [ ! -f "${MANIFEST_FILE}" ]; then
-            echo "template-manifest.json not found, skipping update"
-            exit 0
-          fi
-
-          VERSION="${{ steps.get-version.outputs.version }}"
-
-          # Update templateVersion in manifest using jq if available, otherwise use sed
-          if command -v jq &> /dev/null; then
-            jq --arg version "${VERSION}" '.templateVersion = $version' \
-              "${MANIFEST_FILE}" > "${MANIFEST_FILE}.tmp" && \
-              mv "${MANIFEST_FILE}.tmp" "${MANIFEST_FILE}"
-            echo "✓ Updated template-manifest.json: templateVersion=${VERSION}"
-          else
-            echo "jq not available, using sed fallback"
-            if [ "$(uname)" = "Darwin" ]; then
-              sed -i '' "s/\"templateVersion\":[[:space:]]*\"[^\"]*\"/\"templateVersion\": \"${VERSION}\"/" "${MANIFEST_FILE}"
-            else
-              sed -i "s/\"templateVersion\":[[:space:]]*\"[^\"]*\"/\"templateVersion\": \"${VERSION}\"/" "${MANIFEST_FILE}"
-            fi
-            echo "✓ Updated template-manifest.json: templateVersion=${VERSION}"
-          fi
-
-          # Commit the updated manifest (skip pre-commit hooks to avoid unrelated linting issues)
-          git add "${MANIFEST_FILE}"
-          if git diff --staged --quiet; then
-            echo "No changes to commit in template-manifest.json"
-          else
-            # Skip pre-commit hooks to avoid failing on unrelated linting issues
-            git commit -m "chore: update template-manifest.json to ${VERSION} [skip ci]" --no-verify
-            git push
-            echo "✓ Committed and pushed template-manifest.json update"
-          fi
+      - name: Update template manifest
+        uses: algtools/actions/.github/actions/update-template-manifest@main
+        with:
+          working_directory: ${{ inputs.working_directory }}
+          github_token: ${{ secrets.gh_token }}
 
       - name: Determine template type
         id: template-type
