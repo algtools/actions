@@ -1,3 +1,10 @@
+## [1.20.3](https://github.com/algtools/actions/compare/v1.20.2...v1.20.3) (2025-11-10)
+
+
+### Bug Fixes
+
+* add rebase before pushing changes in update-template-manifest action ([04d867f](https://github.com/algtools/actions/commit/04d867f76c3d701164b3c4129b3f60f120440ccd))
+
 ## [1.20.2](https://github.com/algtools/actions/compare/v1.20.1...v1.20.2) (2025-11-10)
 
 
