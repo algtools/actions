@@ -1,3 +1,10 @@
+## [1.20.9](https://github.com/algtools/actions/compare/v1.20.8...v1.20.9) (2025-11-10)
+
+
+### Bug Fixes
+
+* add tarball upload step to GitHub Release workflow ([1f992fc](https://github.com/algtools/actions/commit/1f992fcb32a11388e35022ed8aa0efdfe08acb14))
+
 ## [1.20.8](https://github.com/algtools/actions/compare/v1.20.7...v1.20.8) (2025-11-10)
 
 
