@@ -1,3 +1,10 @@
+## [1.20.4](https://github.com/algtools/actions/compare/v1.20.3...v1.20.4) (2025-11-10)
+
+
+### Bug Fixes
+
+* enhance rebase process in update-template-manifest ([e627e43](https://github.com/algtools/actions/commit/e627e43d63cab2e5e75873cfe1485e6ffa59ca46))
+
 ## [1.20.3](https://github.com/algtools/actions/compare/v1.20.2...v1.20.3) (2025-11-10)
 
 
