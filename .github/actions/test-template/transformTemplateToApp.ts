@@ -430,7 +430,14 @@ export function transformTemplateToApp(
     }
   }
 
-  // 2. Verify .github directory is from include (already replaced above)
+  // 2. Remove .template-app/ folder from build directory (it shouldn't appear in final package)
+  const templateAppDir = path.join(buildDir, '.template-app');
+  if (fs.existsSync(templateAppDir)) {
+    fs.rmSync(templateAppDir, { recursive: true, force: true });
+    console.log('  ✓ Removed .template-app/ folder from build');
+  }
+
+  // 3. Verify .github directory is from include
   if (fs.existsSync(workflowsDir)) {
     const workflowFiles = fs.readdirSync(workflowsDir);
     console.log(`  ✓ App .github/workflows directory has ${workflowFiles.length} workflow(s)`);
@@ -439,13 +446,6 @@ export function transformTemplateToApp(
     console.log(
       '  ⚠️  No .github/workflows directory found (this may be expected for some templates)',
     );
-  }
-
-  // 3. Remove .template-app/ folder from build directory (it shouldn't appear in final package)
-  const templateAppDir = path.join(buildDir, '.template-app');
-  if (fs.existsSync(templateAppDir)) {
-    fs.rmSync(templateAppDir, { recursive: true, force: true });
-    console.log('  ✓ Removed .template-app/ folder from build');
   }
 
   // 4. Ensure appPack.ts exists
