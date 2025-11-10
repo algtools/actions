@@ -1,3 +1,10 @@
+# [1.20.0](https://github.com/algtools/actions/compare/v1.19.8...v1.20.0) (2025-11-10)
+
+
+### Features
+
+* add Update Template Manifest action to regenerate and commit template manifest ([9288eb6](https://github.com/algtools/actions/commit/9288eb6abea28262b3a6689793d4a28f3442a464))
+
 ## [1.19.8](https://github.com/algtools/actions/compare/v1.19.7...v1.19.8) (2025-11-08)
 
 
