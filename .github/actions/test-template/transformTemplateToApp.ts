@@ -389,23 +389,15 @@ export function transformTemplateToApp(
     if (fs.existsSync(includeDir)) {
       console.log('  📋 Copying files from .template-app/include/...');
 
-      // Delete .github/workflows to ensure template workflows are replaced with app workflows
-      const buildWorkflowsDir = path.join(buildDir, '.github', 'workflows');
-      if (fs.existsSync(buildWorkflowsDir)) {
-        console.log('  🗑️  Removing template workflows before copying app workflows...');
-        fs.rmSync(buildWorkflowsDir, { recursive: true, force: true });
+      // Delete ENTIRE .github directory to ensure template .github is completely replaced
+      const buildGithubDir = path.join(buildDir, '.github');
+      if (fs.existsSync(buildGithubDir)) {
+        console.log('  🗑️  Removing template .github directory before copying app .github...');
+        fs.rmSync(buildGithubDir, { recursive: true, force: true });
       }
 
       copyDirectorySync(includeDir, buildDir);
-      console.log('  ✓ Copied files from include folder');
-
-      // Specifically ensure release-app.yml is in the right place
-      const includeReleaseApp = path.join(includeDir, '.github', 'workflows', 'release-app.yml');
-      const targetReleaseApp = path.join(workflowsDir, 'release-app.yml');
-      if (fs.existsSync(includeReleaseApp) && !fs.existsSync(targetReleaseApp)) {
-        fs.copyFileSync(includeReleaseApp, targetReleaseApp);
-        console.log('  ✓ Copied release-app.yml from include folder');
-      }
+      console.log('  ✓ Copied files from include folder (including app .github)');
 
       // Ensure .cursorrules is in the right place
       const includeCursorRules = path.join(includeDir, '.cursorrules');
@@ -438,23 +430,15 @@ export function transformTemplateToApp(
     }
   }
 
-  // 2. Remove template-specific workflows using exclude patterns
+  // 2. Verify .github directory is from include (already replaced above)
   if (fs.existsSync(workflowsDir)) {
     const workflowFiles = fs.readdirSync(workflowsDir);
-    for (const workflowFile of workflowFiles) {
-      const workflowPath = path.join(workflowsDir, workflowFile);
-      const relativePath = `.github/workflows/${workflowFile}`;
-
-      // Check if this workflow should be excluded
-      const shouldExclude = excludePatterns.some((pattern) =>
-        matchesExcludePattern(relativePath, pattern),
-      );
-
-      if (shouldExclude && fs.statSync(workflowPath).isFile()) {
-        fs.unlinkSync(workflowPath);
-        console.log(`  ✓ Removed ${workflowFile}`);
-      }
-    }
+    console.log(`  ✓ App .github/workflows directory has ${workflowFiles.length} workflow(s)`);
+    workflowFiles.forEach((file) => console.log(`    - ${file}`));
+  } else {
+    console.log(
+      '  ⚠️  No .github/workflows directory found (this may be expected for some templates)',
+    );
   }
 
   // 3. Remove .template-app/ folder from build directory (it shouldn't appear in final package)
