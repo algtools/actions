@@ -59,6 +59,12 @@ runs:
           echo "📝 Committing updated manifest..."
           git add "${MANIFEST_FILE}"
           git commit -m "chore: update template manifest checksums [skip ci]" --no-verify
+
+          # Pull latest changes with rebase to avoid conflicts
+          echo "🔄 Pulling latest changes..."
+          git pull --rebase origin "$(git branch --show-current)"
+
+          echo "📤 Pushing changes..."
           git push
           echo "✅ Manifest committed and pushed"
         fi
