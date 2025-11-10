@@ -69,8 +69,8 @@ runs:
             git checkout --theirs "${MANIFEST_FILE}"
             git add "${MANIFEST_FILE}"
 
-            # Continue the rebase
-            git rebase --continue
+            # Continue the rebase with a dummy editor to avoid interactive prompt
+            GIT_EDITOR=true git rebase --continue
 
             echo "✓ Conflict resolved automatically"
           fi
