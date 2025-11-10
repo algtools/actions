@@ -38,17 +38,17 @@ runs:
       run: |
         set -euo pipefail
 
-        BUILD_DIR="${{ inputs.working_directory }}/.template-build"
-        DIST_DIR="${{ inputs.working_directory }}/template-dist"
+        BUILD_DIR=".template-build"
+        DIST_DIR="template-dist"
         TARBALL_NAME="${{ inputs.template_name }}-v${{ inputs.version }}.tgz"
-        TARBALL_PATH="template-dist/${TARBALL_NAME}"
+        TARBALL_PATH="${DIST_DIR}/${TARBALL_NAME}"
 
         # Create dist directory
         mkdir -p "${DIST_DIR}"
 
-        # Create tarball from build directory
-        cd "${BUILD_DIR}"
-        tar -czf "../${TARBALL_PATH}" .
+        # Create tarball with 'package' parent directory (npm convention)
+        # The provision script expects files in extracted/package/
+        tar -czf "${TARBALL_PATH}" -C "${BUILD_DIR}" --transform 's,^\.,package,' .
 
         echo "tarball_path=${TARBALL_PATH}" >> $GITHUB_OUTPUT
         echo "tarball_name=${TARBALL_NAME}" >> $GITHUB_OUTPUT

@@ -77,8 +77,6 @@ jobs:
         with:
           working_directory: ${{ inputs.working_directory }}
           github_token: ${{ secrets.gh_token }}
-          template_name: ${{ inputs.template_name }}
-          version: ${{ steps.get-version.outputs.version }}
 
       - name: Determine template type
         id: template-type
