@@ -21,7 +21,7 @@ inputs:
     required: false
     default: ""
   pr_title:
-    description: "Title for the pull request (default: chore: update template to {version})"
+    description: "Title for the pull request (default: fix: update template to {version})"
     required: false
     default: ""
   pr_body:
@@ -438,7 +438,7 @@ runs:
         set -euo pipefail
 
         git add -A
-        git commit -m "chore: update template to ${RELEASE_TAG}" || {
+        git commit -m "fix: update template to ${RELEASE_TAG}" || {
           echo "Warning: Commit failed (might be empty or no changes)"
           exit 0
         }
@@ -477,7 +477,7 @@ runs:
         if [ -n "${PR_TITLE_INPUT}" ]; then
           PR_TITLE="${PR_TITLE_INPUT}"
         else
-          PR_TITLE="chore: update template to ${RELEASE_TAG}"
+          PR_TITLE="fix: update template to ${RELEASE_TAG}"
         fi
 
         # Determine PR body

@@ -58,7 +58,7 @@ runs:
         else
           echo "📝 Committing updated manifest..."
           git add "${MANIFEST_FILE}"
-          git commit -m "chore: update template manifest checksums [skip ci]" --no-verify
+          git commit -m "fix: update template manifest checksums [skip ci]" --no-verify
 
           # Pull latest changes with rebase, auto-resolving conflicts by keeping our version
           echo "🔄 Pulling latest changes..."
