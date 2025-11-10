@@ -1,3 +1,10 @@
+## [1.20.10](https://github.com/algtools/actions/compare/v1.20.9...v1.20.10) (2025-11-10)
+
+
+### Bug Fixes
+
+* update tarball creation process in package action and clean up workflow inputs ([de3c884](https://github.com/algtools/actions/commit/de3c884e213b4229007dc029e16fab8a0755b111))
+
 ## [1.20.9](https://github.com/algtools/actions/compare/v1.20.8...v1.20.9) (2025-11-10)
 
 
