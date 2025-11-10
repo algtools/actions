@@ -1,3 +1,10 @@
+## [1.20.22](https://github.com/algtools/actions/compare/v1.20.21...v1.20.22) (2025-11-10)
+
+
+### Bug Fixes
+
+* enhance error handling and logging for template asset retrieval in GitHub actions ([1fa61ca](https://github.com/algtools/actions/commit/1fa61ca583326120c8c0a48c066c1864fdf90c9c))
+
 ## [1.20.21](https://github.com/algtools/actions/compare/v1.20.20...v1.20.21) (2025-11-10)
 
 
