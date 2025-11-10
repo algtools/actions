@@ -1,3 +1,10 @@
+## [1.20.18](https://github.com/algtools/actions/compare/v1.20.17...v1.20.18) (2025-11-10)
+
+
+### Bug Fixes
+
+* remove formatting step for build directory in package action ([ef58f71](https://github.com/algtools/actions/commit/ef58f71f07f9846e6d72a912fd3f72343d0dc591))
+
 ## [1.20.17](https://github.com/algtools/actions/compare/v1.20.16...v1.20.17) (2025-11-10)
 
 
