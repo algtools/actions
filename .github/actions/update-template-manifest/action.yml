@@ -25,15 +25,18 @@ runs:
 
     - name: Update manifest with fresh checksums
       shell: bash
-      working-directory: ${{ inputs.working_directory }}
       run: |
         set -euo pipefail
 
         echo "🔄 Regenerating template manifest..."
 
+        # Resolve absolute path to template directory
+        TEMPLATE_DIR="$(cd "${{ inputs.working_directory }}" && pwd)"
+        echo "📁 Template directory: ${TEMPLATE_DIR}"
+
         # Run the manifest update script using npx from the action directory
         cd "${{ github.action_path }}"
-        npx tsx ./updateManifest.ts "${{ inputs.working_directory }}"
+        npx tsx ./updateManifest.ts "${TEMPLATE_DIR}"
 
     - name: Commit updated manifest
       shell: bash
