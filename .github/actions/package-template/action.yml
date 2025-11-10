@@ -31,6 +31,34 @@ runs:
         template_name: ${{ inputs.template_name }}
         template_type: ${{ inputs.template_type }}
 
+    - name: Format generated files in build directory
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: |
+        echo "🎨 Formatting files in build directory..."
+        BUILD_DIR="./.template-build"
+
+        if [ -d "${BUILD_DIR}" ]; then
+          # Copy prettier config to build directory if it exists
+          if [ -f ".prettierrc.cjs" ]; then
+            cp .prettierrc.cjs "${BUILD_DIR}/" || true
+          fi
+          if [ -f ".prettierignore" ]; then
+            cp .prettierignore "${BUILD_DIR}/" || true
+          fi
+
+          # Run prettier on build directory
+          echo "  🔧 Running prettier on build directory..."
+          pnpm exec prettier --write "${BUILD_DIR}" --log-level=warn || true
+
+          # Remove config files from build directory
+          rm -f "${BUILD_DIR}/.prettierrc.cjs" "${BUILD_DIR}/.prettierignore" || true
+
+          echo "✅ Build directory formatted"
+        else
+          echo "⚠️  Build directory not found, skipping formatting"
+        fi
+
     - name: Create tarball
       id: pack
       shell: bash
@@ -53,11 +81,3 @@ runs:
         echo "tarball_path=${TARBALL_PATH}" >> $GITHUB_OUTPUT
         echo "tarball_name=${TARBALL_NAME}" >> $GITHUB_OUTPUT
         echo "✅ Created tarball: ${TARBALL_NAME}"
-
-    - name: Format generated files
-      shell: bash
-      working-directory: ${{ inputs.working_directory }}
-      run: |
-        echo "🎨 Formatting generated files..."
-        pnpm run format || true
-        echo "✅ Formatting complete"
