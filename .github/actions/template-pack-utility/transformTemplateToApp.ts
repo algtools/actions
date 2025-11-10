@@ -335,6 +335,14 @@ export function transformTemplateToApp(
     const includeDir = path.join(templateRoot, '.template-app', 'include');
     if (fs.existsSync(includeDir)) {
       console.log('  📋 Copying files from .template-app/include/...');
+
+      // Delete .github/workflows to ensure template workflows are replaced with app workflows
+      const buildWorkflowsDir = path.join(buildDir, '.github', 'workflows');
+      if (fs.existsSync(buildWorkflowsDir)) {
+        console.log('  🗑️  Removing template workflows before copying app workflows...');
+        fs.rmSync(buildWorkflowsDir, { recursive: true, force: true });
+      }
+
       copyDirectorySync(includeDir, buildDir);
       console.log('  ✓ Copied files from include folder');
 
