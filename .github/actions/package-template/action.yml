@@ -57,10 +57,7 @@ runs:
           }
           cd ..
 
-          # Remove config files from build directory so they don't end up in the package
-          rm -f "${BUILD_DIR}/.prettierrc.cjs" "${BUILD_DIR}/.prettierignore"
-          echo "  ✓ Cleaned up config files"
-
+          echo "  ✓ Prettier config will be included in package for consistency"
           echo "✅ Build directory formatted"
         else
           echo "⚠️  Build directory not found, skipping formatting"
