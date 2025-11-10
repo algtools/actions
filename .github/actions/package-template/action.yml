@@ -39,17 +39,27 @@ runs:
         BUILD_DIR="./.template-build"
 
         if [ -d "${BUILD_DIR}" ]; then
-          # Copy prettier config to build directory if it exists
+          # Copy prettier config to build directory
           if [ -f ".prettierrc.cjs" ]; then
-            cp .prettierrc.cjs "${BUILD_DIR}/" || true
+            cp .prettierrc.cjs "${BUILD_DIR}/.prettierrc.cjs"
+            echo "  ✓ Copied prettier config"
           fi
           if [ -f ".prettierignore" ]; then
-            cp .prettierignore "${BUILD_DIR}/" || true
+            cp .prettierignore "${BUILD_DIR}/.prettierignore"
+            echo "  ✓ Copied prettier ignore"
           fi
 
-          # Run prettier on build directory
-          echo "  🔧 Running prettier on build directory..."
-          pnpm exec prettier --write "${BUILD_DIR}" --log-level=warn || true
+          # Run prettier FROM inside the build directory
+          echo "  🔧 Running prettier on all files..."
+          cd "${BUILD_DIR}"
+          pnpm exec prettier --write . --log-level=warn || {
+            echo "  ⚠️  Prettier encountered issues, but continuing..."
+          }
+          cd ..
+
+          # Remove config files from build directory so they don't end up in the package
+          rm -f "${BUILD_DIR}/.prettierrc.cjs" "${BUILD_DIR}/.prettierignore"
+          echo "  ✓ Cleaned up config files"
 
           echo "✅ Build directory formatted"
         else

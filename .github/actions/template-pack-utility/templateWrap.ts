@@ -31,6 +31,9 @@ const WRAP_EXCLUDE_PATTERNS = [
   '.template-build',
   'template-dist',
   'app-dist',
+  '.prettierrc.cjs',
+  '.prettierrc.js',
+  '.prettierignore',
 ];
 
 // File extensions to wrap
