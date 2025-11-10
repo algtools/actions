@@ -1,3 +1,10 @@
+## [1.20.17](https://github.com/algtools/actions/compare/v1.20.16...v1.20.17) (2025-11-10)
+
+
+### Bug Fixes
+
+* run Prettier from template root targeting build directory for improved formatting ([3978f95](https://github.com/algtools/actions/commit/3978f95b063670ed8e0ac75e95df45bcf9b358fb))
+
 ## [1.20.16](https://github.com/algtools/actions/compare/v1.20.15...v1.20.16) (2025-11-10)
 
 
