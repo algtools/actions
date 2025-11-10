@@ -1,3 +1,10 @@
+## [1.20.21](https://github.com/algtools/actions/compare/v1.20.20...v1.20.21) (2025-11-10)
+
+
+### Bug Fixes
+
+* add token replacement step for SOURCE_REPO in template-updates.yml ([ab1d1b3](https://github.com/algtools/actions/commit/ab1d1b3a1ca3c855d9e87180ae6ccc8ae757f521))
+
 ## [1.20.20](https://github.com/algtools/actions/compare/v1.20.19...v1.20.20) (2025-11-10)
 
 
