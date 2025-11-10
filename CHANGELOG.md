@@ -1,3 +1,10 @@
+## [1.20.1](https://github.com/algtools/actions/compare/v1.20.0...v1.20.1) (2025-11-10)
+
+
+### Bug Fixes
+
+* update manifest script execution to use npx for improved compatibility ([ebd655d](https://github.com/algtools/actions/commit/ebd655def201b8fe22c7a91441e80f87c36ec10c))
+
 # [1.20.0](https://github.com/algtools/actions/compare/v1.19.8...v1.20.0) (2025-11-10)
 
 
