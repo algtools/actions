@@ -1,3 +1,10 @@
+## [1.20.26](https://github.com/algtools/actions/compare/v1.20.25...v1.20.26) (2025-11-10)
+
+
+### Bug Fixes
+
+* add TypeScript configuration and update devDependencies with @types/node ([00af99c](https://github.com/algtools/actions/commit/00af99c3fdd4cbc366f24596ad29a84e043d8f9c))
+
 ## [1.20.25](https://github.com/algtools/actions/compare/v1.20.24...v1.20.25) (2025-11-10)
 
 
