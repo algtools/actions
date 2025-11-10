@@ -1,3 +1,10 @@
+## [1.20.2](https://github.com/algtools/actions/compare/v1.20.1...v1.20.2) (2025-11-10)
+
+
+### Bug Fixes
+
+* resolve template directory path for manifest update script ([abf1c3d](https://github.com/algtools/actions/commit/abf1c3d2f27bb4325befd6453a21e7dec7078267))
+
 ## [1.20.1](https://github.com/algtools/actions/compare/v1.20.0...v1.20.1) (2025-11-10)
 
 
