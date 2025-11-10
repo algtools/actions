@@ -1,3 +1,10 @@
+## [1.20.24](https://github.com/algtools/actions/compare/v1.20.23...v1.20.24) (2025-11-10)
+
+
+### Bug Fixes
+
+* update commit messages to reflect accurate action types in template provisioning and updates ([c522785](https://github.com/algtools/actions/commit/c522785a0b8b4a7106515156f371ad3991ddbbd6))
+
 ## [1.20.23](https://github.com/algtools/actions/compare/v1.20.22...v1.20.23) (2025-11-10)
 
 
