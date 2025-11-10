@@ -1,3 +1,10 @@
+## [1.20.14](https://github.com/algtools/actions/compare/v1.20.13...v1.20.14) (2025-11-10)
+
+
+### Bug Fixes
+
+* remove unnecessary config file cleanup from build directory in package action ([fa09286](https://github.com/algtools/actions/commit/fa09286a5cc06ea32d7bcd33a1810e703ed9592f))
+
 ## [1.20.13](https://github.com/algtools/actions/compare/v1.20.12...v1.20.13) (2025-11-10)
 
 
