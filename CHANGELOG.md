@@ -1,3 +1,10 @@
+## [1.20.19](https://github.com/algtools/actions/compare/v1.20.18...v1.20.19) (2025-11-10)
+
+
+### Bug Fixes
+
+* add Prettier formatting steps for source and build directories in template packaging ([39a4847](https://github.com/algtools/actions/commit/39a48474d74d007ea6cf0bae9280f991019c1878))
+
 ## [1.20.18](https://github.com/algtools/actions/compare/v1.20.17...v1.20.18) (2025-11-10)
 
 
