@@ -364,6 +364,67 @@ runs:
           echo "CHROMATIC_PROJECT_TOKEN not provided, skipping"
         fi
 
+    - name: Enable GitHub Actions
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.admin_token }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        APP_NAME: ${{ inputs.app_name }}
+      run: |
+        set -euo pipefail
+
+        # Extract owner from source repo
+        IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        TARGET_REPO="${OWNER}/${APP_NAME}"
+
+        echo "Enabling GitHub Actions for ${TARGET_REPO}..."
+
+        # Enable Actions on the repository
+        gh api \
+          "repos/${TARGET_REPO}/actions/permissions" \
+          --method PUT \
+          --field enabled=true \
+          --field allowed_actions=all \
+          --silent
+
+        echo "✓ GitHub Actions enabled"
+
+    - name: Trigger initial deployments
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.admin_token }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        APP_NAME: ${{ inputs.app_name }}
+      run: |
+        set -euo pipefail
+
+        # Extract owner from source repo
+        IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        TARGET_REPO="${OWNER}/${APP_NAME}"
+
+        echo "Triggering initial deployments for ${TARGET_REPO}..."
+
+        # Trigger deploy-dev.yml on dev branch
+        echo "  → Triggering deploy to dev..."
+        gh workflow run deploy-dev.yml \
+          --repo "${TARGET_REPO}" \
+          --ref dev || echo "⚠️  Failed to trigger dev deployment (workflow may not exist yet)"
+
+        # Trigger deploy-qa.yml on qa branch
+        echo "  → Triggering deploy to qa..."
+        gh workflow run deploy-qa.yml \
+          --repo "${TARGET_REPO}" \
+          --ref qa || echo "⚠️  Failed to trigger qa deployment (workflow may not exist yet)"
+
+        # Trigger deploy-prod.yml on main branch
+        echo "  → Triggering deploy to production..."
+        gh workflow run deploy-prod.yml \
+          --repo "${TARGET_REPO}" \
+          --ref main || echo "⚠️  Failed to trigger prod deployment (workflow may not exist yet)"
+
+        echo "✓ Initial deployment workflows triggered"
+        echo "  ℹ️  Check the Actions tab to monitor deployment progress"
+
     - name: Generate summary
       shell: bash
       env:
@@ -387,6 +448,9 @@ runs:
           echo "- **Release tag used**: ${RELEASE_TAG}"
           echo "- **Branches created**: main, dev, qa"
           echo "- **Repository ruleset**: Configured from template (protects dev, qa, main branches)"
+          echo "- **GitHub Actions**: ✅ Enabled"
+          echo "- **Initial deployments**: ✅ Triggered for dev, qa, and production"
+          echo "  - ℹ️ Check the [Actions tab](${REPOSITORY_URL}/actions) to monitor deployment progress"
           echo "- **Repository variables**: APP_NAME, SENTRY_PROJECT"
           if [ -n "${SENTRY_DSN:-}" ]; then
             echo "  - SENTRY_DSN (configured)"
