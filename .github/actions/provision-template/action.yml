@@ -395,13 +395,29 @@ runs:
         echo "🔧 Enabling GitHub Actions for ${TARGET_REPO}..."
 
         # Wait for repository to be fully initialized
+        # GitHub's API is eventually consistent, so we need a longer wait
         echo "  ⏳ Waiting for repository initialization..."
-        sleep 3
+        sleep 8
 
-        # Check current Actions status
+        # Check current Actions status with retry
         echo "  🔍 Checking current Actions status..."
-        CURRENT_STATUS=$(gh api "repos/${TARGET_REPO}/actions/permissions" --jq '.enabled' 2>/dev/null || echo "unknown")
-        echo "  📊 Current Actions status: ${CURRENT_STATUS}"
+        RETRY_COUNT=0
+        MAX_RETRIES=3
+
+        while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+          CURRENT_STATUS=$(gh api "repos/${TARGET_REPO}/actions/permissions" --jq '.enabled' 2>/dev/null || echo "unknown")
+
+          if [ "${CURRENT_STATUS}" != "unknown" ]; then
+            echo "  📊 Current Actions status: ${CURRENT_STATUS}"
+            break
+          fi
+
+          RETRY_COUNT=$((RETRY_COUNT + 1))
+          if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+            echo "  ⏳ Repository not fully ready, waiting... (attempt $RETRY_COUNT/$MAX_RETRIES)"
+            sleep 3
+          fi
+        done
 
         if [ "${CURRENT_STATUS}" = "true" ]; then
           echo "  ✅ Actions already enabled!"
@@ -415,8 +431,16 @@ runs:
           -H "Accept: application/vnd.github+json" \
           -H "X-GitHub-Api-Version: 2022-11-28" \
           --input - <<< '{"enabled":true,"allowed_actions":"all"}' 2>&1; then
-          echo "  ✅ Actions enabled via Method 1"
-          exit 0
+
+          # Verify it actually worked
+          sleep 2
+          VERIFY_STATUS=$(gh api "repos/${TARGET_REPO}/actions/permissions" --jq '.enabled' 2>/dev/null || echo "false")
+          if [ "${VERIFY_STATUS}" = "true" ]; then
+            echo "  ✅ Actions enabled and verified via Method 1"
+            exit 0
+          else
+            echo "  ⚠️  Method 1 API call succeeded but verification failed"
+          fi
         fi
 
         # Method 2: Try with individual fields
@@ -425,8 +449,16 @@ runs:
           --method PUT \
           --field enabled=true \
           --field allowed_actions=all 2>&1; then
-          echo "  ✅ Actions enabled via Method 2"
-          exit 0
+
+          # Verify it actually worked
+          sleep 2
+          VERIFY_STATUS=$(gh api "repos/${TARGET_REPO}/actions/permissions" --jq '.enabled' 2>/dev/null || echo "false")
+          if [ "${VERIFY_STATUS}" = "true" ]; then
+            echo "  ✅ Actions enabled and verified via Method 2"
+            exit 0
+          else
+            echo "  ⚠️  Method 2 API call succeeded but verification failed"
+          fi
         fi
 
         # Method 3: Try enabling organization-level access first
@@ -439,8 +471,16 @@ runs:
           if gh api "repos/${TARGET_REPO}/actions/permissions" \
             --method PUT \
             --input - <<< '{"enabled":true,"allowed_actions":"all"}' 2>&1; then
-            echo "  ✅ Actions enabled after org-level access"
-            exit 0
+
+            # Verify it actually worked
+            sleep 2
+            VERIFY_STATUS=$(gh api "repos/${TARGET_REPO}/actions/permissions" --jq '.enabled' 2>/dev/null || echo "false")
+            if [ "${VERIFY_STATUS}" = "true" ]; then
+              echo "  ✅ Actions enabled and verified after org-level access"
+              exit 0
+            else
+              echo "  ⚠️  Method 3 API call succeeded but verification failed"
+            fi
           fi
         fi
 
@@ -482,9 +522,21 @@ runs:
 
         echo "Triggering initial deployments for ${TARGET_REPO}..."
 
-        # Wait for Actions to be fully enabled
+        # Wait for Actions to be fully enabled and workflows to be registered
         echo "  ⏳ Waiting for Actions to be ready..."
-        sleep 5
+        sleep 10
+
+        # Verify Actions are enabled before attempting to trigger workflows
+        echo "  🔍 Verifying Actions are enabled..."
+        ACTIONS_ENABLED=$(gh api "repos/${TARGET_REPO}/actions/permissions" --jq '.enabled' 2>/dev/null || echo "false")
+
+        if [ "${ACTIONS_ENABLED}" != "true" ]; then
+          echo "  ⚠️  Actions are not enabled, skipping automatic deployment triggers"
+          echo "  ℹ️  Please enable Actions manually and trigger deployments from the Actions tab"
+          exit 0
+        fi
+
+        echo "  ✓ Actions confirmed enabled"
 
         # Trigger deploy-dev.yml on dev branch
         echo "  → Triggering deploy to dev..."
