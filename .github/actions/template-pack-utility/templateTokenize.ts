@@ -80,7 +80,6 @@ function shouldExclude(filePath: string, excludePatterns: string[], templateRoot
     'dist',
     'coverage',
     '.git',
-    'pnpm-lock.yaml',
     '.template-build',
     'template-dist',
     'app-dist',

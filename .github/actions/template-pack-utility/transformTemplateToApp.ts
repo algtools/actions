@@ -127,9 +127,6 @@ async function packApp(): Promise<void> {
             '.dev.vars',
             '.DS_Store',
             'Thumbs.db',
-            'pnpm-lock.yaml',
-            'package-lock.json',
-            'yarn.lock',
             '.vscode',
             '.idea',${webSpecificExcludes}
             // Exclude template-specific files

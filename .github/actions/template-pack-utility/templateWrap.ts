@@ -28,7 +28,6 @@ const WRAP_EXCLUDE_PATTERNS = [
   '.git',
   '.template-manifest.json',
   '.template-app/exclude.json',
-  'pnpm-lock.yaml',
   '.template-build',
   'template-dist',
   'app-dist',

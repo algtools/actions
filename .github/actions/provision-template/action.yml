@@ -379,15 +379,25 @@ runs:
 
         echo "Enabling GitHub Actions for ${TARGET_REPO}..."
 
-        # Enable Actions on the repository
-        gh api \
-          "repos/${TARGET_REPO}/actions/permissions" \
+        # Wait a moment for repository to be fully initialized
+        sleep 2
+
+        # Enable Actions on the repository - try both API approaches
+        if gh api "repos/${TARGET_REPO}/actions/permissions" \
           --method PUT \
           --field enabled=true \
           --field allowed_actions=all \
-          --silent
-
-        echo "✓ GitHub Actions enabled"
+          --silent 2>/dev/null; then
+          echo "✓ GitHub Actions enabled via API"
+        else
+          echo "⚠️  Could not enable Actions via API, trying alternative method..."
+          # Alternative: set permissions object
+          gh api "repos/${TARGET_REPO}/actions/permissions" \
+            --method PUT \
+            --raw-field "enabled=true" \
+            --raw-field "allowed_actions=all" \
+            --silent || echo "⚠️  Actions may need to be enabled manually"
+        fi
 
     - name: Trigger initial deployments
       shell: bash
@@ -404,26 +414,38 @@ runs:
 
         echo "Triggering initial deployments for ${TARGET_REPO}..."
 
+        # Wait for Actions to be fully enabled
+        echo "  ⏳ Waiting for Actions to be ready..."
+        sleep 5
+
         # Trigger deploy-dev.yml on dev branch
         echo "  → Triggering deploy to dev..."
-        gh workflow run deploy-dev.yml \
-          --repo "${TARGET_REPO}" \
-          --ref dev || echo "⚠️  Failed to trigger dev deployment (workflow may not exist yet)"
+        if gh workflow run deploy-dev.yml --repo "${TARGET_REPO}" --ref dev 2>/dev/null; then
+          echo "    ✓ Dev deployment triggered"
+        else
+          echo "    ⚠️  Could not trigger dev deployment automatically"
+        fi
 
         # Trigger deploy-qa.yml on qa branch
         echo "  → Triggering deploy to qa..."
-        gh workflow run deploy-qa.yml \
-          --repo "${TARGET_REPO}" \
-          --ref qa || echo "⚠️  Failed to trigger qa deployment (workflow may not exist yet)"
+        if gh workflow run deploy-qa.yml --repo "${TARGET_REPO}" --ref qa 2>/dev/null; then
+          echo "    ✓ QA deployment triggered"
+        else
+          echo "    ⚠️  Could not trigger qa deployment automatically"
+        fi
 
         # Trigger deploy-prod.yml on main branch
         echo "  → Triggering deploy to production..."
-        gh workflow run deploy-prod.yml \
-          --repo "${TARGET_REPO}" \
-          --ref main || echo "⚠️  Failed to trigger prod deployment (workflow may not exist yet)"
+        if gh workflow run deploy-prod.yml --repo "${TARGET_REPO}" --ref main 2>/dev/null; then
+          echo "    ✓ Production deployment triggered"
+        else
+          echo "    ⚠️  Could not trigger prod deployment automatically"
+        fi
 
-        echo "✓ Initial deployment workflows triggered"
+        echo ""
+        echo "✓ Deployment trigger process completed"
         echo "  ℹ️  Check the Actions tab to monitor deployment progress"
+        echo "  ℹ️  If deployments did not start automatically, you can trigger them manually from the Actions tab"
 
     - name: Generate summary
       shell: bash
