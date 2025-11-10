@@ -1,3 +1,10 @@
+## [1.20.8](https://github.com/algtools/actions/compare/v1.20.7...v1.20.8) (2025-11-10)
+
+
+### Bug Fixes
+
+* reorder steps in transformTemplateToApp for clarity and remove redundant file cleanup ([5711cd2](https://github.com/algtools/actions/commit/5711cd25e4e54e573c2edd15441adebbb3dabe3c))
+
 ## [1.20.7](https://github.com/algtools/actions/compare/v1.20.6...v1.20.7) (2025-11-10)
 
 
