@@ -1,3 +1,10 @@
+## [1.20.7](https://github.com/algtools/actions/compare/v1.20.6...v1.20.7) (2025-11-10)
+
+
+### Bug Fixes
+
+* replace .github workflows removal logic with complete directory deletion ([e93fc0e](https://github.com/algtools/actions/commit/e93fc0eb97bd1d36191df91e5719a2a71a0aca98))
+
 ## [1.20.6](https://github.com/algtools/actions/compare/v1.20.5...v1.20.6) (2025-11-10)
 
 
