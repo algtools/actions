@@ -1,3 +1,10 @@
+## [1.20.15](https://github.com/algtools/actions/compare/v1.20.14...v1.20.15) (2025-11-10)
+
+
+### Bug Fixes
+
+* run prettier from build directory for proper formatting ([08f69f2](https://github.com/algtools/actions/commit/08f69f2e52e0d9b96f04b0729a23dfe8de1b9a28))
+
 ## [1.20.14](https://github.com/algtools/actions/compare/v1.20.13...v1.20.14) (2025-11-10)
 
 
