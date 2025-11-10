@@ -1,3 +1,10 @@
+## [1.20.23](https://github.com/algtools/actions/compare/v1.20.22...v1.20.23) (2025-11-10)
+
+
+### Bug Fixes
+
+* improve GitHub Actions initialization with enhanced waiting and verification logic ([12d7224](https://github.com/algtools/actions/commit/12d7224f190a6ec94bd63266216b4a1d4e7d846b))
+
 ## [1.20.22](https://github.com/algtools/actions/compare/v1.20.21...v1.20.22) (2025-11-10)
 
 
