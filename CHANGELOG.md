@@ -1,3 +1,10 @@
+## [1.20.11](https://github.com/algtools/actions/compare/v1.20.10...v1.20.11) (2025-11-10)
+
+
+### Bug Fixes
+
+* add steps to enable GitHub Actions and trigger initial deployments for new repositories ([9e5829b](https://github.com/algtools/actions/commit/9e5829b414a7de7d82345e391d8212b12aaf4295))
+
 ## [1.20.10](https://github.com/algtools/actions/compare/v1.20.9...v1.20.10) (2025-11-10)
 
 
