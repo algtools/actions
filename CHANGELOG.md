@@ -1,3 +1,10 @@
+## [1.20.16](https://github.com/algtools/actions/compare/v1.20.15...v1.20.16) (2025-11-10)
+
+
+### Bug Fixes
+
+* include Prettier config in package for consistency ([c2b9fc0](https://github.com/algtools/actions/commit/c2b9fc040d49517b3f1cf8d2016ba91dde2c7df9))
+
 ## [1.20.15](https://github.com/algtools/actions/compare/v1.20.14...v1.20.15) (2025-11-10)
 
 
