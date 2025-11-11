@@ -1,3 +1,10 @@
+## [1.21.2](https://github.com/algtools/actions/compare/v1.21.1...v1.21.2) (2025-11-11)
+
+
+### Bug Fixes
+
+* enhance GitHub Actions provisioning ([633c9e8](https://github.com/algtools/actions/commit/633c9e8c2103e5c091d115c7f7387395c9b7f530))
+
 ## [1.21.1](https://github.com/algtools/actions/compare/v1.21.0...v1.21.1) (2025-11-11)
 
 
