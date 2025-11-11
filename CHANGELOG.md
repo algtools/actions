@@ -1,3 +1,10 @@
+## [1.21.7](https://github.com/algtools/actions/compare/v1.21.6...v1.21.7) (2025-11-11)
+
+
+### Bug Fixes
+
+* add .eslintrc.json to wrap exclude patterns to prevent schema validation issues ([34fe68d](https://github.com/algtools/actions/commit/34fe68d2b34f2e69d4c021e6bcc8aa6a8473c593))
+
 ## [1.21.6](https://github.com/algtools/actions/compare/v1.21.5...v1.21.6) (2025-11-11)
 
 
