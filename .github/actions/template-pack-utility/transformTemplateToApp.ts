@@ -402,7 +402,14 @@ export function transformTemplateToApp(
     console.log('  ✓ appPack.ts already exists');
   }
 
-  // 6. Update package.json to ensure app:pack script exists
+  // 6. Remove excluded files (template-specific scripts, workflows, etc.)
+  if (excludePatterns.length > 0) {
+    console.log('  🗑️  Removing excluded files...');
+    removeExcludedFiles(buildDir, excludePatterns, buildDir);
+    console.log('  ✓ Excluded files removed');
+  }
+
+  // 7. Update package.json to ensure app:pack script exists
   if (fs.existsSync(packageJsonPath)) {
     const packageJson: PackageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
 

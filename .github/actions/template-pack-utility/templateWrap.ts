@@ -130,10 +130,26 @@ function wrapFileContent(filePath: string, content: string, templateRoot: string
     }
   }
 
+  // Check for shebang at the start of the file
+  const hasShebang = content.startsWith('#!');
+  let shebangLine = '';
+  let contentAfterShebang = content;
+
+  if (hasShebang) {
+    const firstNewlineIndex = content.indexOf('\n');
+    if (firstNewlineIndex !== -1) {
+      shebangLine = content.substring(0, firstNewlineIndex + 1);
+      contentAfterShebang = content.substring(firstNewlineIndex + 1);
+    }
+  }
+
   // For YAML files, use comment syntax
   if (comments.line) {
     const header = `${comments.line} @template-start:v1 ${relativePath} sha256:${checksum}\n`;
     const footer = `\n${comments.line} @template-end:v1`;
+    if (hasShebang) {
+      return shebangLine + header + contentAfterShebang + footer;
+    }
     return header + content + footer;
   }
 
@@ -141,6 +157,9 @@ function wrapFileContent(filePath: string, content: string, templateRoot: string
   if (comments.start && comments.end) {
     const header = `${comments.start} @template-start:v1 ${relativePath} sha256:${checksum} ${comments.end}\n`;
     const footer = `\n${comments.start} @template-end:v1 ${comments.end}`;
+    if (hasShebang) {
+      return shebangLine + header + contentAfterShebang + footer;
+    }
     return header + content + footer;
   }
 
