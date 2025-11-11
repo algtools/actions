@@ -96,6 +96,12 @@ function getCommentSyntax(filePath: string): { start: string; end: string; line?
       return { start: '<!--', end: '-->', line: '' };
     case '.sql':
       return { start: '/*', end: '*/', line: '--' };
+    case '.css':
+    case '.scss':
+    case '.sass':
+    case '.less':
+      // CSS and CSS-like files only support block comments /* */
+      return { start: '/*', end: '*/', line: '' };
     default:
       return { start: '/*', end: '*/', line: '//' };
   }
