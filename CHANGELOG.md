@@ -1,3 +1,10 @@
+## [1.21.8](https://github.com/algtools/actions/compare/v1.21.7...v1.21.8) (2025-11-11)
+
+
+### Bug Fixes
+
+* add support for block comments in CSS and related file types ([ea3121a](https://github.com/algtools/actions/commit/ea3121ae8aedd9476e93bf4175af6a7f6f4973e2))
+
 ## [1.21.7](https://github.com/algtools/actions/compare/v1.21.6...v1.21.7) (2025-11-11)
 
 
