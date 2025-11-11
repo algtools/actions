@@ -5,6 +5,10 @@ inputs:
   source_repo:
     description: "Source template repository (e.g., 'owner/repo')"
     required: true
+  target_org:
+    description: "Target organization name (e.g., 'janovix'). If not provided, uses source_repo organization."
+    required: false
+    default: ""
   app_name:
     description: "Name of the repository to create (e.g., 'acme-bff')"
     required: true
@@ -222,12 +226,17 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.admin_token }}
         SOURCE_REPO: ${{ inputs.source_repo }}
+        TARGET_ORG: ${{ inputs.target_org }}
         APP_NAME: ${{ inputs.app_name }}
       run: |
         set -euo pipefail
 
-        # Extract owner from source repo
-        IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        # Extract owner - use target_org if provided, otherwise from source_repo
+        if [ -n "${TARGET_ORG}" ]; then
+          OWNER="${TARGET_ORG}"
+        else
+          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        fi
 
         gh repo create "${OWNER}/${APP_NAME}" --private -y
 
@@ -239,12 +248,17 @@ runs:
       env:
         ADMIN_TOKEN: ${{ inputs.admin_token }}
         SOURCE_REPO: ${{ inputs.source_repo }}
+        TARGET_ORG: ${{ inputs.target_org }}
         APP_NAME: ${{ inputs.app_name }}
       run: |
         set -euo pipefail
 
-        # Extract owner from source repo
-        IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        # Extract owner - use target_org if provided, otherwise from source_repo
+        if [ -n "${TARGET_ORG}" ]; then
+          OWNER="${TARGET_ORG}"
+        else
+          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        fi
 
         git remote add origin "https://x-access-token:${ADMIN_TOKEN}@github.com/${OWNER}/${APP_NAME}.git"
         git push -u origin main
@@ -255,12 +269,17 @@ runs:
       env:
         ADMIN_TOKEN: ${{ inputs.admin_token }}
         SOURCE_REPO: ${{ inputs.source_repo }}
+        TARGET_ORG: ${{ inputs.target_org }}
         APP_NAME: ${{ inputs.app_name }}
       run: |
         set -euo pipefail
 
-        # Extract owner from source repo
-        IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        # Extract owner - use target_org if provided, otherwise from source_repo
+        if [ -n "${TARGET_ORG}" ]; then
+          OWNER="${TARGET_ORG}"
+        else
+          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        fi
 
         # Create and push dev branch
         echo "Creating dev branch..."
@@ -280,12 +299,17 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.admin_token }}
         SOURCE_REPO: ${{ inputs.source_repo }}
+        TARGET_ORG: ${{ inputs.target_org }}
         APP_NAME: ${{ inputs.app_name }}
       run: |
         set -euo pipefail
 
-        # Extract owner from source repo
-        IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        # Extract owner - use target_org if provided, otherwise from source_repo
+        if [ -n "${TARGET_ORG}" ]; then
+          OWNER="${TARGET_ORG}"
+        else
+          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        fi
         TARGET_REPO="${OWNER}/${APP_NAME}"
 
         # Check if ruleset.json exists in template
@@ -329,14 +353,19 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.admin_token }}
         SOURCE_REPO: ${{ inputs.source_repo }}
+        TARGET_ORG: ${{ inputs.target_org }}
         APP_NAME: ${{ inputs.app_name }}
         SENTRY_PROJECT: ${{ inputs.sentry_project }}
         SENTRY_DSN: ${{ inputs.sentry_dsn }}
       run: |
         set -euo pipefail
 
-        # Extract owner from source repo
-        IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        # Extract owner - use target_org if provided, otherwise from source_repo
+        if [ -n "${TARGET_ORG}" ]; then
+          OWNER="${TARGET_ORG}"
+        else
+          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        fi
 
         gh variable set APP_NAME --repo "${OWNER}/${APP_NAME}" --body "${APP_NAME}"
 
@@ -363,13 +392,18 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.admin_token }}
         SOURCE_REPO: ${{ inputs.source_repo }}
+        TARGET_ORG: ${{ inputs.target_org }}
         APP_NAME: ${{ inputs.app_name }}
         CHROMATIC_PROJECT_TOKEN: ${{ inputs.chromatic_project_token }}
       run: |
         set -euo pipefail
 
-        # Extract owner from source repo
-        IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        # Extract owner - use target_org if provided, otherwise from source_repo
+        if [ -n "${TARGET_ORG}" ]; then
+          OWNER="${TARGET_ORG}"
+        else
+          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        fi
 
         # Set CHROMATIC_PROJECT_TOKEN as repository secret if provided
         if [ -n "${CHROMATIC_PROJECT_TOKEN:-}" ]; then
@@ -384,12 +418,17 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.admin_token }}
         SOURCE_REPO: ${{ inputs.source_repo }}
+        TARGET_ORG: ${{ inputs.target_org }}
         APP_NAME: ${{ inputs.app_name }}
       run: |
         set -euo pipefail
 
-        # Extract owner from source repo
-        IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        # Extract owner - use target_org if provided, otherwise from source_repo
+        if [ -n "${TARGET_ORG}" ]; then
+          OWNER="${TARGET_ORG}"
+        else
+          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        fi
         TARGET_REPO="${OWNER}/${APP_NAME}"
 
         echo "🔧 Enabling GitHub Actions for ${TARGET_REPO}..."
@@ -512,12 +551,17 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.admin_token }}
         SOURCE_REPO: ${{ inputs.source_repo }}
+        TARGET_ORG: ${{ inputs.target_org }}
         APP_NAME: ${{ inputs.app_name }}
       run: |
         set -euo pipefail
 
-        # Extract owner from source repo
-        IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        # Extract owner - use target_org if provided, otherwise from source_repo
+        if [ -n "${TARGET_ORG}" ]; then
+          OWNER="${TARGET_ORG}"
+        else
+          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        fi
         TARGET_REPO="${OWNER}/${APP_NAME}"
 
         echo "Triggering initial deployments for ${TARGET_REPO}..."
@@ -571,6 +615,7 @@ runs:
       shell: bash
       env:
         SOURCE_REPO: ${{ inputs.source_repo }}
+        TARGET_ORG: ${{ inputs.target_org }}
         APP_NAME: ${{ inputs.app_name }}
         SENTRY_PROJECT: ${{ inputs.sentry_project }}
         SENTRY_DSN: ${{ inputs.sentry_dsn }}
@@ -578,8 +623,12 @@ runs:
         RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
         REPOSITORY_URL: ${{ steps.create-repo.outputs.repository_url }}
       run: |
-        # Extract owner from source repo
-        IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        # Extract owner - use target_org if provided, otherwise from source_repo
+        if [ -n "${TARGET_ORG}" ]; then
+          OWNER="${TARGET_ORG}"
+        else
+          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        fi
 
         SENTRY_PROJECT_VALUE="${SENTRY_PROJECT:-${APP_NAME}}"
 

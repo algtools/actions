@@ -3,6 +3,11 @@ name: "Provision Template - Reusable"
 on:
   workflow_call:
     inputs:
+      target_org:
+        description: "Target organization name (e.g., 'janovix', 'carteracredit'). If not provided, uses source repository organization."
+        required: false
+        type: string
+        default: ""
       app_name:
         description: "Name of the repository to create (e.g. acme-bff)"
         required: true
@@ -59,6 +64,7 @@ jobs:
         uses: algtools/actions/.github/actions/provision-template@main
         with:
           source_repo: ${{ github.repository }}
+          target_org: ${{ inputs.target_org }}
           app_name: ${{ inputs.app_name }}
           sentry_project: ${{ inputs.sentry_project }}
           sentry_dsn: ${{ inputs.sentry_dsn }}
