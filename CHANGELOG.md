@@ -1,3 +1,10 @@
+## [1.21.6](https://github.com/algtools/actions/compare/v1.21.5...v1.21.6) (2025-11-11)
+
+
+### Bug Fixes
+
+* improve template file handling by removing excluded files before copying ([984c231](https://github.com/algtools/actions/commit/984c2311634b7aa4f2ba710881da2aacf2890a34))
+
 ## [1.21.5](https://github.com/algtools/actions/compare/v1.21.4...v1.21.5) (2025-11-11)
 
 
