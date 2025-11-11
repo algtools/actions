@@ -293,6 +293,51 @@ runs:
 
         echo "✓ Created dev and qa branches"
 
+    - name: Enable GitHub Actions
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.admin_token }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        TARGET_ORG: ${{ inputs.target_org }}
+        APP_NAME: ${{ inputs.app_name }}
+      run: |
+        set -euo pipefail
+
+        # Extract owner - use target_org if provided, otherwise from source_repo
+        if [ -n "${TARGET_ORG}" ]; then
+          OWNER="${TARGET_ORG}"
+        else
+          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        fi
+        TARGET_REPO="${OWNER}/${APP_NAME}"
+
+        echo "Enabling GitHub Actions for ${TARGET_REPO}..."
+
+        # Enable Actions for the repository with all actions allowed
+        if gh api \
+          "repos/${TARGET_REPO}/actions/permissions" \
+          --method PUT \
+          --field enabled=true \
+          --field allowed_actions=all \
+          --silent 2>&1; then
+          echo "✓ GitHub Actions enabled successfully"
+        else
+          echo "⚠️ Failed to enable Actions automatically"
+          echo "You may need to enable Actions manually in repository settings"
+        fi
+
+        # Set workflow permissions to read/write
+        if gh api \
+          "repos/${TARGET_REPO}/actions/permissions/workflow" \
+          --method PUT \
+          --field default_workflow_permissions=write \
+          --field can_approve_pull_request_reviews=false \
+          --silent 2>&1; then
+          echo "✓ Workflow permissions set to read/write"
+        else
+          echo "⚠️ Failed to set workflow permissions automatically"
+        fi
+
     - name: Configure repository ruleset
       shell: bash
       working-directory: template
@@ -633,25 +678,25 @@ runs:
         SENTRY_PROJECT_VALUE="${SENTRY_PROJECT:-${APP_NAME}}"
 
         {
-          echo '## Provisioning Summary'
+          echo '## ✅ Provisioning Complete'
           echo
           echo "- **Repository**: [${OWNER}/${APP_NAME}](${REPOSITORY_URL})"
           echo "- **Release tag used**: ${RELEASE_TAG}"
           echo "- **Branches created**: main, dev, qa"
           echo "- **Repository ruleset**: Configured from template (protects dev, qa, main branches)"
+          echo "- **GitHub Actions**: Enabled automatically"
           echo ""
-          echo "### ⚠️ Important Next Steps"
+          echo "### 🚀 Next Steps"
           echo ""
-          echo "**If Actions are not enabled:**"
-          echo "1. Go to [Repository Settings → Actions](${REPOSITORY_URL}/settings/actions)"
-          echo "2. Select 'Allow all actions and reusable workflows'"
-          echo "3. Click 'Save'"
+          echo "1. **Verify Actions are working**: [Check Actions tab](${REPOSITORY_URL}/actions)"
+          echo "   - The initial commit should trigger the release workflow"
+          echo "   - If not, manually trigger workflows or check [Actions settings](${REPOSITORY_URL}/settings/actions)"
           echo ""
-          echo "**Then trigger deployments:**"
-          echo "- Go to [Actions tab](${REPOSITORY_URL}/actions)"
-          echo "- Manually run 'Deploy to Dev', 'Deploy to QA', and 'Deploy to Prod' workflows"
+          echo "2. **Deploy to environments**:"
+          echo "   - The release workflow will run automatically on the main branch"
+          echo "   - Manually run deployment workflows: [Deploy to Dev](${REPOSITORY_URL}/actions), [Deploy to QA](${REPOSITORY_URL}/actions), [Deploy to Prod](${REPOSITORY_URL}/actions)"
           echo ""
-          echo "### Repository Configuration"
+          echo "### 📋 Repository Configuration"
           echo "- **Repository variables**: APP_NAME, SENTRY_PROJECT"
           if [ -n "${SENTRY_DSN:-}" ]; then
             echo "  - SENTRY_DSN (configured)"
