@@ -1,3 +1,10 @@
+## [1.21.1](https://github.com/algtools/actions/compare/v1.21.0...v1.21.1) (2025-11-11)
+
+
+### Bug Fixes
+
+* enable GitHub Actions automatically ([c0250f9](https://github.com/algtools/actions/commit/c0250f9518c0e6f275204b5ec8740d3f8d738241))
+
 # [1.21.0](https://github.com/algtools/actions/compare/v1.20.26...v1.21.0) (2025-11-11)
 
 
