@@ -311,32 +311,80 @@ runs:
         fi
         TARGET_REPO="${OWNER}/${APP_NAME}"
 
-        echo "Enabling GitHub Actions for ${TARGET_REPO}..."
+        echo "=========================================="
+        echo "ENABLING GITHUB ACTIONS"
+        echo "=========================================="
+        echo "Target repository: ${TARGET_REPO}"
+        echo ""
 
-        # Enable Actions for the repository with all actions allowed
-        if gh api \
+        # Check organization-level Actions policy first
+        echo "Checking organization Actions policy..."
+        ORG_POLICY=$(gh api "orgs/${OWNER}/actions/permissions" --jq '.enabled_repositories // "unknown"' 2>&1 || echo "unable_to_check")
+        echo "Organization policy: ${ORG_POLICY}"
+
+        if [ "${ORG_POLICY}" = "none" ]; then
+          echo ""
+          echo "⚠️  WARNING: Organization has Actions DISABLED for all repositories!"
+          echo "    You must enable Actions at the organization level first:"
+          echo "    https://github.com/organizations/${OWNER}/settings/actions"
+          echo ""
+        fi
+
+        # Enable Actions for the repository
+        echo ""
+        echo "Enabling Actions for repository..."
+        if RESPONSE=$(gh api \
           "repos/${TARGET_REPO}/actions/permissions" \
           --method PUT \
           --field enabled=true \
-          --field allowed_actions=all \
-          --silent 2>&1; then
-          echo "✓ GitHub Actions enabled successfully"
+          --field allowed_actions=all 2>&1); then
+          echo "✓ Actions API call succeeded"
         else
-          echo "⚠️ Failed to enable Actions automatically"
-          echo "You may need to enable Actions manually in repository settings"
+          echo "✗ Actions API call failed: ${RESPONSE}"
         fi
 
         # Set workflow permissions to read/write
-        if gh api \
+        echo ""
+        echo "Setting workflow permissions to read/write..."
+        if RESPONSE=$(gh api \
           "repos/${TARGET_REPO}/actions/permissions/workflow" \
           --method PUT \
           --field default_workflow_permissions=write \
-          --field can_approve_pull_request_reviews=false \
-          --silent 2>&1; then
-          echo "✓ Workflow permissions set to read/write"
+          --field can_approve_pull_request_reviews=false 2>&1); then
+          echo "✓ Workflow permissions API call succeeded"
         else
-          echo "⚠️ Failed to set workflow permissions automatically"
+          echo "✗ Workflow permissions API call failed: ${RESPONSE}"
         fi
+
+        # Verify Actions are actually enabled by checking the current state
+        echo ""
+        echo "Verifying Actions are enabled..."
+        sleep 2  # Brief wait for settings to propagate
+
+        ACTIONS_ENABLED=$(gh api "repos/${TARGET_REPO}/actions/permissions" --jq '.enabled // false' 2>&1 || echo "false")
+        ALLOWED_ACTIONS=$(gh api "repos/${TARGET_REPO}/actions/permissions" --jq '.allowed_actions // "none"' 2>&1 || echo "none")
+
+        echo "Actions enabled: ${ACTIONS_ENABLED}"
+        echo "Allowed actions: ${ALLOWED_ACTIONS}"
+        echo ""
+
+        if [ "${ACTIONS_ENABLED}" = "true" ]; then
+          echo "✅ GitHub Actions are ENABLED and verified!"
+        else
+          echo "❌ GitHub Actions are NOT enabled!"
+          echo ""
+          echo "MANUAL ACTION REQUIRED:"
+          echo "1. Go to: https://github.com/${TARGET_REPO}/settings/actions"
+          echo "2. Select 'Allow all actions and reusable workflows'"
+          echo "3. Under 'Workflow permissions', select 'Read and write permissions'"
+          echo "4. Click 'Save'"
+          echo ""
+          echo "If Actions are still disabled, check organization settings:"
+          echo "https://github.com/organizations/${OWNER}/settings/actions"
+          echo ""
+        fi
+
+        echo "=========================================="
 
     - name: Configure repository ruleset
       shell: bash
@@ -392,6 +440,71 @@ runs:
             exit 1
           fi
         fi
+
+    - name: Trigger initial workflows
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.admin_token }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        TARGET_ORG: ${{ inputs.target_org }}
+        APP_NAME: ${{ inputs.app_name }}
+      run: |
+        set -euo pipefail
+
+        # Extract owner - use target_org if provided, otherwise from source_repo
+        if [ -n "${TARGET_ORG}" ]; then
+          OWNER="${TARGET_ORG}"
+        else
+          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        fi
+        TARGET_REPO="${OWNER}/${APP_NAME}"
+
+        echo "=========================================="
+        echo "TRIGGERING INITIAL WORKFLOWS"
+        echo "=========================================="
+        echo "Target repository: ${TARGET_REPO}"
+        echo ""
+
+        # Wait a bit for Actions to be fully enabled
+        echo "Waiting for Actions to be ready..."
+        sleep 5
+
+        # Try to trigger the release workflow on main branch
+        echo "Triggering release workflow on main branch..."
+        if gh workflow run release-template.yml \
+          --repo "${TARGET_REPO}" \
+          --ref main 2>&1; then
+          echo "✓ Release workflow triggered successfully"
+        else
+          echo "⚠️ Could not trigger release workflow (Actions may not be enabled yet)"
+          echo "   You can trigger it manually at:"
+          echo "   https://github.com/${TARGET_REPO}/actions/workflows/release-template.yml"
+        fi
+
+        echo ""
+        echo "Waiting for workflows to start..."
+        sleep 3
+
+        # Check if any workflows are running
+        echo ""
+        echo "Checking workflow status..."
+        WORKFLOW_COUNT=$(gh run list --repo "${TARGET_REPO}" --limit 5 --json status,conclusion --jq 'length' 2>&1 || echo "0")
+
+        if [ "${WORKFLOW_COUNT}" -gt 0 ]; then
+          echo "✅ Workflows are running! Check status at:"
+          echo "   https://github.com/${TARGET_REPO}/actions"
+        else
+          echo "⚠️  No workflows detected yet. This could mean:"
+          echo "   1. Actions are not enabled (check organization settings)"
+          echo "   2. Workflows are starting (wait a moment and refresh)"
+          echo "   3. Manual trigger is needed"
+          echo ""
+          echo "   To manually trigger workflows, visit:"
+          echo "   https://github.com/${TARGET_REPO}/actions"
+        fi
+
+        echo ""
+        echo "=========================================="
 
     - name: Configure repository variables
       shell: bash
@@ -684,17 +797,34 @@ runs:
           echo "- **Release tag used**: ${RELEASE_TAG}"
           echo "- **Branches created**: main, dev, qa"
           echo "- **Repository ruleset**: Configured from template (protects dev, qa, main branches)"
-          echo "- **GitHub Actions**: Enabled automatically"
+          echo ""
+          echo "### ⚡ GitHub Actions Status"
+          echo ""
+          echo "The provision workflow attempted to:"
+          echo "1. ✅ Enable GitHub Actions for the repository"
+          echo "2. ✅ Set workflow permissions to read/write"
+          echo "3. ✅ Trigger the initial release workflow"
+          echo ""
+          echo "**Important**: Check the workflow logs above to verify Actions were successfully enabled."
+          echo ""
+          echo "If you see warnings about Actions not being enabled, you must:"
+          echo "1. Go to [Actions Settings](${REPOSITORY_URL}/settings/actions)"
+          echo "2. Select 'Allow all actions and reusable workflows'"
+          echo "3. Under 'Workflow permissions', select 'Read and write permissions'"
+          echo "4. Click 'Save'"
+          echo ""
+          echo "If Actions still don't work, check your [organization Actions policy](https://github.com/organizations/${OWNER}/settings/actions)"
           echo ""
           echo "### 🚀 Next Steps"
           echo ""
-          echo "1. **Verify Actions are working**: [Check Actions tab](${REPOSITORY_URL}/actions)"
-          echo "   - The initial commit should trigger the release workflow"
-          echo "   - If not, manually trigger workflows or check [Actions settings](${REPOSITORY_URL}/settings/actions)"
+          echo "1. **Verify workflows are running**: [Check Actions tab](${REPOSITORY_URL}/actions)"
+          echo "   - The release workflow should be running or completed"
+          echo "   - If not running, manually trigger it or check Actions settings"
           echo ""
-          echo "2. **Deploy to environments**:"
-          echo "   - The release workflow will run automatically on the main branch"
-          echo "   - Manually run deployment workflows: [Deploy to Dev](${REPOSITORY_URL}/actions), [Deploy to QA](${REPOSITORY_URL}/actions), [Deploy to Prod](${REPOSITORY_URL}/actions)"
+          echo "2. **Trigger deployment workflows manually (if needed)**:"
+          echo "   - [Deploy to Dev](${REPOSITORY_URL}/actions/workflows/deploy-dev.yml)"
+          echo "   - [Deploy to QA](${REPOSITORY_URL}/actions/workflows/deploy-qa.yml)"
+          echo "   - [Deploy to Prod](${REPOSITORY_URL}/actions/workflows/deploy-prod.yml)"
           echo ""
           echo "### 📋 Repository Configuration"
           echo "- **Repository variables**: APP_NAME, SENTRY_PROJECT"
