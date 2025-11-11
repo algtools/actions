@@ -12,6 +12,10 @@ inputs:
   app_name:
     description: "Name of the repository to create (e.g., 'acme-bff')"
     required: true
+  database_name:
+    description: "Database name (e.g. acme-api) - will be suffixed with -dev, -qa, -prod (core-template only)"
+    required: false
+    default: ""
   sentry_project:
     description: "Sentry project name (defaults to app_name if not provided)"
     required: false
@@ -34,6 +38,14 @@ inputs:
   github_token:
     description: "Standard GitHub token for API calls"
     required: true
+  cloudflare_api_token:
+    description: "Cloudflare API token for D1 database creation (optional, core-template only)"
+    required: false
+    default: ""
+  cloudflare_account_id:
+    description: "Cloudflare Account ID for D1 database creation (optional, core-template only)"
+    required: false
+    default: ""
 
 outputs:
   repository_url:
@@ -205,6 +217,110 @@ runs:
 
         # Add other token replacements here in the future if needed
         echo "✓ Token replacement completed"
+
+    - name: Create D1 databases and update bindings
+      shell: bash
+      working-directory: template
+      env:
+        DATABASE_NAME: ${{ inputs.database_name }}
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare_api_token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare_account_id }}
+      run: |
+        set -euo pipefail
+
+        # Skip if no database_name provided or wrangler.jsonc doesn't exist
+        if [ -z "${DATABASE_NAME}" ] || [ ! -f "wrangler.jsonc" ]; then
+          echo "ℹ️  Skipping D1 database creation (not core-template or no database_name provided)"
+          exit 0
+        fi
+
+        # Verify Cloudflare credentials are provided
+        if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
+          echo "::error::DATABASE_NAME provided but CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is missing"
+          exit 1
+        fi
+
+        echo "=========================================="
+        echo "CREATING D1 DATABASES"
+        echo "=========================================="
+        echo "Database base name: ${DATABASE_NAME}"
+        echo ""
+
+        # Install Wrangler
+        echo "Installing Wrangler..."
+        npm install -g wrangler
+        echo ""
+
+        # Create dev database
+        echo "Creating dev database: ${DATABASE_NAME}-dev"
+        DEV_OUTPUT=$(wrangler d1 create "${DATABASE_NAME}-dev" --json 2>/dev/null || echo '{"error":"failed"}')
+        if echo "${DEV_OUTPUT}" | grep -q '"error"'; then
+          echo "::error::Failed to create dev database"
+          exit 1
+        fi
+        DEV_DB_ID=$(echo "${DEV_OUTPUT}" | jq -r '.uuid // .database_id // empty')
+        if [ -z "${DEV_DB_ID}" ]; then
+          echo "::error::Failed to extract dev database ID"
+          exit 1
+        fi
+        echo "✓ Created dev database with ID: ${DEV_DB_ID}"
+        echo ""
+
+        # Create qa database
+        echo "Creating qa database: ${DATABASE_NAME}-qa"
+        QA_OUTPUT=$(wrangler d1 create "${DATABASE_NAME}-qa" --json 2>/dev/null || echo '{"error":"failed"}')
+        if echo "${QA_OUTPUT}" | grep -q '"error"'; then
+          echo "::error::Failed to create qa database"
+          exit 1
+        fi
+        QA_DB_ID=$(echo "${QA_OUTPUT}" | jq -r '.uuid // .database_id // empty')
+        if [ -z "${QA_DB_ID}" ]; then
+          echo "::error::Failed to extract qa database ID"
+          exit 1
+        fi
+        echo "✓ Created qa database with ID: ${QA_DB_ID}"
+        echo ""
+
+        # Create prod database
+        echo "Creating prod database: ${DATABASE_NAME}-prod"
+        PROD_OUTPUT=$(wrangler d1 create "${DATABASE_NAME}-prod" --json 2>/dev/null || echo '{"error":"failed"}')
+        if echo "${PROD_OUTPUT}" | grep -q '"error"'; then
+          echo "::error::Failed to create prod database"
+          exit 1
+        fi
+        PROD_DB_ID=$(echo "${PROD_OUTPUT}" | jq -r '.uuid // .database_id // empty')
+        if [ -z "${PROD_DB_ID}" ]; then
+          echo "::error::Failed to extract prod database ID"
+          exit 1
+        fi
+        echo "✓ Created prod database with ID: ${PROD_DB_ID}"
+        echo ""
+
+        # Update wrangler.jsonc with actual database names and IDs
+        echo "Updating wrangler.jsonc with database bindings..."
+
+        # Replace tokens in wrangler.jsonc
+        if [ "$(uname)" = "Darwin" ]; then
+          sed -i '' "s|{{DATABASE_NAME}}|${DATABASE_NAME}|g" wrangler.jsonc
+          sed -i '' "s|{{DEV_DB_ID}}|${DEV_DB_ID}|g" wrangler.jsonc
+          sed -i '' "s|{{QA_DB_ID}}|${QA_DB_ID}|g" wrangler.jsonc
+          sed -i '' "s|{{PROD_DB_ID}}|${PROD_DB_ID}|g" wrangler.jsonc
+        else
+          sed -i "s|{{DATABASE_NAME}}|${DATABASE_NAME}|g" wrangler.jsonc
+          sed -i "s|{{DEV_DB_ID}}|${DEV_DB_ID}|g" wrangler.jsonc
+          sed -i "s|{{QA_DB_ID}}|${QA_DB_ID}|g" wrangler.jsonc
+          sed -i "s|{{PROD_DB_ID}}|${PROD_DB_ID}|g" wrangler.jsonc
+        fi
+
+        echo "✓ Updated wrangler.jsonc with database bindings"
+        echo ""
+        echo "=========================================="
+        echo "D1 DATABASES CREATED SUCCESSFULLY"
+        echo "=========================================="
+        echo "Dev:  ${DATABASE_NAME}-dev (${DEV_DB_ID})"
+        echo "QA:   ${DATABASE_NAME}-qa (${QA_DB_ID})"
+        echo "Prod: ${DATABASE_NAME}-prod (${PROD_DB_ID})"
+        echo ""
 
     - name: Initialize repository contents
       shell: bash

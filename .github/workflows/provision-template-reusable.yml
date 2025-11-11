@@ -12,6 +12,11 @@ on:
         description: "Name of the repository to create (e.g. acme-bff)"
         required: true
         type: string
+      database_name:
+        description: "Database name (e.g. acme-api) - will be suffixed with -dev, -qa, -prod (core-template only)"
+        required: false
+        type: string
+        default: ""
       sentry_project:
         description: "Sentry project name (defaults to repository name if not provided)"
         required: false
@@ -38,6 +43,12 @@ on:
         required: true
       sentry_token:
         description: "Sentry authentication token (optional)"
+        required: false
+      cloudflare_api_token:
+        description: "Cloudflare API token for D1 database creation (optional, core-template only)"
+        required: false
+      cloudflare_account_id:
+        description: "Cloudflare Account ID for D1 database creation (optional, core-template only)"
         required: false
     outputs:
       repository_url:
@@ -66,9 +77,12 @@ jobs:
           source_repo: ${{ github.repository }}
           target_org: ${{ inputs.target_org }}
           app_name: ${{ inputs.app_name }}
+          database_name: ${{ inputs.database_name }}
           sentry_project: ${{ inputs.sentry_project }}
           sentry_dsn: ${{ inputs.sentry_dsn }}
           chromatic_project_token: ${{ inputs.chromatic_project_token }}
           version: ${{ inputs.version }}
           admin_token: ${{ secrets.admin_token }}
           github_token: ${{ github.token }}
+          cloudflare_api_token: ${{ secrets.cloudflare_api_token }}
+          cloudflare_account_id: ${{ secrets.cloudflare_account_id }}
