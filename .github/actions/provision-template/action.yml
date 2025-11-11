@@ -218,7 +218,8 @@ runs:
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
         git checkout -b main
         git add .
-        git commit -m "fix: bootstrap from template ${RELEASE_TAG}"
+        git commit -m "feat: bootstrap from template ${RELEASE_TAG}" \
+                   -m "BREAKING CHANGE: Initial release of application from template"
 
     - name: Create remote repository
       id: create-repo
@@ -241,57 +242,6 @@ runs:
         gh repo create "${OWNER}/${APP_NAME}" --private -y
 
         echo "repository_url=https://github.com/${OWNER}/${APP_NAME}" >> $GITHUB_OUTPUT
-
-    - name: Push bootstrap commit
-      shell: bash
-      working-directory: template
-      env:
-        ADMIN_TOKEN: ${{ inputs.admin_token }}
-        SOURCE_REPO: ${{ inputs.source_repo }}
-        TARGET_ORG: ${{ inputs.target_org }}
-        APP_NAME: ${{ inputs.app_name }}
-      run: |
-        set -euo pipefail
-
-        # Extract owner - use target_org if provided, otherwise from source_repo
-        if [ -n "${TARGET_ORG}" ]; then
-          OWNER="${TARGET_ORG}"
-        else
-          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
-        fi
-
-        git remote add origin "https://x-access-token:${ADMIN_TOKEN}@github.com/${OWNER}/${APP_NAME}.git"
-        git push -u origin main
-
-    - name: Create dev and qa branches
-      shell: bash
-      working-directory: template
-      env:
-        ADMIN_TOKEN: ${{ inputs.admin_token }}
-        SOURCE_REPO: ${{ inputs.source_repo }}
-        TARGET_ORG: ${{ inputs.target_org }}
-        APP_NAME: ${{ inputs.app_name }}
-      run: |
-        set -euo pipefail
-
-        # Extract owner - use target_org if provided, otherwise from source_repo
-        if [ -n "${TARGET_ORG}" ]; then
-          OWNER="${TARGET_ORG}"
-        else
-          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
-        fi
-
-        # Create and push dev branch
-        echo "Creating dev branch..."
-        git checkout -b dev
-        git push -u origin dev
-
-        # Create and push qa branch
-        echo "Creating qa branch..."
-        git checkout -b qa
-        git push -u origin qa
-
-        echo "✓ Created dev and qa branches"
 
     - name: Enable GitHub Actions
       shell: bash
@@ -386,6 +336,79 @@ runs:
 
         echo "=========================================="
 
+    - name: Wait for Actions to be ready
+      shell: bash
+      run: |
+        echo "Waiting for GitHub Actions to be fully ready..."
+        sleep 5
+        echo "✓ Ready to push code"
+
+    - name: Push bootstrap commit
+      shell: bash
+      working-directory: template
+      env:
+        ADMIN_TOKEN: ${{ inputs.admin_token }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        TARGET_ORG: ${{ inputs.target_org }}
+        APP_NAME: ${{ inputs.app_name }}
+      run: |
+        set -euo pipefail
+
+        # Extract owner - use target_org if provided, otherwise from source_repo
+        if [ -n "${TARGET_ORG}" ]; then
+          OWNER="${TARGET_ORG}"
+        else
+          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        fi
+
+        echo "=========================================="
+        echo "PUSHING BOOTSTRAP COMMIT"
+        echo "=========================================="
+        echo "Target repository: ${OWNER}/${APP_NAME}"
+        echo ""
+
+        git remote add origin "https://x-access-token:${ADMIN_TOKEN}@github.com/${OWNER}/${APP_NAME}.git"
+        git push -u origin main
+
+        echo "✓ Bootstrap commit pushed to main branch"
+
+    - name: Create dev and qa branches
+      shell: bash
+      working-directory: template
+      env:
+        ADMIN_TOKEN: ${{ inputs.admin_token }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        TARGET_ORG: ${{ inputs.target_org }}
+        APP_NAME: ${{ inputs.app_name }}
+      run: |
+        set -euo pipefail
+
+        # Extract owner - use target_org if provided, otherwise from source_repo
+        if [ -n "${TARGET_ORG}" ]; then
+          OWNER="${TARGET_ORG}"
+        else
+          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        fi
+
+        echo "=========================================="
+        echo "CREATING ADDITIONAL BRANCHES"
+        echo "=========================================="
+
+        # Create and push dev branch
+        echo "Creating dev branch..."
+        git checkout -b dev
+        git push -u origin dev
+        echo "✓ Dev branch created and pushed"
+
+        # Create and push qa branch
+        echo "Creating qa branch..."
+        git checkout -b qa
+        git push -u origin qa
+        echo "✓ QA branch created and pushed"
+
+        echo ""
+        echo "✅ All branches created successfully!"
+
     - name: Configure repository ruleset
       shell: bash
       working-directory: template
@@ -465,25 +488,94 @@ runs:
         echo "Target repository: ${TARGET_REPO}"
         echo ""
 
-        # Wait a bit for Actions to be fully enabled
-        echo "Waiting for Actions to be ready..."
-        sleep 5
+        # Wait for workflows to be registered and potentially auto-triggered by push events
+        echo "Waiting for workflows to be registered and auto-triggered..."
+        sleep 15
 
-        # Try to trigger the release workflow on main branch
-        echo "Triggering release workflow on main branch..."
-        if gh workflow run release-template.yml \
-          --repo "${TARGET_REPO}" \
-          --ref main 2>&1; then
-          echo "✓ Release workflow triggered successfully"
-        else
-          echo "⚠️ Could not trigger release workflow (Actions may not be enabled yet)"
-          echo "   You can trigger it manually at:"
-          echo "   https://github.com/${TARGET_REPO}/actions/workflows/release-template.yml"
-        fi
-
+        # Check if workflows were auto-triggered by the push events
         echo ""
-        echo "Waiting for workflows to start..."
-        sleep 3
+        echo "Checking if workflows were auto-triggered by push events..."
+        WORKFLOW_COUNT=$(gh run list --repo "${TARGET_REPO}" --limit 10 --json status,conclusion --jq 'length' 2>&1 || echo "0")
+
+        if [ "${WORKFLOW_COUNT}" -gt 0 ]; then
+          echo "✅ Found ${WORKFLOW_COUNT} workflow run(s) - push events triggered workflows successfully!"
+          echo "   Workflows are running automatically, no manual trigger needed."
+        else
+          echo "⚠️ No workflows detected yet - will trigger manually as fallback..."
+          echo ""
+
+          # Trigger release workflows for main and qa branches as fallback
+          echo "=========================================="
+          echo "MANUALLY TRIGGERING RELEASE WORKFLOWS"
+          echo "=========================================="
+
+          # Try to trigger the release workflow on main branch
+          echo "Triggering release workflow on main branch..."
+          if gh workflow run release-app.yml \
+            --repo "${TARGET_REPO}" \
+            --ref main 2>&1; then
+            echo "✓ Release workflow triggered on main"
+          else
+            echo "⚠️ Could not trigger release workflow on main"
+          fi
+
+          sleep 2
+
+          # Try to trigger the release workflow on qa branch
+          echo "Triggering release workflow on qa branch..."
+          if gh workflow run release-app.yml \
+            --repo "${TARGET_REPO}" \
+            --ref qa 2>&1; then
+            echo "✓ Release workflow triggered on qa"
+          else
+            echo "⚠️ Could not trigger release workflow on qa"
+          fi
+
+          # Trigger deployment workflows as fallback
+          echo ""
+          echo "=========================================="
+          echo "MANUALLY TRIGGERING DEPLOYMENT WORKFLOWS"
+          echo "=========================================="
+
+          sleep 2
+
+          # Deploy to production (main branch)
+          echo "Triggering production deployment..."
+          if gh workflow run deploy-prod.yml \
+            --repo "${TARGET_REPO}" \
+            --ref main 2>&1; then
+            echo "✓ Production deployment triggered"
+          else
+            echo "⚠️ Could not trigger production deployment"
+          fi
+
+          sleep 2
+
+          # Deploy to QA
+          echo "Triggering QA deployment..."
+          if gh workflow run deploy-qa.yml \
+            --repo "${TARGET_REPO}" \
+            --ref qa 2>&1; then
+            echo "✓ QA deployment triggered"
+          else
+            echo "⚠️ Could not trigger QA deployment"
+          fi
+
+          sleep 2
+
+          # Deploy to Dev
+          echo "Triggering dev deployment..."
+          if gh workflow run deploy-dev.yml \
+            --repo "${TARGET_REPO}" \
+            --ref dev 2>&1; then
+            echo "✓ Dev deployment triggered"
+          else
+            echo "⚠️ Could not trigger dev deployment"
+          fi
+
+          echo ""
+          sleep 5
+        fi
 
         # Check if any workflows are running
         echo ""
