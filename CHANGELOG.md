@@ -1,3 +1,10 @@
+# [1.22.0](https://github.com/algtools/actions/compare/v1.21.8...v1.22.0) (2025-11-11)
+
+
+### Features
+
+* add database configuration inputs and D1 database creation logic to provisioning workflow ([dbaa80f](https://github.com/algtools/actions/commit/dbaa80f696f15f46e9b6a7e612157b22bb8159d7))
+
 ## [1.21.8](https://github.com/algtools/actions/compare/v1.21.7...v1.21.8) (2025-11-11)
 
 
