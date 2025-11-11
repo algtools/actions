@@ -1,3 +1,10 @@
+## [1.21.4](https://github.com/algtools/actions/compare/v1.21.3...v1.21.4) (2025-11-11)
+
+
+### Bug Fixes
+
+* update git configuration to use authenticated user for commits in provisioning action ([ba950c8](https://github.com/algtools/actions/commit/ba950c8c7bf51609faf3aae022373e610b04d472))
+
 ## [1.21.3](https://github.com/algtools/actions/compare/v1.21.2...v1.21.3) (2025-11-11)
 
 
