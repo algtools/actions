@@ -34,6 +34,7 @@ const WRAP_EXCLUDE_PATTERNS = [
   '.prettierrc.cjs',
   '.prettierrc.js',
   '.prettierignore',
+  '.eslintrc.json', // ESLint's old config format has strict schema validation that rejects __template
 ];
 
 // File extensions to wrap
