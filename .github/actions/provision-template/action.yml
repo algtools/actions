@@ -211,11 +211,21 @@ runs:
       working-directory: template
       env:
         RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
+        GH_TOKEN: ${{ inputs.admin_token }}
       run: |
         set -euo pipefail
+
+        # Get authenticated user info from the admin token
+        # This ensures commits come from a real user, not github-actions[bot]
+        # which would prevent workflows from triggering (GitHub security feature)
+        AUTHOR_NAME=$(gh api /user --jq '.name // .login')
+        AUTHOR_EMAIL=$(gh api /user --jq '.email // "\(.login)@users.noreply.github.com"')
+
+        echo "Configuring git with authenticated user: ${AUTHOR_NAME}"
+
         git init
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git config user.name "${AUTHOR_NAME}"
+        git config user.email "${AUTHOR_EMAIL}"
         git checkout -b main
         git add .
         git commit -m "feat: bootstrap from template ${RELEASE_TAG}" \
