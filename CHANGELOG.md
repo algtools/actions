@@ -1,3 +1,10 @@
+## [1.21.5](https://github.com/algtools/actions/compare/v1.21.4...v1.21.5) (2025-11-11)
+
+
+### Bug Fixes
+
+* improve file formatting and wrapping logic in template utility ([34fb222](https://github.com/algtools/actions/commit/34fb2223848beb8a9b6fbca164c125680b8d3416))
+
 ## [1.21.4](https://github.com/algtools/actions/compare/v1.21.3...v1.21.4) (2025-11-11)
 
 
