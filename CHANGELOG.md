@@ -1,3 +1,10 @@
+## [1.23.3](https://github.com/algtools/actions/compare/v1.23.2...v1.23.3) (2025-11-12)
+
+
+### Bug Fixes
+
+* update JSON output formatting for exclude patterns in update-provisioned-app action ([ce0df69](https://github.com/algtools/actions/commit/ce0df690e35971633da88f31ca271f4a4745cdfa))
+
 ## [1.23.2](https://github.com/algtools/actions/compare/v1.23.1...v1.23.2) (2025-11-12)
 
 
