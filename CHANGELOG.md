@@ -1,3 +1,10 @@
+## [1.23.2](https://github.com/algtools/actions/compare/v1.23.1...v1.23.2) (2025-11-12)
+
+
+### Bug Fixes
+
+* enhance input validation for Chromatic uploads and Sentry release in workflows ([7b6ddda](https://github.com/algtools/actions/commit/7b6dddaa58736f38cb715e72298f0f60c1632429))
+
 ## [1.23.1](https://github.com/algtools/actions/compare/v1.23.0...v1.23.1) (2025-11-12)
 
 
