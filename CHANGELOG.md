@@ -1,3 +1,10 @@
+## [1.23.6](https://github.com/algtools/actions/compare/v1.23.5...v1.23.6) (2025-11-12)
+
+
+### Bug Fixes
+
+* enhance branch name generation and PR creation in update-provisioned-app action ([c9d122d](https://github.com/algtools/actions/commit/c9d122d3c40ad355867e9a51447e880abb8c8a41))
+
 ## [1.23.5](https://github.com/algtools/actions/compare/v1.23.4...v1.23.5) (2025-11-12)
 
 
