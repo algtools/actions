@@ -1,3 +1,10 @@
+## [1.23.4](https://github.com/algtools/actions/compare/v1.23.3...v1.23.4) (2025-11-12)
+
+
+### Bug Fixes
+
+* update handling of missing project_token in Chromatic upload workflow to skip gracefully ([26bdc6b](https://github.com/algtools/actions/commit/26bdc6bd2e5a80fa9d782fb652800c5e41c5ede8))
+
 ## [1.23.3](https://github.com/algtools/actions/compare/v1.23.2...v1.23.3) (2025-11-12)
 
 
