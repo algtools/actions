@@ -1,3 +1,10 @@
+## [1.22.4](https://github.com/algtools/actions/compare/v1.22.3...v1.22.4) (2025-11-12)
+
+
+### Bug Fixes
+
+* improve database existence check and output parsing in provisioning workflow ([6446a59](https://github.com/algtools/actions/commit/6446a5946d6a3c267881beb3f38382c01f113f51))
+
 ## [1.22.3](https://github.com/algtools/actions/compare/v1.22.2...v1.22.3) (2025-11-12)
 
 
