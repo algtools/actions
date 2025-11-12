@@ -340,8 +340,8 @@ runs:
         # Combine all excludes
         EXCLUDE_PATTERNS=("${TEMPLATE_SPECIFIC_EXCLUDES[@]}" "${USER_FILE_EXCLUDES[@]}")
 
-        # Convert array to JSON for output
-        EXCLUDE_JSON=$(printf '%s\n' "${EXCLUDE_PATTERNS[@]}" | jq -R . | jq -s . 2>/dev/null || echo "[]")
+        # Convert array to JSON for output (use -c for compact single-line output)
+        EXCLUDE_JSON=$(printf '%s\n' "${EXCLUDE_PATTERNS[@]}" | jq -R . | jq -sc . 2>/dev/null || echo "[]")
         echo "exclude_patterns=${EXCLUDE_JSON}" >> $GITHUB_OUTPUT
         echo "exclude_count=${#EXCLUDE_PATTERNS[@]}" >> $GITHUB_OUTPUT
 
