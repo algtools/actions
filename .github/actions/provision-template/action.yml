@@ -433,9 +433,8 @@ runs:
         git config user.name "${AUTHOR_NAME}"
         git config user.email "${AUTHOR_EMAIL}"
         git checkout -b main
-        git add .
-        git commit -m "feat: bootstrap from template ${RELEASE_TAG}" \
-                   -m "BREAKING CHANGE: Initial release of application from template"
+
+        echo "✓ Git repository initialized and configured"
 
     - name: Create remote repository
       id: create-repo
@@ -567,6 +566,7 @@ runs:
         SOURCE_REPO: ${{ inputs.source_repo }}
         TARGET_ORG: ${{ inputs.target_org }}
         APP_NAME: ${{ inputs.app_name }}
+        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
       run: |
         set -euo pipefail
 
@@ -582,6 +582,7 @@ runs:
         echo "=========================================="
         echo "This minimal commit will register the repository with GitHub"
         echo "Target repository: ${OWNER}/${APP_NAME}"
+        echo "Template version: ${RELEASE_TAG}"
         echo ""
 
         # Stage only minimal files for initial commit
@@ -592,7 +593,7 @@ runs:
         git add .nvmrc 2>/dev/null || true
         git add LICENSE 2>/dev/null || true
 
-        git commit -m "chore: initial repository setup [skip ci]" -m "This is a minimal initial commit to register the repository. Full template code will be added in the next commit."
+        git commit -m "chore: initial repository setup from ${RELEASE_TAG} [skip ci]" -m "This is a minimal initial commit to register the repository. Full template code will be added in the next commit."
 
         git remote add origin "https://x-access-token:${ADMIN_TOKEN}@github.com/${OWNER}/${APP_NAME}.git"
         git push -u origin main
@@ -656,6 +657,7 @@ runs:
         SOURCE_REPO: ${{ inputs.source_repo }}
         TARGET_ORG: ${{ inputs.target_org }}
         APP_NAME: ${{ inputs.app_name }}
+        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
       run: |
         set -euo pipefail
 
@@ -674,7 +676,7 @@ runs:
           echo "ℹ️  No additional files to commit (all files were in phase 1)"
         else
           # Commit full template code
-          git commit -m "feat: add full template code" -m "This commit includes all template files and will trigger initial deployments on dev, qa, and main branches."
+          git commit -m "feat: bootstrap from template ${RELEASE_TAG}" -m "This commit includes all template files and will trigger initial deployments on dev, qa, and main branches." -m "BREAKING CHANGE: Initial release of application from template"
 
           # Push to main
           echo "Pushing full code to main..."
