@@ -356,31 +356,42 @@ runs:
 
         echo "Applying template changes..."
 
-        # Parse exclude patterns from JSON
-        if command -v jq &> /dev/null && [ -n "${EXCLUDE_PATTERNS_JSON}" ]; then
-          EXCLUDE_PATTERNS=($(echo "${EXCLUDE_PATTERNS_JSON}" | jq -r '.[]' 2>/dev/null || echo ""))
-        else
-          # Fallback to default patterns
-          EXCLUDE_PATTERNS=(
-            ".git"
-            "node_modules"
-            ".next"
-            "dist"
-            "build"
-            ".env"
-            ".env.local"
-            ".env.*.local"
-            "*.log"
-            ".DS_Store"
-            ".idea"
-            ".vscode"
-            "coverage"
-            ".nyc_output"
-            "pnpm-lock.yaml"
-            "package-lock.json"
-            "yarn.lock"
-          )
+        # Define default exclude patterns
+        EXCLUDE_PATTERNS=(
+          ".git"
+          "node_modules"
+          ".next"
+          "dist"
+          "build"
+          ".env"
+          ".env.local"
+          ".env.*.local"
+          "*.log"
+          ".DS_Store"
+          ".idea"
+          ".vscode"
+          "coverage"
+          ".nyc_output"
+          "pnpm-lock.yaml"
+          "package-lock.json"
+          "yarn.lock"
         )
+
+        # Try to override with patterns from JSON if available
+        if command -v jq &> /dev/null && [ -n "${EXCLUDE_PATTERNS_JSON}" ]; then
+          # Use mapfile to safely read patterns into array (handles special characters)
+          mapfile -t PATTERNS_FROM_JSON < <(echo "${EXCLUDE_PATTERNS_JSON}" | jq -r '.[]' 2>/dev/null)
+
+          # Use JSON patterns if successfully parsed
+          if [ ${#PATTERNS_FROM_JSON[@]} -gt 0 ]; then
+            EXCLUDE_PATTERNS=("${PATTERNS_FROM_JSON[@]}")
+            echo "Using exclude patterns from template configuration (${#EXCLUDE_PATTERNS[@]} patterns)"
+          else
+            echo "Using default exclude patterns (${#EXCLUDE_PATTERNS[@]} patterns)"
+          fi
+        else
+          echo "Using default exclude patterns (${#EXCLUDE_PATTERNS[@]} patterns)"
+        fi
 
         # Build rsync exclude string
         EXCLUDE_ARGS=()
