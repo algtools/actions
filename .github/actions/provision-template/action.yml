@@ -256,54 +256,54 @@ runs:
           local db_name=$1
           local db_env=$2
 
-          echo "Processing ${db_env} database: ${db_name}"
+          echo "Processing ${db_env} database: ${db_name}" >&2
 
           # List existing databases and check if it exists
-          echo "  Checking if database exists..."
+          echo "  Checking if database exists..." >&2
 
           # Try to list databases, capture both stdout and stderr
           if ! DB_LIST=$(wrangler d1 list --json 2>&1); then
-            echo "::error::Failed to list D1 databases. Wrangler error:"
-            echo "${DB_LIST}"
-            exit 1
+            echo "::error::Failed to list D1 databases. Wrangler error:" >&2
+            echo "${DB_LIST}" >&2
+            return 1
           fi
 
           # Check if output is valid JSON
           if ! echo "${DB_LIST}" | jq empty 2>/dev/null; then
-            echo "::error::Wrangler d1 list did not return valid JSON. Output:"
-            echo "${DB_LIST}"
-            exit 1
+            echo "::error::Wrangler d1 list did not return valid JSON. Output:" >&2
+            echo "${DB_LIST}" >&2
+            return 1
           fi
 
           EXISTING_DB_ID=$(echo "${DB_LIST}" | jq -r --arg name "${db_name}" '.[] | select(.name == $name) | .uuid // .database_id // empty' | head -n 1)
 
           if [ -n "${EXISTING_DB_ID}" ]; then
-            echo "  ✓ Found existing database with ID: ${EXISTING_DB_ID}"
+            echo "  ✓ Found existing database with ID: ${EXISTING_DB_ID}" >&2
             echo "${EXISTING_DB_ID}"
           else
-            echo "  Creating new database..."
+            echo "  Creating new database..." >&2
 
             # Try to create database, capture both stdout and stderr
             if ! CREATE_OUTPUT=$(wrangler d1 create "${db_name}" --json 2>&1); then
-              echo "::error::Failed to create ${db_env} database. Wrangler error:"
-              echo "${CREATE_OUTPUT}"
-              exit 1
+              echo "::error::Failed to create ${db_env} database. Wrangler error:" >&2
+              echo "${CREATE_OUTPUT}" >&2
+              return 1
             fi
 
             # Check if output is valid JSON
             if ! echo "${CREATE_OUTPUT}" | jq empty 2>/dev/null; then
-              echo "::error::Wrangler d1 create did not return valid JSON. Output:"
-              echo "${CREATE_OUTPUT}"
-              exit 1
+              echo "::error::Wrangler d1 create did not return valid JSON. Output:" >&2
+              echo "${CREATE_OUTPUT}" >&2
+              return 1
             fi
 
             NEW_DB_ID=$(echo "${CREATE_OUTPUT}" | jq -r '.uuid // .database_id // empty')
             if [ -z "${NEW_DB_ID}" ]; then
-              echo "::error::Failed to extract ${db_env} database ID from output:"
-              echo "${CREATE_OUTPUT}"
-              exit 1
+              echo "::error::Failed to extract ${db_env} database ID from output:" >&2
+              echo "${CREATE_OUTPUT}" >&2
+              return 1
             fi
-            echo "  ✓ Created new database with ID: ${NEW_DB_ID}"
+            echo "  ✓ Created new database with ID: ${NEW_DB_ID}" >&2
             echo "${NEW_DB_ID}"
           fi
         }
