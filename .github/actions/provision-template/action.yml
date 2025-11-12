@@ -111,6 +111,66 @@ runs:
           exit 1
         fi
 
+    - name: Verify admin token permissions
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.admin_token }}
+      run: |
+        echo "=========================================="
+        echo "VERIFYING ADMIN TOKEN PERMISSIONS"
+        echo "=========================================="
+        echo ""
+
+        # Required permissions for provisioning:
+        # - repo: Full control of repositories (create, push, configure)
+        # - workflow: Trigger and manage workflows
+        # - admin:org: Manage organization settings (optional but recommended)
+        # - write:packages: Access to packages (if using private packages)
+
+        echo "Checking token scopes..."
+
+        # Get token info
+        SCOPES=$(gh api /user -i 2>&1 | grep -i "x-oauth-scopes:" | cut -d: -f2- | tr -d ' ')
+
+        if [ -z "$SCOPES" ]; then
+          echo "::error::Failed to retrieve token scopes. Token may be invalid."
+          exit 1
+        fi
+
+        echo "Token scopes: $SCOPES"
+        echo ""
+
+        # Check for required scopes
+        MISSING_SCOPES=""
+
+        if ! echo "$SCOPES" | grep -q "repo"; then
+          MISSING_SCOPES="${MISSING_SCOPES}- repo (full repository control)\n"
+        fi
+
+        if ! echo "$SCOPES" | grep -q "workflow"; then
+          MISSING_SCOPES="${MISSING_SCOPES}- workflow (trigger workflows)\n"
+        fi
+
+        if [ -n "$MISSING_SCOPES" ]; then
+          echo "::error::Missing required token permissions:"
+          echo -e "$MISSING_SCOPES"
+          echo ""
+          echo "The ADMIN_TOKEN must have the following scopes:"
+          echo "  - repo: Full control of repositories"
+          echo "  - workflow: Update GitHub Action workflows"
+          echo ""
+          echo "Optional but recommended:"
+          echo "  - admin:org: Manage organization settings"
+          echo "  - write:packages: Access to private packages"
+          echo ""
+          echo "Please create a new Personal Access Token (classic) with these scopes"
+          echo "or use a GitHub App with equivalent permissions."
+          exit 1
+        fi
+
+        echo "✅ Token has required permissions"
+        echo ""
+
     - name: Download template archive
       shell: bash
       env:
@@ -499,7 +559,7 @@ runs:
         sleep 5
         echo "✓ Ready to push code"
 
-    - name: Push bootstrap commit
+    - name: Phase 1 - Create and push minimal initial commit
       shell: bash
       working-directory: template
       env:
@@ -510,7 +570,7 @@ runs:
       run: |
         set -euo pipefail
 
-        # Extract owner - use target_org if provided, otherwise from source_repo
+        # Extract owner
         if [ -n "${TARGET_ORG}" ]; then
           OWNER="${TARGET_ORG}"
         else
@@ -518,17 +578,28 @@ runs:
         fi
 
         echo "=========================================="
-        echo "PUSHING BOOTSTRAP COMMIT"
+        echo "PHASE 1: PUSHING MINIMAL INITIAL COMMIT"
         echo "=========================================="
+        echo "This minimal commit will register the repository with GitHub"
         echo "Target repository: ${OWNER}/${APP_NAME}"
         echo ""
+
+        # Stage only minimal files for initial commit
+        # This ensures GitHub recognizes the repo but doesn't process workflows yet
+        git add README.md
+        git add .gitignore 2>/dev/null || true
+        git add package.json 2>/dev/null || true
+        git add .nvmrc 2>/dev/null || true
+        git add LICENSE 2>/dev/null || true
+
+        git commit -m "chore: initial repository setup [skip ci]" -m "This is a minimal initial commit to register the repository. Full template code will be added in the next commit."
 
         git remote add origin "https://x-access-token:${ADMIN_TOKEN}@github.com/${OWNER}/${APP_NAME}.git"
         git push -u origin main
 
-        echo "✓ Bootstrap commit pushed to main branch"
+        echo "✓ Minimal commit pushed to main branch"
 
-    - name: Create dev and qa branches
+    - name: Phase 1 - Create dev and qa branches with minimal commits
       shell: bash
       working-directory: template
       env:
@@ -539,15 +610,8 @@ runs:
       run: |
         set -euo pipefail
 
-        # Extract owner - use target_org if provided, otherwise from source_repo
-        if [ -n "${TARGET_ORG}" ]; then
-          OWNER="${TARGET_ORG}"
-        else
-          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
-        fi
-
         echo "=========================================="
-        echo "CREATING ADDITIONAL BRANCHES"
+        echo "PHASE 1: CREATING DEV AND QA BRANCHES"
         echo "=========================================="
 
         # Create and push dev branch
@@ -562,8 +626,84 @@ runs:
         git push -u origin qa
         echo "✓ QA branch created and pushed"
 
+        # Return to main for phase 2
+        git checkout main
+
         echo ""
-        echo "✅ All branches created successfully!"
+        echo "✅ All branches created with minimal commits!"
+
+    - name: Wait for GitHub to register repository and workflows
+      shell: bash
+      run: |
+        echo "=========================================="
+        echo "WAITING FOR GITHUB TO PROCESS REPOSITORY"
+        echo "=========================================="
+        echo ""
+        echo "Waiting 10 seconds for GitHub to:"
+        echo "  - Register the new repository"
+        echo "  - Index the branch structure"
+        echo "  - Prepare for workflow files"
+        echo ""
+        sleep 10
+        echo "✅ Wait complete"
+        echo ""
+
+    - name: Phase 2 - Push full template code to all branches
+      shell: bash
+      working-directory: template
+      env:
+        ADMIN_TOKEN: ${{ inputs.admin_token }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        TARGET_ORG: ${{ inputs.target_org }}
+        APP_NAME: ${{ inputs.app_name }}
+      run: |
+        set -euo pipefail
+
+        echo "=========================================="
+        echo "PHASE 2: PUSHING FULL TEMPLATE CODE"
+        echo "=========================================="
+        echo "This will trigger GitHub Actions workflows"
+        echo ""
+
+        # Stage all remaining files
+        echo "Staging all template files..."
+        git add .
+
+        # Check if there are changes to commit
+        if git diff --staged --quiet; then
+          echo "ℹ️  No additional files to commit (all files were in phase 1)"
+        else
+          # Commit full template code
+          git commit -m "feat: add full template code" -m "This commit includes all template files and will trigger initial deployments on dev, qa, and main branches."
+
+          # Push to main
+          echo "Pushing full code to main..."
+          git push origin main
+          echo "✓ Full code pushed to main"
+
+          # Push to dev
+          echo "Pushing full code to dev..."
+          git checkout dev
+          git merge main --no-edit
+          git push origin dev
+          echo "✓ Full code pushed to dev"
+
+          # Push to qa
+          echo "Pushing full code to qa..."
+          git checkout qa
+          git merge main --no-edit
+          git push origin qa
+          echo "✓ Full code pushed to qa"
+
+          echo ""
+          echo "✅ Full template code deployed to all branches!"
+          echo ""
+          echo "GitHub Actions workflows should now trigger automatically:"
+          echo "  - release-app.yml on main and qa"
+          echo "  - deploy-dev.yml on dev"
+          echo "  - deploy-qa.yml on qa"
+          echo "  - deploy-prod.yml on main"
+        fi
 
     - name: Configure repository ruleset
       shell: bash
@@ -952,70 +1092,73 @@ runs:
         # Don't fail the workflow, just warn
         exit 0
 
-    - name: Trigger initial deployments
-      shell: bash
-      env:
-        GH_TOKEN: ${{ inputs.admin_token }}
-        SOURCE_REPO: ${{ inputs.source_repo }}
-        TARGET_ORG: ${{ inputs.target_org }}
-        APP_NAME: ${{ inputs.app_name }}
-      run: |
-        set -euo pipefail
-
-        # Extract owner - use target_org if provided, otherwise from source_repo
-        if [ -n "${TARGET_ORG}" ]; then
-          OWNER="${TARGET_ORG}"
-        else
-          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
-        fi
-        TARGET_REPO="${OWNER}/${APP_NAME}"
-
-        echo "Triggering initial deployments for ${TARGET_REPO}..."
-
-        # Wait for Actions to be fully enabled and workflows to be registered
-        echo "  ⏳ Waiting for Actions to be ready..."
-        sleep 10
-
-        # Verify Actions are enabled before attempting to trigger workflows
-        echo "  🔍 Verifying Actions are enabled..."
-        ACTIONS_ENABLED=$(gh api "repos/${TARGET_REPO}/actions/permissions" --jq '.enabled' 2>/dev/null || echo "false")
-
-        if [ "${ACTIONS_ENABLED}" != "true" ]; then
-          echo "  ⚠️  Actions are not enabled, skipping automatic deployment triggers"
-          echo "  ℹ️  Please enable Actions manually and trigger deployments from the Actions tab"
-          exit 0
-        fi
-
-        echo "  ✓ Actions confirmed enabled"
-
-        # Trigger deploy-dev.yml on dev branch
-        echo "  → Triggering deploy to dev..."
-        if gh workflow run deploy-dev.yml --repo "${TARGET_REPO}" --ref dev 2>/dev/null; then
-          echo "    ✓ Dev deployment triggered"
-        else
-          echo "    ⚠️  Could not trigger dev deployment automatically"
-        fi
-
-        # Trigger deploy-qa.yml on qa branch
-        echo "  → Triggering deploy to qa..."
-        if gh workflow run deploy-qa.yml --repo "${TARGET_REPO}" --ref qa 2>/dev/null; then
-          echo "    ✓ QA deployment triggered"
-        else
-          echo "    ⚠️  Could not trigger qa deployment automatically"
-        fi
-
-        # Trigger deploy-prod.yml on main branch
-        echo "  → Triggering deploy to production..."
-        if gh workflow run deploy-prod.yml --repo "${TARGET_REPO}" --ref main 2>/dev/null; then
-          echo "    ✓ Production deployment triggered"
-        else
-          echo "    ⚠️  Could not trigger prod deployment automatically"
-        fi
-
-        echo ""
-        echo "✓ Deployment trigger process completed"
-        echo "  ℹ️  Check the Actions tab to monitor deployment progress"
-        echo "  ℹ️  If deployments did not start automatically, you can trigger them manually from the Actions tab"
+    # NOTE: This step is deprecated. Workflows now trigger automatically
+    # via the two-phase commit strategy above.
+    #
+    # - name: Trigger initial deployments
+    #   shell: bash
+    #   env:
+    #     GH_TOKEN: ${{ inputs.admin_token }}
+    #     SOURCE_REPO: ${{ inputs.source_repo }}
+    #     TARGET_ORG: ${{ inputs.target_org }}
+    #     APP_NAME: ${{ inputs.app_name }}
+    #   run: |
+    #     set -euo pipefail
+    #
+    #     # Extract owner - use target_org if provided, otherwise from source_repo
+    #     if [ -n "${TARGET_ORG}" ]; then
+    #       OWNER="${TARGET_ORG}"
+    #     else
+    #       IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+    #     fi
+    #     TARGET_REPO="${OWNER}/${APP_NAME}"
+    #
+    #     echo "Triggering initial deployments for ${TARGET_REPO}..."
+    #
+    #     # Wait for Actions to be fully enabled and workflows to be registered
+    #     echo "  ⏳ Waiting for Actions to be ready..."
+    #     sleep 10
+    #
+    #     # Verify Actions are enabled before attempting to trigger workflows
+    #     echo "  🔍 Verifying Actions are enabled..."
+    #     ACTIONS_ENABLED=$(gh api "repos/${TARGET_REPO}/actions/permissions" --jq '.enabled' 2>/dev/null || echo "false")
+    #
+    #     if [ "${ACTIONS_ENABLED}" != "true" ]; then
+    #       echo "  ⚠️  Actions are not enabled, skipping automatic deployment triggers"
+    #       echo "  ℹ️  Please enable Actions manually and trigger deployments from the Actions tab"
+    #       exit 0
+    #     fi
+    #
+    #     echo "  ✓ Actions confirmed enabled"
+    #
+    #     # Trigger deploy-dev.yml on dev branch
+    #     echo "  → Triggering deploy to dev..."
+    #     if gh workflow run deploy-dev.yml --repo "${TARGET_REPO}" --ref dev 2>/dev/null; then
+    #       echo "    ✓ Dev deployment triggered"
+    #     else
+    #       echo "    ⚠️  Could not trigger dev deployment automatically"
+    #     fi
+    #
+    #     # Trigger deploy-qa.yml on qa branch
+    #     echo "  → Triggering deploy to qa..."
+    #     if gh workflow run deploy-qa.yml --repo "${TARGET_REPO}" --ref qa 2>/dev/null; then
+    #       echo "    ✓ QA deployment triggered"
+    #     else
+    #       echo "    ⚠️  Could not trigger qa deployment automatically"
+    #     fi
+    #
+    #     # Trigger deploy-prod.yml on main branch
+    #     echo "  → Triggering deploy to production..."
+    #     if gh workflow run deploy-prod.yml --repo "${TARGET_REPO}" --ref main 2>/dev/null; then
+    #       echo "    ✓ Production deployment triggered"
+    #     else
+    #       echo "    ⚠️  Could not trigger prod deployment automatically"
+    #     fi
+    #
+    #     echo ""
+    #     echo "✓ Deployment trigger process completed"
+    #     echo "  ℹ️  Check the Actions tab to monitor deployment progress"
+    #     echo "  ℹ️  If deployments did not start automatically, you can trigger them manually from the Actions tab"
 
     - name: Generate summary
       shell: bash
@@ -1048,31 +1191,24 @@ runs:
           echo ""
           echo "### ⚡ GitHub Actions Status"
           echo ""
-          echo "The provision workflow attempted to:"
-          echo "1. ✅ Enable GitHub Actions for the repository"
-          echo "2. ✅ Set workflow permissions to read/write"
-          echo "3. ✅ Trigger the initial release workflow"
+          echo "The provision workflow used a two-phase commit strategy:"
+          echo "1. ✅ Pushed minimal initial commit to register repository"
+          echo "2. ✅ Created dev and qa branches"
+          echo "3. ✅ Waited 10 seconds for GitHub to process"
+          echo "4. ✅ Pushed full template code to trigger workflows"
           echo ""
-          echo "**Important**: Check the workflow logs above to verify Actions were successfully enabled."
-          echo ""
-          echo "If you see warnings about Actions not being enabled, you must:"
-          echo "1. Go to [Actions Settings](${REPOSITORY_URL}/settings/actions)"
-          echo "2. Select 'Allow all actions and reusable workflows'"
-          echo "3. Under 'Workflow permissions', select 'Read and write permissions'"
-          echo "4. Click 'Save'"
-          echo ""
-          echo "If Actions still don't work, check your [organization Actions policy](https://github.com/organizations/${OWNER}/settings/actions)"
+          echo "**Workflows should now be running automatically.**"
           echo ""
           echo "### 🚀 Next Steps"
           echo ""
           echo "1. **Verify workflows are running**: [Check Actions tab](${REPOSITORY_URL}/actions)"
-          echo "   - The release workflow should be running or completed"
-          echo "   - If not running, manually trigger it or check Actions settings"
+          echo "   - Workflows should have triggered automatically from the full code push"
+          echo "   - Look for: release-app, deploy-dev, deploy-qa, deploy-prod workflows"
           echo ""
-          echo "2. **Trigger deployment workflows manually (if needed)**:"
-          echo "   - [Deploy to Dev](${REPOSITORY_URL}/actions/workflows/deploy-dev.yml)"
-          echo "   - [Deploy to QA](${REPOSITORY_URL}/actions/workflows/deploy-qa.yml)"
-          echo "   - [Deploy to Prod](${REPOSITORY_URL}/actions/workflows/deploy-prod.yml)"
+          echo "2. **If workflows didn't start automatically**:"
+          echo "   - Verify [Actions are enabled](${REPOSITORY_URL}/settings/actions)"
+          echo "   - Check organization Actions policy allows workflow runs"
+          echo "   - Manually trigger workflows from the Actions tab if needed"
           echo ""
           echo "### 📋 Repository Configuration"
           echo "- **Repository variables**: APP_NAME, SENTRY_PROJECT"
