@@ -226,20 +226,20 @@ jobs:
           artifact_name: "validation-test"
           artifact_paths: "test-validation"
 
-      - name: Test missing project_token (should fail)
+      - name: Test missing project_token (should skip)
         id: test-missing-token
         uses: ./.github/actions/chromatic-upload-from-artifact
         with:
           artifact_name: "validation-test"
           project_token: ""
-        continue-on-error: true
 
-      - name: Verify validation caught missing token
+      - name: Verify validation gracefully skipped
         run: |
-          if [ "${{ steps.test-missing-token.outcome }}" = "failure" ]; then
-            echo "✓ Input validation correctly caught missing project_token"
+          if [ "${{ steps.test-missing-token.outcome }}" = "success" ]; then
+            echo "✓ Action gracefully skipped when project_token is missing (optional parameter)"
+            echo "✓ This allows Chromatic to be optional in workflows"
           else
-            echo "❌ Input validation should have failed for missing project_token"
+            echo "❌ Action should succeed and skip when project_token is missing"
             exit 1
           fi
 
