@@ -251,49 +251,48 @@ runs:
         npm install -g wrangler
         echo ""
 
-        # Create dev database
-        echo "Creating dev database: ${DATABASE_NAME}-dev"
-        DEV_OUTPUT=$(wrangler d1 create "${DATABASE_NAME}-dev" --json 2>/dev/null || echo '{"error":"failed"}')
-        if echo "${DEV_OUTPUT}" | grep -q '"error"'; then
-          echo "::error::Failed to create dev database"
-          exit 1
-        fi
-        DEV_DB_ID=$(echo "${DEV_OUTPUT}" | jq -r '.uuid // .database_id // empty')
-        if [ -z "${DEV_DB_ID}" ]; then
-          echo "::error::Failed to extract dev database ID"
-          exit 1
-        fi
-        echo "✓ Created dev database with ID: ${DEV_DB_ID}"
+        # Function to get or create database
+        get_or_create_database() {
+          local db_name=$1
+          local db_env=$2
+
+          echo "Processing ${db_env} database: ${db_name}"
+
+          # List existing databases and check if it exists
+          echo "  Checking if database exists..."
+          DB_LIST=$(wrangler d1 list --json 2>/dev/null || echo '[]')
+          EXISTING_DB_ID=$(echo "${DB_LIST}" | jq -r --arg name "${db_name}" '.[] | select(.name == $name) | .uuid // .database_id // empty' | head -n 1)
+
+          if [ -n "${EXISTING_DB_ID}" ]; then
+            echo "  ✓ Found existing database with ID: ${EXISTING_DB_ID}"
+            echo "${EXISTING_DB_ID}"
+          else
+            echo "  Creating new database..."
+            CREATE_OUTPUT=$(wrangler d1 create "${db_name}" --json 2>/dev/null || echo '{"error":"failed"}')
+            if echo "${CREATE_OUTPUT}" | grep -q '"error"'; then
+              echo "::error::Failed to create ${db_env} database"
+              exit 1
+            fi
+            NEW_DB_ID=$(echo "${CREATE_OUTPUT}" | jq -r '.uuid // .database_id // empty')
+            if [ -z "${NEW_DB_ID}" ]; then
+              echo "::error::Failed to extract ${db_env} database ID"
+              exit 1
+            fi
+            echo "  ✓ Created new database with ID: ${NEW_DB_ID}"
+            echo "${NEW_DB_ID}"
+          fi
+        }
+
+        # Get or create dev database
+        DEV_DB_ID=$(get_or_create_database "${DATABASE_NAME}-dev" "dev")
         echo ""
 
-        # Create qa database
-        echo "Creating qa database: ${DATABASE_NAME}-qa"
-        QA_OUTPUT=$(wrangler d1 create "${DATABASE_NAME}-qa" --json 2>/dev/null || echo '{"error":"failed"}')
-        if echo "${QA_OUTPUT}" | grep -q '"error"'; then
-          echo "::error::Failed to create qa database"
-          exit 1
-        fi
-        QA_DB_ID=$(echo "${QA_OUTPUT}" | jq -r '.uuid // .database_id // empty')
-        if [ -z "${QA_DB_ID}" ]; then
-          echo "::error::Failed to extract qa database ID"
-          exit 1
-        fi
-        echo "✓ Created qa database with ID: ${QA_DB_ID}"
+        # Get or create qa database
+        QA_DB_ID=$(get_or_create_database "${DATABASE_NAME}-qa" "qa")
         echo ""
 
-        # Create prod database
-        echo "Creating prod database: ${DATABASE_NAME}-prod"
-        PROD_OUTPUT=$(wrangler d1 create "${DATABASE_NAME}-prod" --json 2>/dev/null || echo '{"error":"failed"}')
-        if echo "${PROD_OUTPUT}" | grep -q '"error"'; then
-          echo "::error::Failed to create prod database"
-          exit 1
-        fi
-        PROD_DB_ID=$(echo "${PROD_OUTPUT}" | jq -r '.uuid // .database_id // empty')
-        if [ -z "${PROD_DB_ID}" ]; then
-          echo "::error::Failed to extract prod database ID"
-          exit 1
-        fi
-        echo "✓ Created prod database with ID: ${PROD_DB_ID}"
+        # Get or create prod database
+        PROD_DB_ID=$(get_or_create_database "${DATABASE_NAME}-prod" "prod")
         echo ""
 
         # Update wrangler.jsonc with actual database names and IDs
@@ -315,11 +314,14 @@ runs:
         echo "✓ Updated wrangler.jsonc with database bindings"
         echo ""
         echo "=========================================="
-        echo "D1 DATABASES CREATED SUCCESSFULLY"
+        echo "D1 DATABASES CONFIGURED SUCCESSFULLY"
         echo "=========================================="
-        echo "Dev:  ${DATABASE_NAME}-dev (${DEV_DB_ID})"
-        echo "QA:   ${DATABASE_NAME}-qa (${QA_DB_ID})"
-        echo "Prod: ${DATABASE_NAME}-prod (${PROD_DB_ID})"
+        echo "The following databases are bound in wrangler.jsonc:"
+        echo "  Dev:  ${DATABASE_NAME}-dev (${DEV_DB_ID})"
+        echo "  QA:   ${DATABASE_NAME}-qa (${QA_DB_ID})"
+        echo "  Prod: ${DATABASE_NAME}-prod (${PROD_DB_ID})"
+        echo ""
+        echo "Note: Databases were either found existing or created as needed."
         echo ""
 
     - name: Initialize repository contents
