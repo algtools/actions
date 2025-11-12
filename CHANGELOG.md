@@ -1,3 +1,10 @@
+## [1.23.1](https://github.com/algtools/actions/compare/v1.23.0...v1.23.1) (2025-11-12)
+
+
+### Bug Fixes
+
+* update initial commit messages to include release tag ([60db6b6](https://github.com/algtools/actions/commit/60db6b6862f4c1d18463b9282dfa49cc3b123597))
+
 # [1.23.0](https://github.com/algtools/actions/compare/v1.22.4...v1.23.0) (2025-11-12)
 
 
