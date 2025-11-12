@@ -261,9 +261,10 @@ runs:
           REPO_NAME=$(echo "${SOURCE_REPO}" | cut -d'/' -f2)
           TEMPLATE_TYPE=$(echo "${REPO_NAME}" | sed 's/-template$//')
 
-          # Default: {org}/update-{template-type}-template-{version}
+          # Default: {org}-update-{template-type}-template-{version}
+          # Note: Using dash instead of slash to avoid issues with branch naming
           VERSION_SLUG=$(echo "${RELEASE_TAG}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
-          BRANCH_NAME="${SOURCE_ORG}/update-${TEMPLATE_TYPE}-template-${VERSION_SLUG}"
+          BRANCH_NAME="${SOURCE_ORG}-update-${TEMPLATE_TYPE}-template-${VERSION_SLUG}"
         fi
 
         echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT

@@ -509,12 +509,16 @@ jobs:
 
     steps:
       - name: Validate Chromatic inputs
+        id: validate
         run: |
           echo "::group::Validating Chromatic configuration"
 
           if [ -z "${{ secrets.chromatic_project_token }}" ]; then
-            echo "::error::chromatic_project_token is required when enable_chromatic is true"
-            exit 1
+            echo "⚠️  Chromatic project token not provided - Chromatic upload will be skipped"
+            echo "To enable Chromatic uploads, set the CHROMATIC_PROJECT_TOKEN secret"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "::endgroup::"
+            exit 0
           fi
 
           if [ -z "${{ inputs.storybook_build_dir }}" ]; then
@@ -523,9 +527,11 @@ jobs:
           fi
 
           echo "✓ Chromatic configuration validated"
+          echo "skip=false" >> $GITHUB_OUTPUT
           echo "::endgroup::"
 
       - name: Upload to Chromatic
+        if: steps.validate.outputs.skip != 'true'
         id: chromatic-upload
         uses: algtools/actions/.github/actions/chromatic-upload-from-artifact@main
         with:
