@@ -1,3 +1,10 @@
+## [1.22.2](https://github.com/algtools/actions/compare/v1.22.1...v1.22.2) (2025-11-12)
+
+
+### Bug Fixes
+
+* enhance error handling and validation in database provisioning workflow ([bd32621](https://github.com/algtools/actions/commit/bd32621dc9b65e5052f142c92674297b900fa6d3))
+
 ## [1.22.1](https://github.com/algtools/actions/compare/v1.22.0...v1.22.1) (2025-11-12)
 
 
