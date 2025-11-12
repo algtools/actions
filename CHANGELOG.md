@@ -1,3 +1,10 @@
+# [1.23.0](https://github.com/algtools/actions/compare/v1.22.4...v1.23.0) (2025-11-12)
+
+
+### Features
+
+* implement two-phase commit strategy for repository provisioning ([8456446](https://github.com/algtools/actions/commit/84564465e45ca7a3be5f49df5fbcb03f8dff7029))
+
 ## [1.22.4](https://github.com/algtools/actions/compare/v1.22.3...v1.22.4) (2025-11-12)
 
 
