@@ -1,3 +1,15 @@
+# [1.24.0](https://github.com/algtools/actions/compare/v1.23.7...v1.24.0) (2025-11-12)
+
+
+### Bug Fixes
+
+* exclude wrangler.jsonc and .cursorrules from template updates ([9086c8e](https://github.com/algtools/actions/commit/9086c8eebd1b697811ade6a7320bed43a36358da))
+
+
+### Features
+
+* implement smart merge in update-provisioned-app action ([d1b811d](https://github.com/algtools/actions/commit/d1b811d0726c935d3fff5753374cc8c4ac4493a5))
+
 ## [1.23.7](https://github.com/algtools/actions/compare/v1.23.6...v1.23.7) (2025-11-12)
 
 
