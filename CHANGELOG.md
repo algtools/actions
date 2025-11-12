@@ -1,3 +1,10 @@
+## [1.23.5](https://github.com/algtools/actions/compare/v1.23.4...v1.23.5) (2025-11-12)
+
+
+### Bug Fixes
+
+* improve handling of exclude patterns in update-provisioned-app action ([e518e25](https://github.com/algtools/actions/commit/e518e251d418b1fceab4c7beb0d0c99414020440))
+
 ## [1.23.4](https://github.com/algtools/actions/compare/v1.23.3...v1.23.4) (2025-11-12)
 
 
