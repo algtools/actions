@@ -247,15 +247,23 @@ runs:
       env:
         BRANCH_NAME_INPUT: ${{ inputs.branch_name }}
         RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
       run: |
         set -euo pipefail
 
         if [ -n "${BRANCH_NAME_INPUT}" ]; then
           BRANCH_NAME="${BRANCH_NAME_INPUT}"
         else
-          # Default: update-template-{version}
+          # Extract source org from SOURCE_REPO (e.g., "algtools" from "algtools/web-template")
+          SOURCE_ORG=$(echo "${SOURCE_REPO}" | cut -d'/' -f1)
+
+          # Extract repo name and template type (e.g., "web" from "algtools/web-template")
+          REPO_NAME=$(echo "${SOURCE_REPO}" | cut -d'/' -f2)
+          TEMPLATE_TYPE=$(echo "${REPO_NAME}" | sed 's/-template$//')
+
+          # Default: {org}/update-{template-type}-template-{version}
           VERSION_SLUG=$(echo "${RELEASE_TAG}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
-          BRANCH_NAME="update-template-${VERSION_SLUG}"
+          BRANCH_NAME="${SOURCE_ORG}/update-${TEMPLATE_TYPE}-template-${VERSION_SLUG}"
         fi
 
         echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
@@ -513,21 +521,22 @@ runs:
           echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
           echo "pr_url=${PR_URL}" >> $GITHUB_OUTPUT
         else
-          # Create new PR
-          PR=$(gh pr create \
+          # Create new PR (returns PR URL)
+          PR_URL=$(gh pr create \
             --repo "${TARGET_REPO}" \
             --title "${PR_TITLE}" \
             --body "${PR_BODY}" \
             --base "${BASE_BRANCH}" \
-            --head "${BRANCH_NAME}" \
-            --json number,url) || {
+            --head "${BRANCH_NAME}") || {
             echo "Error: Failed to create pull request"
             exit 1
           }
 
-          PR_NUMBER=$(echo "${PR}" | jq -r '.number')
-          PR_URL=$(echo "${PR}" | jq -r '.url')
           echo "Created pull request: ${PR_URL}"
+
+          # Extract PR number from URL or use gh pr view to get it
+          PR_NUMBER=$(gh pr view "${PR_URL}" --repo "${TARGET_REPO}" --json number --jq '.number')
+
           echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
           echo "pr_url=${PR_URL}" >> $GITHUB_OUTPUT
         fi
