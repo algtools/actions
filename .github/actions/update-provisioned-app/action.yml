@@ -326,7 +326,8 @@ runs:
           "pnpm-lock.yaml"
           "package-lock.json"
           "yarn.lock"
-          "wrangler.jsonc"
+          "CHANGELOG.md"
+          ".cursorrules"
         )
 
         # Try to read exclude.json from template (may not exist if .template-app was removed)
@@ -385,7 +386,7 @@ runs:
           "pnpm-lock.yaml"
           "package-lock.json"
           "yarn.lock"
-          "wrangler.jsonc"
+          "CHANGELOG.md"
           ".cursorrules"
         )
 
@@ -433,6 +434,273 @@ runs:
         }
 
         echo "Template changes applied"
+
+    - name: Smart merge package.json
+      shell: bash
+      working-directory: target-repo
+      env:
+        TEMPLATE_DIR: ../template
+      run: |
+        set -euo pipefail
+
+        echo "Smart merging package.json..."
+
+        if [ ! -f "package.json" ]; then
+          echo "No package.json in target repo, skipping merge"
+          exit 0
+        fi
+
+        if [ ! -f "${TEMPLATE_DIR}/package.json" ]; then
+          echo "No package.json in template, skipping merge"
+          exit 0
+        fi
+
+        # Use Node.js to perform smart merge with deep merge logic
+        node -e "
+          const fs = require('fs');
+
+          const appPkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const templatePkg = JSON.parse(fs.readFileSync('${TEMPLATE_DIR}/package.json', 'utf8'));
+
+          // Preserve app-specific fields
+          const preservedFields = {
+            name: appPkg.name,
+            version: appPkg.version,
+            __template: appPkg.__template
+          };
+
+          // Preserve private field if it exists in app
+          if (appPkg.private !== undefined) {
+            preservedFields.private = appPkg.private;
+          }
+
+          // Deep merge dependencies - app first, then template (template versions win)
+          const mergedDependencies = {
+            ...(appPkg.dependencies || {}),
+            ...(templatePkg.dependencies || {})
+          };
+
+          // Deep merge devDependencies - app first, then template (template versions win)
+          const mergedDevDependencies = {
+            ...(appPkg.devDependencies || {}),
+            ...(templatePkg.devDependencies || {})
+          };
+
+          // Deep merge scripts - app first, then template (template scripts win)
+          const mergedScripts = {
+            ...(appPkg.scripts || {}),
+            ...(templatePkg.scripts || {})
+          };
+
+          // Detect and log conflicts
+          const conflicts = [];
+          if (appPkg.dependencies && templatePkg.dependencies) {
+            for (const pkg of Object.keys(appPkg.dependencies)) {
+              if (templatePkg.dependencies[pkg] && appPkg.dependencies[pkg] !== templatePkg.dependencies[pkg]) {
+                conflicts.push(\`  - \${pkg}: \${appPkg.dependencies[pkg]} → \${templatePkg.dependencies[pkg]}\`);
+              }
+            }
+          }
+
+          // Final merge: start with template structure, override with preserved fields and merged collections
+          const merged = {
+            ...templatePkg,
+            ...preservedFields,
+            dependencies: Object.keys(mergedDependencies).length > 0 ? mergedDependencies : undefined,
+            devDependencies: Object.keys(mergedDevDependencies).length > 0 ? mergedDevDependencies : undefined,
+            scripts: Object.keys(mergedScripts).length > 0 ? mergedScripts : undefined
+          };
+
+          // Remove undefined fields
+          Object.keys(merged).forEach(key => merged[key] === undefined && delete merged[key]);
+
+          // Write back
+          fs.writeFileSync('package.json', JSON.stringify(merged, null, 2) + '\n');
+
+          console.log('✓ package.json smart merged');
+          console.log('  Preserved: name, version, __template' + (preservedFields.private !== undefined ? ', private' : ''));
+          console.log('  Dependencies: ' + Object.keys(mergedDependencies).length + ' total');
+          console.log('  DevDependencies: ' + Object.keys(mergedDevDependencies).length + ' total');
+          console.log('  Scripts: ' + Object.keys(mergedScripts).length + ' total');
+          if (conflicts.length > 0) {
+            console.log('  ⚠️  Updated versions (template wins):');
+            conflicts.forEach(c => console.log(c));
+          }
+        " || {
+          echo "Warning: Smart merge failed, package.json was excluded by rsync"
+          exit 0
+        }
+
+    - name: Smart merge wrangler.jsonc
+      shell: bash
+      working-directory: target-repo
+      env:
+        TEMPLATE_DIR: ../template
+      run: |
+        set -euo pipefail
+
+        echo "Smart merging wrangler.jsonc..."
+
+        if [ ! -f "wrangler.jsonc" ]; then
+          echo "No wrangler.jsonc in target repo, skipping merge"
+          exit 0
+        fi
+
+        if [ ! -f "${TEMPLATE_DIR}/wrangler.jsonc" ]; then
+          echo "No wrangler.jsonc in template, skipping merge"
+          exit 0
+        fi
+
+        # Use Node.js to perform smart merge of wrangler config with binding-name matching
+        node -e "
+          const fs = require('fs');
+
+          // Helper to strip JSONC comments
+          function parseJSONC(content) {
+            let cleaned = content
+              .replace(/\/\*[\s\S]*?\*\//g, '') // Remove /* */ comments
+              .replace(/\/\/.*/g, '')            // Remove // comments
+              .replace(/,(\s*[}\]])/g, '\$1');   // Remove trailing commas
+            return JSON.parse(cleaned);
+          }
+
+          const appConfig = parseJSONC(fs.readFileSync('wrangler.jsonc', 'utf8'));
+          const templateConfig = parseJSONC(fs.readFileSync('${TEMPLATE_DIR}/wrangler.jsonc', 'utf8'));
+
+          // Helper to merge bindings by name, preserving app-specific IDs
+          function mergeBindings(appBindings, templateBindings, idField) {
+            if (!templateBindings) return appBindings;
+            if (!appBindings) return templateBindings;
+
+            const merged = [];
+            const appMap = new Map((appBindings || []).map(b => [b.binding, b]));
+            const templateMap = new Map((templateBindings || []).map(b => [b.binding, b]));
+            const processed = new Set();
+
+            // Process template bindings (updates + new ones)
+            for (const [binding, templateBinding] of templateMap) {
+              const appBinding = appMap.get(binding);
+              if (appBinding) {
+                // Merge: preserve app IDs, use template structure
+                const mergedBinding = { ...templateBinding };
+                if (idField && appBinding[idField]) {
+                  mergedBinding[idField] = appBinding[idField];
+                }
+                // Preserve database_name for D1
+                if (appBinding.database_name) {
+                  mergedBinding.database_name = appBinding.database_name;
+                }
+                // Preserve bucket_name for R2
+                if (appBinding.bucket_name) {
+                  mergedBinding.bucket_name = appBinding.bucket_name;
+                }
+                merged.push(mergedBinding);
+                processed.add(binding);
+              } else {
+                // New binding from template
+                merged.push(templateBinding);
+                processed.add(binding);
+              }
+            }
+
+            // Add app-specific bindings not in template
+            for (const [binding, appBinding] of appMap) {
+              if (!processed.has(binding)) {
+                merged.push(appBinding);
+              }
+            }
+
+            return merged.length > 0 ? merged : undefined;
+          }
+
+          // Helper to merge environment-specific configs
+          function mergeEnvironment(appEnv, templateEnv) {
+            if (!appEnv && !templateEnv) return undefined;
+            if (!appEnv) return templateEnv;
+            if (!templateEnv) return appEnv;
+
+            const merged = { ...templateEnv };
+
+            // Preserve app-specific name
+            if (appEnv.name) {
+              merged.name = appEnv.name;
+            }
+
+            // Preserve app-specific routes
+            if (appEnv.routes) {
+              merged.routes = appEnv.routes;
+            }
+
+            // Merge bindings by name
+            merged.d1_databases = mergeBindings(appEnv.d1_databases, templateEnv.d1_databases, 'database_id');
+            merged.kv_namespaces = mergeBindings(appEnv.kv_namespaces, templateEnv.kv_namespaces, 'id');
+            merged.r2_buckets = mergeBindings(appEnv.r2_buckets, templateEnv.r2_buckets, 'bucket_name');
+            merged.durable_objects = mergeBindings(appEnv.durable_objects, templateEnv.durable_objects, 'script_name');
+            merged.services = mergeBindings(appEnv.services, templateEnv.services, 'service');
+
+            // Clean up undefined fields
+            Object.keys(merged).forEach(key => merged[key] === undefined && delete merged[key]);
+
+            return merged;
+          }
+
+          // Start with template config structure
+          const merged = { ...templateConfig };
+
+          // Preserve app-specific root name
+          if (appConfig.name) {
+            merged.name = appConfig.name;
+          }
+
+          // Merge root-level bindings
+          merged.d1_databases = mergeBindings(appConfig.d1_databases, templateConfig.d1_databases, 'database_id');
+          merged.kv_namespaces = mergeBindings(appConfig.kv_namespaces, templateConfig.kv_namespaces, 'id');
+          merged.r2_buckets = mergeBindings(appConfig.r2_buckets, templateConfig.r2_buckets, 'bucket_name');
+          merged.durable_objects = mergeBindings(appConfig.durable_objects, templateConfig.durable_objects, 'script_name');
+          merged.services = mergeBindings(appConfig.services, templateConfig.services, 'service');
+
+          // Preserve app-specific routes at root level
+          if (appConfig.routes) {
+            merged.routes = appConfig.routes;
+          }
+
+          // Merge environment-specific configs
+          if (merged.env || appConfig.env) {
+            merged.env = merged.env || {};
+            const allEnvNames = new Set([
+              ...Object.keys(merged.env || {}),
+              ...Object.keys(appConfig.env || {})
+            ]);
+
+            for (const envName of allEnvNames) {
+              merged.env[envName] = mergeEnvironment(
+                appConfig.env?.[envName],
+                templateConfig.env?.[envName]
+              );
+            }
+          }
+
+          // Clean up undefined fields
+          Object.keys(merged).forEach(key => merged[key] === undefined && delete merged[key]);
+
+          // Write back as JSON
+          fs.writeFileSync('wrangler.jsonc', JSON.stringify(merged, null, 2) + '\n');
+
+          // Log merge summary
+          console.log('✓ wrangler.jsonc smart merged with binding-name matching');
+          console.log('  Preserved: worker names, database IDs, KV IDs, routes');
+          console.log('  Updated: compatibility settings, vars, and other configs');
+
+          const d1Count = (merged.d1_databases?.length || 0);
+          const kvCount = (merged.kv_namespaces?.length || 0);
+          const r2Count = (merged.r2_buckets?.length || 0);
+          if (d1Count + kvCount + r2Count > 0) {
+            console.log('  Bindings: ' + d1Count + ' D1, ' + kvCount + ' KV, ' + r2Count + ' R2');
+          }
+        " || {
+          echo "Warning: Smart merge failed for wrangler.jsonc"
+          exit 0
+        }
 
     - name: Check for changes
       id: check-changes
