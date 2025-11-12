@@ -1,3 +1,10 @@
+## [1.22.3](https://github.com/algtools/actions/compare/v1.22.2...v1.22.3) (2025-11-12)
+
+
+### Bug Fixes
+
+* redirect error messages to stderr in database provisioning workflow ([16bf7f2](https://github.com/algtools/actions/commit/16bf7f2e1caccec101e32d47f7d721ef27ca88db))
+
 ## [1.22.2](https://github.com/algtools/actions/compare/v1.22.1...v1.22.2) (2025-11-12)
 
 
