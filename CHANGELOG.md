@@ -1,3 +1,10 @@
+## [1.22.1](https://github.com/algtools/actions/compare/v1.22.0...v1.22.1) (2025-11-12)
+
+
+### Bug Fixes
+
+* streamline database creation logic in provisioning workflow ([4dc1cca](https://github.com/algtools/actions/commit/4dc1ccaf60d65b92744ff2de4d5e8d4f672a977f))
+
 # [1.22.0](https://github.com/algtools/actions/compare/v1.21.8...v1.22.0) (2025-11-11)
 
 
