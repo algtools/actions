@@ -1,3 +1,10 @@
+# [1.25.0](https://github.com/algtools/actions/compare/v1.24.0...v1.25.0) (2025-11-12)
+
+
+### Features
+
+* add additional files to exclude patterns in update-provisioned-app action ([7e824b6](https://github.com/algtools/actions/commit/7e824b66cc98cd12970083f96f1bfa6f38b0d03a))
+
 # [1.24.0](https://github.com/algtools/actions/compare/v1.23.7...v1.24.0) (2025-11-12)
 
 
