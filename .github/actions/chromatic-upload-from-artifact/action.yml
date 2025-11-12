@@ -48,6 +48,7 @@ runs:
         fetch-depth: 0
 
     - name: Validate inputs
+      id: validate
       shell: bash
       run: |
         echo "::group::Validating inputs"
@@ -58,8 +59,11 @@ runs:
           exit 1
         fi
         if [ -z "${{ inputs.project_token }}" ]; then
-          echo "::error::project_token input is required"
-          exit 1
+          echo "⚠️  Chromatic project token not provided - skipping Chromatic upload"
+          echo "To enable Chromatic uploads, set the CHROMATIC_PROJECT_TOKEN secret"
+          echo "skip=true" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+          exit 0
         fi
 
         echo "✓ All required inputs validated successfully"
@@ -71,15 +75,18 @@ runs:
         echo "  Download path: ${{ inputs.download_path }}"
         echo "  Exit zero on changes: ${{ inputs.exit_zero_on_changes }}"
         echo "  Project token: [REDACTED]"
+        echo "skip=false" >> $GITHUB_OUTPUT
         echo "::endgroup::"
 
     - name: Download artifact
+      if: steps.validate.outputs.skip != 'true'
       uses: actions/download-artifact@v4
       with:
         name: ${{ inputs.artifact_name }}
         path: ${{ inputs.download_path }}
 
     - name: Verify artifact contents
+      if: steps.validate.outputs.skip != 'true'
       shell: bash
       run: |
         echo "::group::Verifying artifact contents"
@@ -116,6 +123,7 @@ runs:
         echo "::endgroup::"
 
     - name: Extract and prepare Storybook
+      if: steps.validate.outputs.skip != 'true'
       shell: bash
       working-directory: ${{ inputs.working_dir }}
       run: |
@@ -174,6 +182,7 @@ runs:
         echo "::endgroup::"
 
     - name: Upload to Chromatic
+      if: steps.validate.outputs.skip != 'true'
       id: upload
       shell: bash
       working-directory: ${{ inputs.working_dir }}
@@ -268,6 +277,7 @@ runs:
         echo "::endgroup::"
 
     - name: Upload summary
+      if: steps.validate.outputs.skip != 'true'
       shell: bash
       run: |
         echo "::group::Upload Summary"

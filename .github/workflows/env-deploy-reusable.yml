@@ -147,18 +147,24 @@ jobs:
 
           # Validate Sentry inputs if enabled
           if [ "${{ inputs.sentry_release }}" = "true" ]; then
+            echo "Sentry release is enabled, validating required inputs..."
             if [ -z "${{ inputs.sentry_org }}" ]; then
               echo "::error::sentry_org is required when sentry_release is enabled"
+              echo "::error::Set SENTRY_ORG repository variable or pass sentry_release: false"
               exit 1
             fi
             if [ -z "${{ inputs.sentry_project }}" ]; then
               echo "::error::sentry_project is required when sentry_release is enabled"
+              echo "::error::Set SENTRY_PROJECT repository variable or pass sentry_release: false"
               exit 1
             fi
             if [ -z "${{ secrets.sentry_auth_token }}" ]; then
               echo "::error::sentry_auth_token secret is required when sentry_release is enabled"
+              echo "::error::Set SENTRY_AUTH_TOKEN organization secret or pass sentry_release: false"
               exit 1
             fi
+          else
+            echo "ℹ️  Sentry release is disabled (sentry_release: false)"
           fi
 
           echo "✓ All required inputs validated successfully"
