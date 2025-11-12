@@ -326,6 +326,7 @@ runs:
           "pnpm-lock.yaml"
           "package-lock.json"
           "yarn.lock"
+          "wrangler.jsonc"
         )
 
         # Try to read exclude.json from template (may not exist if .template-app was removed)
@@ -384,6 +385,8 @@ runs:
           "pnpm-lock.yaml"
           "package-lock.json"
           "yarn.lock"
+          "wrangler.jsonc"
+          ".cursorrules"
         )
 
         # Try to override with patterns from JSON if available
