@@ -388,6 +388,8 @@ runs:
           "yarn.lock"
           "CHANGELOG.md"
           ".cursorrules"
+          ".github/template-updates.yml"
+          ".template-app"
         )
 
         # Try to override with patterns from JSON if available
