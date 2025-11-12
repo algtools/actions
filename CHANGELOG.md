@@ -1,3 +1,10 @@
+## [1.23.7](https://github.com/algtools/actions/compare/v1.23.6...v1.23.7) (2025-11-12)
+
+
+### Bug Fixes
+
+* improve validation and handling of Chromatic project token ([f2faee0](https://github.com/algtools/actions/commit/f2faee006fe54b6c11d3130ce18c6447a525def0))
+
 ## [1.23.6](https://github.com/algtools/actions/compare/v1.23.5...v1.23.6) (2025-11-12)
 
 
