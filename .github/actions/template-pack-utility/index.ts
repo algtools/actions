@@ -1,7 +1,6 @@
 /* eslint-disable no-console */
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
-import { wrapTemplate } from './templateWrap';
 import { tokenizeTemplate } from './templateTokenize';
 import { transformTemplateToApp } from './transformTemplateToApp';
 
@@ -47,33 +46,21 @@ async function main(): Promise<void> {
   const buildDir = path.join(templateRoot, '.template-build');
 
   try {
-    // Step 1: Wrap template files
+    // Step 1: Tokenize template
     console.log('\n' + '='.repeat(50));
-    console.log('Step 1: Wrapping template files');
-    console.log('='.repeat(50) + '\n');
-    wrapTemplate(templateRoot);
-
-    // Step 1.5: Format wrapped files with Prettier
-    console.log('\n' + '='.repeat(50));
-    console.log('Step 1.5: Formatting wrapped files');
-    console.log('='.repeat(50) + '\n');
-    formatFiles(templateRoot, 'source template files');
-
-    // Step 2: Tokenize template
-    console.log('\n' + '='.repeat(50));
-    console.log('Step 2: Tokenizing template');
+    console.log('Step 1: Tokenizing template');
     console.log('='.repeat(50) + '\n');
     tokenizeTemplate(templateRoot, templateName, buildDir);
 
-    // Step 3: Transform template to app
+    // Step 2: Transform template to app
     console.log('\n' + '='.repeat(50));
-    console.log('Step 3: Transforming template to app');
+    console.log('Step 2: Transforming template to app');
     console.log('='.repeat(50) + '\n');
     transformTemplateToApp(buildDir, templateRoot, templateType);
 
-    // Step 4: Format build directory files
+    // Step 3: Format build directory files
     console.log('\n' + '='.repeat(50));
-    console.log('Step 4: Formatting build directory');
+    console.log('Step 3: Formatting build directory');
     console.log('='.repeat(50) + '\n');
     formatFiles(buildDir, 'build directory files');
 

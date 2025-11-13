@@ -335,24 +335,53 @@ export function transformTemplateToApp(
     console.log('  ✓ Created scripts directory');
   }
 
-  // 2. Copy files from .template-app/include/ to build directory root
+  // 2. Copy app workflows from .github/workflows/app/ to .github/workflows/
+  const templateAppWorkflowsDir = path.join(buildDir, '.github', 'workflows', 'app');
+  if (fs.existsSync(templateAppWorkflowsDir)) {
+    console.log('  📋 Copying app workflows from .github/workflows/app/...');
+
+    const appWorkflowFiles = fs.readdirSync(templateAppWorkflowsDir);
+    for (const file of appWorkflowFiles) {
+      const sourcePath = path.join(templateAppWorkflowsDir, file);
+      const destPath = path.join(workflowsDir, file);
+      fs.copyFileSync(sourcePath, destPath);
+    }
+
+    // Remove the app subdirectory
+    fs.rmSync(templateAppWorkflowsDir, { recursive: true, force: true });
+    console.log(`  ✓ Copied ${appWorkflowFiles.length} app workflow(s) to .github/workflows/`);
+  }
+
+  // 3. Copy app actions from .github/actions/app/ to .github/actions/ (if they exist)
+  const templateAppActionsDir = path.join(buildDir, '.github', 'actions', 'app');
+  if (fs.existsSync(templateAppActionsDir)) {
+    console.log('  📋 Copying app actions from .github/actions/app/...');
+
+    const actionsDir = path.join(buildDir, '.github', 'actions');
+    const appActionDirs = fs.readdirSync(templateAppActionsDir, { withFileTypes: true });
+    for (const actionDir of appActionDirs) {
+      if (actionDir.isDirectory()) {
+        const sourcePath = path.join(templateAppActionsDir, actionDir.name);
+        const destPath = path.join(actionsDir, actionDir.name);
+        copyDirectorySync(sourcePath, destPath);
+      }
+    }
+
+    // Remove the app subdirectory
+    fs.rmSync(templateAppActionsDir, { recursive: true, force: true });
+    console.log(`  ✓ Copied ${appActionDirs.length} app action(s) to .github/actions/`);
+  }
+
+  // 4. Copy files from .template-app/include/ to build directory root
   if (templateRoot) {
     const includeDir = path.join(templateRoot, '.template-app', 'include');
     if (fs.existsSync(includeDir)) {
-      console.log('  📋 Copying files from .template-app/include/...');
-
-      // Note: .github was already deleted by exclusion patterns in step 1 (if in exclude.json)
-      // If it still exists, delete it now to ensure clean replacement
-      const buildGithubDir = path.join(buildDir, '.github');
-      if (fs.existsSync(buildGithubDir)) {
-        console.log('  🗑️  Removing remaining template .github directory...');
-        fs.rmSync(buildGithubDir, { recursive: true, force: true });
-      }
+      console.log('  📋 Copying provision-only files from .template-app/include/...');
 
       copyDirectorySync(includeDir, buildDir);
-      console.log('  ✓ Copied files from include folder (including app .github)');
+      console.log('  ✓ Copied provision-only files from include folder');
 
-      // Ensure .cursorrules is in the right place
+      // Ensure .cursorrules is in the right place (if it exists in include)
       const includeCursorRules = path.join(includeDir, '.cursorrules');
       const targetCursorRules = path.join(buildDir, '.cursorrules');
       if (fs.existsSync(includeCursorRules)) {
@@ -368,7 +397,7 @@ export function transformTemplateToApp(
     }
   }
 
-  // 3. Verify .github directory is from include (already replaced above)
+  // 5. Verify .github/workflows directory
   if (fs.existsSync(workflowsDir)) {
     const workflowFiles = fs.readdirSync(workflowsDir);
     console.log(`  ✓ App .github/workflows directory has ${workflowFiles.length} workflow(s)`);
@@ -379,14 +408,14 @@ export function transformTemplateToApp(
     );
   }
 
-  // 4. Remove .template-app/ folder from build directory (it shouldn't appear in final package)
+  // 6. Remove .template-app/ folder from build directory (it shouldn't appear in final package)
   const templateAppDir = path.join(buildDir, '.template-app');
   if (fs.existsSync(templateAppDir)) {
     fs.rmSync(templateAppDir, { recursive: true, force: true });
     console.log('  ✓ Removed .template-app/ folder from build');
   }
 
-  // 5. Ensure appPack.ts exists
+  // 7. Ensure appPack.ts exists
   const appPackPath = path.join(scriptsDir, 'appPack.ts');
   if (!fs.existsSync(appPackPath)) {
     // Check if source template has appPack.ts
@@ -411,7 +440,7 @@ export function transformTemplateToApp(
     console.log('  ✓ appPack.ts already exists');
   }
 
-  // 6. Update package.json to ensure app:pack script exists
+  // 8. Update package.json to ensure app:pack script exists
   if (fs.existsSync(packageJsonPath)) {
     const packageJson: PackageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
 
