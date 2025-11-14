@@ -1,0 +1,123 @@
+name: Sync Documentation
+
+on:
+  workflow_call:
+    inputs:
+      template_name:
+        description: "Template name (web-template, core-template, bff-template)"
+        required: true
+        type: string
+      version:
+        description: "Template version (e.g., 1.0.0)"
+        required: true
+        type: string
+      docs_source_path:
+        description: "Path to docs source directory"
+        required: true
+        type: string
+      template_docs_repo:
+        description: "Template docs repository (owner/repo)"
+        required: false
+        type: string
+        default: "algtools/algtools"
+      template_docs_path:
+        description: "Path to template-docs directory in repo"
+        required: false
+        type: string
+        default: "template-docs"
+  workflow_dispatch:
+    inputs:
+      template_name:
+        description: "Template name (web-template, core-template, bff-template)"
+        required: true
+        type: choice
+        options:
+          - web-template
+          - core-template
+          - bff-template
+      version:
+        description: "Template version (e.g., 1.0.0)"
+        required: true
+        type: string
+      docs_source_path:
+        description: "Path to docs source directory (relative to repo root)"
+        required: true
+        type: string
+        default: "docs"
+      force:
+        description: "Force sync even if version exists"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout template repository
+        uses: actions/checkout@v4
+        with:
+          path: template-repo
+
+      - name: Checkout template-docs repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.template_docs_repo || 'algtools/algtools' }}
+          path: template-docs
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        working-directory: template-docs
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate docs source path
+        run: |
+          if [ ! -d "template-repo/${{ inputs.docs_source_path }}" ]; then
+            echo "Error: Docs source path does not exist: template-repo/${{ inputs.docs_source_path }}"
+            exit 1
+          fi
+
+      - name: Sync documentation
+        working-directory: template-docs
+        run: |
+          pnpm sync-docs \
+            "${{ inputs.template_name }}" \
+            "${{ inputs.version }}" \
+            "../template-repo/${{ inputs.docs_source_path }}"
+
+      - name: Commit changes
+        working-directory: template-docs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pages/
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "docs: sync ${{ inputs.template_name }} v${{ inputs.version }}"
+            git push
+          fi
+
+      - name: Create summary
+        run: |
+          echo "## Documentation Sync Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Template**: ${{ inputs.template_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source**: ${{ inputs.docs_source_path }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Documentation has been synced to template-docs repository." >> $GITHUB_STEP_SUMMARY

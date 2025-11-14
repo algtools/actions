@@ -122,3 +122,56 @@ jobs:
           gh release upload "${VERSION}" "${TARBALL_PATH}" --clobber
 
           echo "✅ Tarball uploaded to GitHub Release"
+
+  sync-docs:
+    needs: release
+    runs-on: ubuntu-latest
+    if: github.ref_name == 'main' || github.ref_name == 'qa'
+    steps:
+      - name: Checkout template repository
+        uses: actions/checkout@v4
+        with:
+          path: template-repo
+          token: ${{ secrets.gh_token }}
+
+      - name: Checkout template-docs repository
+        uses: actions/checkout@v4
+        with:
+          repository: algtools/algtools
+          path: template-docs
+          token: ${{ secrets.gh_token }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        working-directory: template-docs
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync documentation
+        working-directory: template-docs
+        run: |
+          pnpm sync-docs \
+            "${{ inputs.template_name }}" \
+            "${{ needs.release.outputs.version }}" \
+            "../template-repo/${{ inputs.working_directory }}/docs"
+
+      - name: Commit changes
+        working-directory: template-docs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pages/
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "docs: sync ${{ inputs.template_name }} v${{ needs.release.outputs.version }}"
+            git push
+          fi

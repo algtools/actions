@@ -381,16 +381,14 @@ export function transformTemplateToApp(
       copyDirectorySync(includeDir, buildDir);
       console.log('  ✓ Copied provision-only files from include folder');
 
-      // Ensure .cursorrules is in the right place (if it exists in include)
-      const includeCursorRules = path.join(includeDir, '.cursorrules');
-      const targetCursorRules = path.join(buildDir, '.cursorrules');
-      if (fs.existsSync(includeCursorRules)) {
-        // Remove existing .cursorrules if it exists (template dev version)
-        if (fs.existsSync(targetCursorRules)) {
-          fs.unlinkSync(targetCursorRules);
+      // Verify .cursor directory was copied
+      const targetCursorDir = path.join(buildDir, '.cursor');
+      if (fs.existsSync(targetCursorDir)) {
+        const rulesDir = path.join(targetCursorDir, 'rules');
+        if (fs.existsSync(rulesDir)) {
+          const ruleFiles = fs.readdirSync(rulesDir);
+          console.log(`  ✓ Copied .cursor/rules/ with ${ruleFiles.length} rule file(s)`);
         }
-        fs.copyFileSync(includeCursorRules, targetCursorRules);
-        console.log('  ✓ Copied .cursorrules from include folder');
       }
     } else {
       console.log('  ⚠️  .template-app/include/ folder not found, skipping include copy');
