@@ -1,3 +1,10 @@
+# [1.26.0](https://github.com/algtools/actions/compare/v1.25.0...v1.26.0) (2025-11-13)
+
+
+### Features
+
+* streamline template processing ([96cacde](https://github.com/algtools/actions/commit/96cacdefff877ed8b167b6aa49f4d2d4bacb4edf))
+
 # [1.25.0](https://github.com/algtools/actions/compare/v1.24.0...v1.25.0) (2025-11-12)
 
 
