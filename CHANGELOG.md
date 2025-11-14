@@ -1,3 +1,10 @@
+# [1.27.0](https://github.com/algtools/actions/compare/v1.26.0...v1.27.0) (2025-11-14)
+
+
+### Features
+
+* add documentation sync workflow and enhance template processing ([edbe28b](https://github.com/algtools/actions/commit/edbe28b207dcc460a968336a504cc1761838398b))
+
 # [1.26.0](https://github.com/algtools/actions/compare/v1.25.0...v1.26.0) (2025-11-13)
 
 
