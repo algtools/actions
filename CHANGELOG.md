@@ -1,3 +1,10 @@
+## [1.27.3](https://github.com/algtools/actions/compare/v1.27.2...v1.27.3) (2025-11-15)
+
+
+### Bug Fixes
+
+* improve template provisioning auto-actions and sentry_release ([40fc419](https://github.com/algtools/actions/commit/40fc419e07db9ae54a3ac31393fa808033ee4898))
+
 ## [1.27.2](https://github.com/algtools/actions/compare/v1.27.1...v1.27.2) (2025-11-15)
 
 
