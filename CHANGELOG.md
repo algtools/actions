@@ -1,3 +1,10 @@
+## [1.27.1](https://github.com/algtools/actions/compare/v1.27.0...v1.27.1) (2025-11-15)
+
+
+### Bug Fixes
+
+* add Sentry release verification steps ([be9f940](https://github.com/algtools/actions/commit/be9f9408818420ae2a5367c2405226918ddd4993))
+
 # [1.27.0](https://github.com/algtools/actions/compare/v1.26.0...v1.27.0) (2025-11-14)
 
 
