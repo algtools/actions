@@ -675,7 +675,8 @@ runs:
         if git diff --staged --quiet; then
           echo "ℹ️  No additional files to commit (all files were in phase 1)"
         else
-          # Commit full template code
+          # Commit full template code on main first
+          echo "Committing full template code on main..."
           git commit -m "feat: bootstrap from template ${RELEASE_TAG}" -m "This commit includes all template files and will trigger initial deployments on dev, qa, and main branches." -m "BREAKING CHANGE: Initial release of application from template"
 
           # Push to main
@@ -683,17 +684,51 @@ runs:
           git push origin main
           echo "✓ Full code pushed to main"
 
-          # Push to dev
-          echo "Pushing full code to dev..."
+          # Wait a moment for GitHub to process the push
+          echo "Waiting for GitHub to process main branch push..."
+          sleep 5
+
+          # For dev branch: merge main to get all files, then create a new commit to trigger workflows
+          # This ensures workflows are present in the branch when we push
+          echo ""
+          echo "Pushing full code to dev branch..."
           git checkout dev
-          git merge main --no-edit
+
+          # Merge main to bring in all the files (including workflows)
+          if ! git merge main --no-edit --no-ff; then
+            echo "⚠️  Merge conflict or already merged, continuing..."
+          fi
+
+          # Create an empty commit or amend to ensure a push event that triggers workflows
+          # This is necessary because merge commits don't always trigger workflows reliably
+          if ! git commit --allow-empty -m "chore: trigger dev deployment" -m "This commit ensures deploy-dev.yml workflow is triggered after bootstrap."; then
+            echo "ℹ️  Could not create trigger commit"
+          fi
+
+          # Push to dev - this should trigger deploy-dev.yml
           git push origin dev
           echo "✓ Full code pushed to dev"
 
-          # Push to qa
-          echo "Pushing full code to qa..."
+          # Wait a moment for GitHub to process
+          sleep 5
+
+          # For qa branch: merge main to get all files, then create a new commit to trigger workflows
+          echo ""
+          echo "Pushing full code to qa branch..."
           git checkout qa
-          git merge main --no-edit
+
+          # Merge main to bring in all the files (including workflows)
+          if ! git merge main --no-edit --no-ff; then
+            echo "⚠️  Merge conflict or already merged, continuing..."
+          fi
+
+          # Create an empty commit to ensure workflows trigger
+          # This is necessary because merge commits don't always trigger workflows reliably
+          if ! git commit --allow-empty -m "chore: trigger qa release and deployment" -m "This commit ensures release-app.yml and deploy-qa.yml workflows are triggered after bootstrap."; then
+            echo "ℹ️  Could not create trigger commit"
+          fi
+
+          # Push to qa - this should trigger release-app.yml and deploy-qa.yml
           git push origin qa
           echo "✓ Full code pushed to qa"
 
@@ -786,108 +821,94 @@ runs:
         echo "Target repository: ${TARGET_REPO}"
         echo ""
 
-        # Wait for workflows to be registered and potentially auto-triggered by push events
-        echo "Waiting for workflows to be registered and auto-triggered..."
-        sleep 15
+        # Wait for workflows to be registered by GitHub
+        # GitHub needs time to index the workflow files after they're pushed
+        echo "Waiting for GitHub to register workflow files..."
+        sleep 20
 
-        # Check if workflows were auto-triggered by the push events
+        # Always trigger workflows manually as a fallback to ensure they run
+        # Push events don't always trigger workflows reliably, especially for new repositories
         echo ""
-        echo "Checking if workflows were auto-triggered by push events..."
+        echo "=========================================="
+        echo "MANUALLY TRIGGERING WORKFLOWS"
+        echo "=========================================="
+        echo "This ensures workflows run even if push events didn't trigger them"
+        echo ""
+
+        # Trigger release workflow on qa branch (bff-template issue: release-app not triggering on qa)
+        echo "Triggering release-app.yml on qa branch..."
+        if gh workflow run release-app.yml \
+          --repo "${TARGET_REPO}" \
+          --ref qa 2>&1; then
+          echo "✓ Release workflow triggered on qa"
+        else
+          echo "⚠️ Could not trigger release workflow on qa (workflow may not exist or branch not ready)"
+        fi
+
+        sleep 3
+
+        # Trigger release workflow on main branch
+        echo "Triggering release-app.yml on main branch..."
+        if gh workflow run release-app.yml \
+          --repo "${TARGET_REPO}" \
+          --ref main 2>&1; then
+          echo "✓ Release workflow triggered on main"
+        else
+          echo "⚠️ Could not trigger release workflow on main"
+        fi
+
+        sleep 3
+
+        # Trigger deploy-dev.yml (core-template and web-template issue: deploy-dev not triggering)
+        echo "Triggering deploy-dev.yml on dev branch..."
+        if gh workflow run deploy-dev.yml \
+          --repo "${TARGET_REPO}" \
+          --ref dev 2>&1; then
+          echo "✓ Dev deployment workflow triggered"
+        else
+          echo "⚠️ Could not trigger dev deployment (workflow may not exist or branch not ready)"
+        fi
+
+        sleep 3
+
+        # Trigger deploy-qa.yml (bff-template issue: deploy-qa not triggering)
+        echo "Triggering deploy-qa.yml on qa branch..."
+        if gh workflow run deploy-qa.yml \
+          --repo "${TARGET_REPO}" \
+          --ref qa 2>&1; then
+          echo "✓ QA deployment workflow triggered"
+        else
+          echo "⚠️ Could not trigger QA deployment (workflow may not exist or branch not ready)"
+        fi
+
+        sleep 3
+
+        # Trigger deploy-prod.yml on main branch
+        echo "Triggering deploy-prod.yml on main branch..."
+        if gh workflow run deploy-prod.yml \
+          --repo "${TARGET_REPO}" \
+          --ref main 2>&1; then
+          echo "✓ Production deployment workflow triggered"
+        else
+          echo "⚠️ Could not trigger production deployment"
+        fi
+
+        echo ""
+        sleep 5
+
+        # Check if workflows are running
+        echo ""
+        echo "Checking workflow status..."
         WORKFLOW_COUNT=$(gh run list --repo "${TARGET_REPO}" --limit 10 --json status,conclusion --jq 'length' 2>&1 || echo "0")
 
         if [ "${WORKFLOW_COUNT}" -gt 0 ]; then
-          echo "✅ Found ${WORKFLOW_COUNT} workflow run(s) - push events triggered workflows successfully!"
-          echo "   Workflows are running automatically, no manual trigger needed."
-        else
-          echo "⚠️ No workflows detected yet - will trigger manually as fallback..."
-          echo ""
-
-          # Trigger release workflows for main and qa branches as fallback
-          echo "=========================================="
-          echo "MANUALLY TRIGGERING RELEASE WORKFLOWS"
-          echo "=========================================="
-
-          # Try to trigger the release workflow on main branch
-          echo "Triggering release workflow on main branch..."
-          if gh workflow run release-app.yml \
-            --repo "${TARGET_REPO}" \
-            --ref main 2>&1; then
-            echo "✓ Release workflow triggered on main"
-          else
-            echo "⚠️ Could not trigger release workflow on main"
-          fi
-
-          sleep 2
-
-          # Try to trigger the release workflow on qa branch
-          echo "Triggering release workflow on qa branch..."
-          if gh workflow run release-app.yml \
-            --repo "${TARGET_REPO}" \
-            --ref qa 2>&1; then
-            echo "✓ Release workflow triggered on qa"
-          else
-            echo "⚠️ Could not trigger release workflow on qa"
-          fi
-
-          # Trigger deployment workflows as fallback
-          echo ""
-          echo "=========================================="
-          echo "MANUALLY TRIGGERING DEPLOYMENT WORKFLOWS"
-          echo "=========================================="
-
-          sleep 2
-
-          # Deploy to production (main branch)
-          echo "Triggering production deployment..."
-          if gh workflow run deploy-prod.yml \
-            --repo "${TARGET_REPO}" \
-            --ref main 2>&1; then
-            echo "✓ Production deployment triggered"
-          else
-            echo "⚠️ Could not trigger production deployment"
-          fi
-
-          sleep 2
-
-          # Deploy to QA
-          echo "Triggering QA deployment..."
-          if gh workflow run deploy-qa.yml \
-            --repo "${TARGET_REPO}" \
-            --ref qa 2>&1; then
-            echo "✓ QA deployment triggered"
-          else
-            echo "⚠️ Could not trigger QA deployment"
-          fi
-
-          sleep 2
-
-          # Deploy to Dev
-          echo "Triggering dev deployment..."
-          if gh workflow run deploy-dev.yml \
-            --repo "${TARGET_REPO}" \
-            --ref dev 2>&1; then
-            echo "✓ Dev deployment triggered"
-          else
-            echo "⚠️ Could not trigger dev deployment"
-          fi
-
-          echo ""
-          sleep 5
-        fi
-
-        # Check if any workflows are running
-        echo ""
-        echo "Checking workflow status..."
-        WORKFLOW_COUNT=$(gh run list --repo "${TARGET_REPO}" --limit 5 --json status,conclusion --jq 'length' 2>&1 || echo "0")
-
-        if [ "${WORKFLOW_COUNT}" -gt 0 ]; then
-          echo "✅ Workflows are running! Check status at:"
+          echo "✅ ${WORKFLOW_COUNT} workflow run(s) detected! Check status at:"
           echo "   https://github.com/${TARGET_REPO}/actions"
         else
           echo "⚠️  No workflows detected yet. This could mean:"
           echo "   1. Actions are not enabled (check organization settings)"
-          echo "   2. Workflows are starting (wait a moment and refresh)"
-          echo "   3. Manual trigger is needed"
+          echo "   2. Workflows are still being registered (wait a moment and refresh)"
+          echo "   3. Workflow files are in a different location (check .github/workflows/app/)"
           echo ""
           echo "   To manually trigger workflows, visit:"
           echo "   https://github.com/${TARGET_REPO}/actions"

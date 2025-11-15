@@ -251,23 +251,39 @@ jobs:
 
           # Verify project exists (this will help diagnose the issue)
           echo "Verifying project exists..."
-          PROJECT_LIST_OUTPUT=$(sentry-cli projects list --org "$SENTRY_ORG" 2>&1)
+          # Temporarily disable exit-on-error to capture diagnostic info
+          set +e
+          # Use temp file to capture output since command substitution runs in subshell
+          TEMP_OUTPUT=$(mktemp) || TEMP_OUTPUT="/tmp/sentry-projects-$$.txt"
+          sentry-cli projects list --org "$SENTRY_ORG" > "$TEMP_OUTPUT" 2>&1
           PROJECT_LIST_EXIT_CODE=$?
+          PROJECT_LIST_OUTPUT=$(cat "$TEMP_OUTPUT" 2>/dev/null || echo "")
+          rm -f "$TEMP_OUTPUT" 2>/dev/null || true
+          set -e  # Re-enable exit on error
 
           if [ $PROJECT_LIST_EXIT_CODE -ne 0 ]; then
-            echo "::warning::Could not list projects. This might indicate:"
+            echo "::warning::Could not list projects (exit code: $PROJECT_LIST_EXIT_CODE)"
+            echo ""
+            echo "This might indicate:"
             echo "  - Auth token doesn't have 'project:read' permission"
             echo "  - Organization slug '$SENTRY_ORG' is incorrect"
-            echo "  - Auth token is invalid"
+            echo "  - Auth token is invalid or expired"
             echo ""
-            echo "Output: $PROJECT_LIST_OUTPUT"
+            echo "Full error output:"
+            echo "$PROJECT_LIST_OUTPUT"
             echo ""
-            echo "Continuing anyway - will fail with a clearer error if project doesn't exist..."
+            echo "⚠️  Continuing anyway - will attempt to create release..."
+            echo "   If the project doesn't exist, you'll get a clearer error message below."
+            echo ""
           else
             echo "Available projects in '$SENTRY_ORG':"
             echo "$PROJECT_LIST_OUTPUT"
             echo ""
-            if ! echo "$PROJECT_LIST_OUTPUT" | grep -qi "$SENTRY_PROJECT"; then
+            set +e  # Don't exit on error for grep
+            echo "$PROJECT_LIST_OUTPUT" | grep -qi "$SENTRY_PROJECT"
+            GREP_EXIT=$?
+            set -e
+            if [ $GREP_EXIT -ne 0 ]; then
               echo "::error::Sentry project '$SENTRY_PROJECT' not found in organization '$SENTRY_ORG'"
               echo ""
               echo "Please verify:"
