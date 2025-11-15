@@ -1,3 +1,10 @@
+## [1.27.2](https://github.com/algtools/actions/compare/v1.27.1...v1.27.2) (2025-11-15)
+
+
+### Bug Fixes
+
+* enhance linting and validation for GitHub workflows ([35fbf49](https://github.com/algtools/actions/commit/35fbf4977648bf0104325135c6158da198758781))
+
 ## [1.27.1](https://github.com/algtools/actions/compare/v1.27.0...v1.27.1) (2025-11-15)
 
 
