@@ -13,7 +13,7 @@ inputs:
     description: "Name of the repository to create (e.g., 'acme-bff')"
     required: true
   database_name:
-    description: "Database name (e.g. acme-api) - will be suffixed with -dev, -qa, -prod (core-template only)"
+    description: "Database name (e.g. acme-api) - will be suffixed with -dev, -qa, -prod (core-template only). Stored as DB_NAME variable."
     required: false
     default: ""
   sentry_project:
@@ -282,28 +282,28 @@ runs:
       shell: bash
       working-directory: template
       env:
-        DATABASE_NAME: ${{ inputs.database_name }}
+        DB_NAME: ${{ inputs.database_name }}
         CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare_api_token }}
         CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare_account_id }}
       run: |
         set -euo pipefail
 
         # Skip if no database_name provided or wrangler.jsonc doesn't exist
-        if [ -z "${DATABASE_NAME}" ] || [ ! -f "wrangler.jsonc" ]; then
+        if [ -z "${DB_NAME}" ] || [ ! -f "wrangler.jsonc" ]; then
           echo "ℹ️  Skipping D1 database creation (not core-template or no database_name provided)"
           exit 0
         fi
 
         # Verify Cloudflare credentials are provided
         if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
-          echo "::error::DATABASE_NAME provided but CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is missing"
+          echo "::error::DB_NAME provided but CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is missing"
           exit 1
         fi
 
         echo "=========================================="
         echo "CREATING D1 DATABASES"
         echo "=========================================="
-        echo "Database base name: ${DATABASE_NAME}"
+        echo "Database base name: ${DB_NAME}"
         echo ""
 
         # Install Wrangler
@@ -361,7 +361,7 @@ runs:
 
         # Get or create dev database
         echo "Starting dev database provisioning..."
-        DEV_DB_ID=$(get_or_create_database "${DATABASE_NAME}-dev" "dev") || {
+        DEV_DB_ID=$(get_or_create_database "${DB_NAME}-dev" "dev") || {
           echo "::error::Failed to provision dev database"
           exit 1
         }
@@ -369,7 +369,7 @@ runs:
 
         # Get or create qa database
         echo "Starting qa database provisioning..."
-        QA_DB_ID=$(get_or_create_database "${DATABASE_NAME}-qa" "qa") || {
+        QA_DB_ID=$(get_or_create_database "${DB_NAME}-qa" "qa") || {
           echo "::error::Failed to provision qa database"
           exit 1
         }
@@ -377,7 +377,7 @@ runs:
 
         # Get or create prod database
         echo "Starting prod database provisioning..."
-        PROD_DB_ID=$(get_or_create_database "${DATABASE_NAME}-prod" "prod") || {
+        PROD_DB_ID=$(get_or_create_database "${DB_NAME}-prod" "prod") || {
           echo "::error::Failed to provision prod database"
           exit 1
         }
@@ -388,12 +388,14 @@ runs:
 
         # Replace tokens in wrangler.jsonc
         if [ "$(uname)" = "Darwin" ]; then
-          sed -i '' "s|{{DATABASE_NAME}}|${DATABASE_NAME}|g" wrangler.jsonc
+          sed -i '' "s|{{DB_NAME}}|${DB_NAME}|g" wrangler.jsonc
+          sed -i '' "s|{{DB_NAME}}|${DB_NAME}|g" wrangler.jsonc
           sed -i '' "s|{{DEV_DB_ID}}|${DEV_DB_ID}|g" wrangler.jsonc
           sed -i '' "s|{{QA_DB_ID}}|${QA_DB_ID}|g" wrangler.jsonc
           sed -i '' "s|{{PROD_DB_ID}}|${PROD_DB_ID}|g" wrangler.jsonc
         else
-          sed -i "s|{{DATABASE_NAME}}|${DATABASE_NAME}|g" wrangler.jsonc
+          sed -i "s|{{DB_NAME}}|${DB_NAME}|g" wrangler.jsonc
+          sed -i "s|{{DB_NAME}}|${DB_NAME}|g" wrangler.jsonc
           sed -i "s|{{DEV_DB_ID}}|${DEV_DB_ID}|g" wrangler.jsonc
           sed -i "s|{{QA_DB_ID}}|${QA_DB_ID}|g" wrangler.jsonc
           sed -i "s|{{PROD_DB_ID}}|${PROD_DB_ID}|g" wrangler.jsonc
@@ -405,9 +407,9 @@ runs:
         echo "D1 DATABASES CONFIGURED SUCCESSFULLY"
         echo "=========================================="
         echo "The following databases are bound in wrangler.jsonc:"
-        echo "  Dev:  ${DATABASE_NAME}-dev (${DEV_DB_ID})"
-        echo "  QA:   ${DATABASE_NAME}-qa (${QA_DB_ID})"
-        echo "  Prod: ${DATABASE_NAME}-prod (${PROD_DB_ID})"
+        echo "  Dev:  ${DB_NAME}-dev (${DEV_DB_ID})"
+        echo "  QA:   ${DB_NAME}-qa (${QA_DB_ID})"
+        echo "  Prod: ${DB_NAME}-prod (${PROD_DB_ID})"
         echo ""
         echo "Note: Databases were either found existing or created as needed."
         echo ""
@@ -924,6 +926,7 @@ runs:
         SOURCE_REPO: ${{ inputs.source_repo }}
         TARGET_ORG: ${{ inputs.target_org }}
         APP_NAME: ${{ inputs.app_name }}
+        DB_NAME: ${{ inputs.database_name }}
         SENTRY_PROJECT: ${{ inputs.sentry_project }}
         SENTRY_DSN: ${{ inputs.sentry_dsn }}
       run: |
@@ -937,6 +940,14 @@ runs:
         fi
 
         gh variable set APP_NAME --repo "${OWNER}/${APP_NAME}" --body "${APP_NAME}"
+
+        # Set DB_NAME if provided (for core-template)
+        if [ -n "${DB_NAME}" ]; then
+          gh variable set DB_NAME --repo "${OWNER}/${APP_NAME}" --body "${DB_NAME}"
+          echo "Set DB_NAME variable: ${DB_NAME}"
+        else
+          echo "DB_NAME not provided, skipping"
+        fi
 
         # Set SENTRY_PROJECT (default to APP_NAME if not provided)
         SENTRY_PROJECT_VALUE="${SENTRY_PROJECT:-${APP_NAME}}"

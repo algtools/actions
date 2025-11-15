@@ -5,8 +5,8 @@ echo "Running pre-commit checks..."
 # Run lint-staged for format checks and actionlint on staged files
 npx lint-staged
 
-# Check if any workflow files are staged
-STAGED_WORKFLOWS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(yml|yaml)$' | grep -E '\.github/workflows/|\.github/actions/' || true)
+# Check if any workflow files are staged (exclude action files - actionlint doesn't validate them)
+STAGED_WORKFLOWS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(yml|yaml)$' | grep -E '\.github/workflows/' || true)
 
 # Run actionlint on all workflow files if any are staged (to catch cross-workflow dependencies)
 # lint-staged already validated staged files, but we validate all to catch dependencies

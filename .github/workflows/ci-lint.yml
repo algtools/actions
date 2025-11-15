@@ -33,3 +33,6 @@ jobs:
           reporter: github-check
           level: error
           fail_level: error
+          # Only check workflow files - actionlint doesn't validate action.yml files
+          # The reviewdog action will use actionlint's default behavior which only checks .github/workflows/
+          # If it checks all files, the actionlint.yaml config will ignore errors from action files
