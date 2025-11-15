@@ -1,3 +1,10 @@
+## [1.27.4](https://github.com/algtools/actions/compare/v1.27.3...v1.27.4) (2025-11-15)
+
+
+### Bug Fixes
+
+* update database name variable references in provisioning action ([dc49d2c](https://github.com/algtools/actions/commit/dc49d2c92ffc56ee99d4f37fb2ad844fa08dbf48))
+
 ## [1.27.3](https://github.com/algtools/actions/compare/v1.27.2...v1.27.3) (2025-11-15)
 
 
