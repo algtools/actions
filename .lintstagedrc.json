@@ -1,4 +1,6 @@
 {
+  "*.{json,md}": ["prettier --check"],
   "*.{yml,yaml}": ["prettier --check"],
-  "*.{json,md}": ["prettier --check"]
+  ".github/workflows/**/*.{yml,yaml}": ["prettier --check", "sh scripts/actionlint-check.sh"],
+  ".github/actions/**/*.{yml,yaml}": ["prettier --check", "sh scripts/actionlint-check.sh"]
 }

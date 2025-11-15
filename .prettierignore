@@ -31,3 +31,4 @@ Thumbs.db
 # Temp
 *.tmp
 .cache/
+.lintstagedrc.json

@@ -114,10 +114,12 @@ jobs:
 
       - name: Create summary
         run: |
-          echo "## Documentation Sync Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Template**: ${{ inputs.template_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version**: ${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Source**: ${{ inputs.docs_source_path }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Documentation has been synced to template-docs repository." >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Documentation Sync Complete"
+            echo ""
+            echo "- **Template**: ${{ inputs.template_name }}"
+            echo "- **Version**: ${{ inputs.version }}"
+            echo "- **Source**: ${{ inputs.docs_source_path }}"
+            echo ""
+            echo "Documentation has been synced to template-docs repository."
+          } >> "$GITHUB_STEP_SUMMARY"

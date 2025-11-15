@@ -516,7 +516,7 @@ jobs:
           if [ -z "${{ secrets.chromatic_project_token }}" ]; then
             echo "⚠️  Chromatic project token not provided - Chromatic upload will be skipped"
             echo "To enable Chromatic uploads, set the CHROMATIC_PROJECT_TOKEN secret"
-            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "::endgroup::"
             exit 0
           fi
@@ -527,7 +527,7 @@ jobs:
           fi
 
           echo "✓ Chromatic configuration validated"
-          echo "skip=false" >> $GITHUB_OUTPUT
+          echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "::endgroup::"
 
       - name: Upload to Chromatic
