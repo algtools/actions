@@ -1,3 +1,10 @@
+## [1.27.5](https://github.com/algtools/actions/compare/v1.27.4...v1.27.5) (2025-11-16)
+
+
+### Bug Fixes
+
+* update template-docs repository reference and improve error handling in workflows ([8bad54f](https://github.com/algtools/actions/commit/8bad54fa5158df360bf33ed7566877dc4398e0f7))
+
 ## [1.27.4](https://github.com/algtools/actions/compare/v1.27.3...v1.27.4) (2025-11-15)
 
 
