@@ -66,7 +66,7 @@ jobs:
       - name: Checkout template-docs repository
         uses: actions/checkout@v4
         with:
-          repository: ${{ inputs.template_docs_repo || 'algtools/algtools' }}
+          repository: ${{ inputs.template_docs_repo || 'algtools/template-docs' }}
           path: template-docs
           token: ${{ secrets.GITHUB_TOKEN }}
 

@@ -127,6 +127,7 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     if: github.ref_name == 'main' || github.ref_name == 'qa'
+    continue-on-error: true
     steps:
       - name: Checkout template repository
         uses: actions/checkout@v4
@@ -135,27 +136,45 @@ jobs:
           token: ${{ secrets.gh_token }}
 
       - name: Checkout template-docs repository
+        id: checkout-docs
+        continue-on-error: true
         uses: actions/checkout@v4
         with:
-          repository: algtools/algtools
+          repository: algtools/template-docs
           path: template-docs
           token: ${{ secrets.gh_token }}
 
+      - name: Check if template-docs checkout succeeded
+        if: steps.checkout-docs.outcome != 'success'
+        run: |
+          echo "⚠️ Warning: Could not checkout template-docs repository (algtools/template-docs)"
+          echo "This may be because:"
+          echo "  - The repository doesn't exist"
+          echo "  - The token doesn't have access to it"
+          echo "  - The repository is private and needs different permissions"
+          echo ""
+          echo "Skipping documentation sync. Release will continue."
+          exit 0
+
       - name: Setup Node.js
+        if: steps.checkout-docs.outcome == 'success'
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       - name: Setup pnpm
+        if: steps.checkout-docs.outcome == 'success'
         uses: pnpm/action-setup@v4
         with:
           version: 9
 
       - name: Install dependencies
+        if: steps.checkout-docs.outcome == 'success'
         working-directory: template-docs
         run: pnpm install --frozen-lockfile
 
       - name: Sync documentation
+        if: steps.checkout-docs.outcome == 'success'
         working-directory: template-docs
         run: |
           pnpm sync-docs \
@@ -164,6 +183,7 @@ jobs:
             "../template-repo/${{ inputs.working_directory }}/docs"
 
       - name: Commit changes
+        if: steps.checkout-docs.outcome == 'success'
         working-directory: template-docs
         run: |
           git config user.name "github-actions[bot]"
