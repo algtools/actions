@@ -1,3 +1,10 @@
+## [1.27.7](https://github.com/algtools/actions/compare/v1.27.6...v1.27.7) (2025-11-18)
+
+
+### Bug Fixes
+
+* new pr naming convention for update template action ([5145a71](https://github.com/algtools/actions/commit/5145a714c3844f54155e4ab78f7fe38480a3ebd7))
+
 ## [1.27.6](https://github.com/algtools/actions/compare/v1.27.5...v1.27.6) (2025-11-18)
 
 
