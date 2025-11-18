@@ -704,6 +704,23 @@ runs:
           exit 0
         }
 
+    - name: Format wrangler.jsonc
+      if: always()
+      shell: bash
+      working-directory: target-repo
+      run: |
+        set -euo pipefail
+
+        if [ -f "wrangler.jsonc" ]; then
+          echo "Formatting wrangler.jsonc with Prettier..."
+          # Try pnpm exec first (if dependencies are installed), fallback to npx
+          (pnpm exec prettier --write wrangler.jsonc 2>/dev/null || npx prettier --write wrangler.jsonc) || {
+            echo "Warning: Prettier formatting failed for wrangler.jsonc"
+            exit 0
+          }
+          echo "✓ wrangler.jsonc formatted"
+        fi
+
     - name: Check for changes
       id: check-changes
       shell: bash
