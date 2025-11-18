@@ -122,7 +122,7 @@ Updates an already provisioned app with the latest or specific template version 
 - `target_repo` (required): Target repository to update (e.g., 'owner/app-name')
 - `version` (optional): Template release tag (default: "latest")
 - `base_branch` (optional): Base branch to create PR against (default: "main")
-- `branch_name` (optional): Name for the update branch (default: update-template-{version})
+- `branch_name` (optional): Name for the update branch (default: algtools/{template_name}-{version}, e.g., algtools/web-template-1-16-4)
 - `pr_title` (optional): Title for the pull request
 - `pr_body` (optional): Body for the pull request
 - `github_token` (required): GitHub token with repo permissions
@@ -702,7 +702,7 @@ jobs:
 
 - `version` (optional): Template release tag (default: "latest")
 - `base_branch` (optional): Base branch to create PR against (default: "main")
-- `branch_name` (optional): Name for the update branch (default: update-template-{version})
+- `branch_name` (optional): Name for the update branch (default: algtools/{template_name}-{version}, e.g., algtools/web-template-1-16-4)
 - `pr_title` (optional): Title for the pull request
 - `pr_body` (optional): Body for the pull request
 

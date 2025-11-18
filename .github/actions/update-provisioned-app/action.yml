@@ -17,7 +17,7 @@ inputs:
     required: false
     default: "main"
   branch_name:
-    description: "Name for the update branch (default: update-template-{version})"
+    description: "Name for the update branch (default: algtools/{template_name}-{version}, e.g., algtools/web-template-1-16-4)"
     required: false
     default: ""
   pr_title:
@@ -257,14 +257,13 @@ runs:
           # Extract source org from SOURCE_REPO (e.g., "algtools" from "algtools/web-template")
           SOURCE_ORG=$(echo "${SOURCE_REPO}" | cut -d'/' -f1)
 
-          # Extract repo name and template type (e.g., "web" from "algtools/web-template")
+          # Extract repo name (e.g., "web-template" from "algtools/web-template")
           REPO_NAME=$(echo "${SOURCE_REPO}" | cut -d'/' -f2)
-          TEMPLATE_TYPE=$(echo "${REPO_NAME}" | sed 's/-template$//')
 
-          # Default: {org}-update-{template-type}-template-{version}
-          # Note: Using dash instead of slash to avoid issues with branch naming
+          # Format: {org}/{template_name}-{version}
+          # Example: algtools/web-template-1-16-4
           VERSION_SLUG=$(echo "${RELEASE_TAG}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
-          BRANCH_NAME="${SOURCE_ORG}-update-${TEMPLATE_TYPE}-template-${VERSION_SLUG}"
+          BRANCH_NAME="${SOURCE_ORG}/${REPO_NAME}-${VERSION_SLUG}"
         fi
 
         echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
