@@ -1,3 +1,10 @@
+## [1.27.6](https://github.com/algtools/actions/compare/v1.27.5...v1.27.6) (2025-11-18)
+
+
+### Bug Fixes
+
+* add formatting step for wrangler.jsonc  in update-provisioned-app action ([626b579](https://github.com/algtools/actions/commit/626b579c778ed2687c184eedcd459c007113f1da))
+
 ## [1.27.5](https://github.com/algtools/actions/compare/v1.27.4...v1.27.5) (2025-11-16)
 
 
