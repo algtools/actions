@@ -1,3 +1,10 @@
+## [1.29.2](https://github.com/algtools/actions/compare/v1.29.1...v1.29.2) (2025-11-20)
+
+
+### Bug Fixes
+
+* streamline branch creation in provision-template action ([bed1e73](https://github.com/algtools/actions/commit/bed1e73705f0a611bc5555e93617ff7a7e1989ff))
+
 ## [1.29.1](https://github.com/algtools/actions/compare/v1.29.0...v1.29.1) (2025-11-20)
 
 
