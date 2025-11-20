@@ -808,6 +808,13 @@ runs:
           git status
           exit 1
         else
+          # Extract owner for workflow triggering
+          if [ -n "${TARGET_ORG}" ]; then
+            OWNER="${TARGET_ORG}"
+          else
+            IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+          fi
+
           # Show what we're committing
           echo "Files included in commit 2 (workflows and source code):"
           git diff --staged --name-only | head -20
@@ -829,8 +836,8 @@ runs:
 
           # Wait for GitHub to process the push and register workflow files
           echo ""
-          echo "Waiting for GitHub to process workflow files..."
-          sleep 10
+          echo "Waiting for GitHub to process and register workflow files..."
+          sleep 30
           echo "✓ Wait complete - workflows should now be registered"
 
           # Create qa branch from main and push
@@ -838,12 +845,22 @@ runs:
           echo "Creating qa branch from main..."
           git checkout -b qa
           git push -u origin qa
-          echo "✓ QA branch created from main and pushed (will trigger release-app.yml and deploy-qa.yml)"
+          echo "✓ QA branch created from main and pushed"
+
+          # Manually trigger deploy-qa.yml workflow
+          echo ""
+          echo "Manually triggering deploy-qa.yml workflow..."
+          export GH_TOKEN="${ADMIN_TOKEN}"
+          if gh workflow run deploy-qa.yml --repo "${OWNER}/${APP_NAME}" --ref qa 2>&1; then
+            echo "✓ deploy-qa.yml workflow triggered successfully"
+          else
+            echo "⚠️  Warning: Failed to trigger deploy-qa.yml (it may trigger automatically)"
+          fi
 
           # Wait for GitHub to process qa branch push
           echo ""
-          echo "Waiting for GitHub to process qa branch..."
-          sleep 10
+          echo "Waiting for GitHub to process qa branch and workflows..."
+          sleep 30
           echo "✓ Wait complete - ready to create dev branch"
 
           # Create dev branch from qa and push
@@ -851,7 +868,16 @@ runs:
           echo "Creating dev branch from qa..."
           git checkout -b dev
           git push -u origin dev
-          echo "✓ Dev branch created from qa and pushed (will trigger deploy-dev.yml)"
+          echo "✓ Dev branch created from qa and pushed"
+
+          # Manually trigger deploy-dev.yml workflow
+          echo ""
+          echo "Manually triggering deploy-dev.yml workflow..."
+          if gh workflow run deploy-dev.yml --repo "${OWNER}/${APP_NAME}" --ref dev 2>&1; then
+            echo "✓ deploy-dev.yml workflow triggered successfully"
+          else
+            echo "⚠️  Warning: Failed to trigger deploy-dev.yml (it may trigger automatically)"
+          fi
 
           echo ""
           echo "✅ Workflows and source code deployed to all branches!"
@@ -861,10 +887,10 @@ runs:
           echo "  - qa:   created from main"
           echo "  - dev:  created from qa"
           echo ""
-          echo "Expected workflow triggers:"
-          echo "  - main: release-app.yml → creates v1.0.0 → triggers deploy-prod.yml"
-          echo "  - qa:   release-app.yml → creates v1.0.0-rc.1 → triggers deploy-qa.yml"
-          echo "  - dev:  deploy-dev.yml → deploys directly (no versioning)"
+          echo "Workflow triggers:"
+          echo "  - main: release-app.yml (auto) → deploy-prod.yml (auto)"
+          echo "  - qa:   release-app.yml (auto) + deploy-qa.yml (manual trigger)"
+          echo "  - dev:  deploy-dev.yml (manual trigger)"
         fi
 
     - name: Configure repository ruleset
@@ -921,293 +947,6 @@ runs:
             exit 1
           fi
         fi
-
-    - name: Fallback workflow trigger (if needed)
-      shell: bash
-      env:
-        GH_TOKEN: ${{ inputs.admin_token }}
-        SOURCE_REPO: ${{ inputs.source_repo }}
-        TARGET_ORG: ${{ inputs.target_org }}
-        APP_NAME: ${{ inputs.app_name }}
-      run: |
-        set -euo pipefail
-
-        # Extract owner - use target_org if provided, otherwise from source_repo
-        if [ -n "${TARGET_ORG}" ]; then
-          OWNER="${TARGET_ORG}"
-        else
-          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
-        fi
-        TARGET_REPO="${OWNER}/${APP_NAME}"
-
-        echo "=========================================="
-        echo "SMART WORKFLOW FALLBACK CHECK"
-        echo "=========================================="
-        echo "Target repository: ${TARGET_REPO}"
-        echo ""
-        echo "Workflows should have triggered automatically from commit 2."
-        echo "Checking if manual trigger is needed as a fallback..."
-        echo ""
-
-        # Wait longer for GitHub to register workflows and start them
-        echo "Waiting 30 seconds for GitHub to:"
-        echo "  - Index workflow files"
-        echo "  - Process push events"
-        echo "  - Start workflows automatically"
-        echo ""
-        sleep 30
-
-        # Check if workflows are already running
-        echo "Checking for active workflow runs..."
-        WORKFLOW_COUNT=$(gh run list \
-          --repo "${TARGET_REPO}" \
-          --limit 20 \
-          --json status,conclusion,workflowName,createdAt \
-          --jq '[.[] | select(.status == "in_progress" or .status == "queued" or .status == "waiting")] | length' \
-          2>&1 || echo "0")
-
-        echo "Active/queued workflows found: ${WORKFLOW_COUNT}"
-
-        if [ "${WORKFLOW_COUNT}" -gt 0 ]; then
-          echo ""
-          echo "✅ SUCCESS: Workflows are already running!"
-          echo "   ${WORKFLOW_COUNT} workflow(s) detected in progress/queued state"
-          echo "   Skipping manual trigger (not needed)"
-          echo ""
-          echo "   View running workflows:"
-          echo "   https://github.com/${TARGET_REPO}/actions"
-          echo ""
-          echo "=========================================="
-          exit 0
-        fi
-
-        # If no workflows running, check if any completed recently (within last 2 minutes)
-        RECENT_COUNT=$(gh run list \
-          --repo "${TARGET_REPO}" \
-          --limit 20 \
-          --json status,conclusion,createdAt \
-          --jq '[.[] | select(.createdAt | fromdateiso8601 > (now - 120))] | length' \
-          2>&1 || echo "0")
-
-        if [ "${RECENT_COUNT}" -gt 0 ]; then
-          echo ""
-          echo "✅ SUCCESS: Workflows already triggered!"
-          echo "   ${RECENT_COUNT} workflow(s) detected from recent commits"
-          echo "   Skipping manual trigger (not needed)"
-          echo ""
-          echo "   View workflows:"
-          echo "   https://github.com/${TARGET_REPO}/actions"
-          echo ""
-          echo "=========================================="
-          exit 0
-        fi
-
-        # No workflows detected - use manual trigger as fallback
-        echo ""
-        echo "⚠️  No workflows detected yet"
-        echo "   Using manual trigger as fallback to ensure workflows run"
-        echo ""
-        echo "=========================================="
-        echo "MANUAL WORKFLOW TRIGGER (FALLBACK)"
-        echo "=========================================="
-        echo ""
-
-        # Track success/failure
-        TRIGGERED_COUNT=0
-        FAILED_COUNT=0
-
-        # Trigger release workflow on main branch
-        echo "[1/3] Triggering release-app.yml on main..."
-        if gh workflow run release-app.yml \
-          --repo "${TARGET_REPO}" \
-          --ref main 2>&1; then
-          echo "      ✓ Triggered successfully"
-          TRIGGERED_COUNT=$((TRIGGERED_COUNT + 1))
-        else
-          echo "      ✗ Failed to trigger (may not exist or branch not ready)"
-          FAILED_COUNT=$((FAILED_COUNT + 1))
-        fi
-        sleep 3
-
-        # Trigger release workflow on qa branch
-        echo "[2/3] Triggering release-app.yml on qa..."
-        if gh workflow run release-app.yml \
-          --repo "${TARGET_REPO}" \
-          --ref qa 2>&1; then
-          echo "      ✓ Triggered successfully"
-          TRIGGERED_COUNT=$((TRIGGERED_COUNT + 1))
-        else
-          echo "      ✗ Failed to trigger (may not exist or branch not ready)"
-          FAILED_COUNT=$((FAILED_COUNT + 1))
-        fi
-        sleep 3
-
-        # Trigger deploy workflow on dev branch
-        echo "[3/3] Triggering deploy-dev.yml on dev..."
-        if gh workflow run deploy-dev.yml \
-          --repo "${TARGET_REPO}" \
-          --ref dev 2>&1; then
-          echo "      ✓ Triggered successfully"
-          TRIGGERED_COUNT=$((TRIGGERED_COUNT + 1))
-        else
-          echo "      ✗ Failed to trigger (may not exist or branch not ready)"
-          FAILED_COUNT=$((FAILED_COUNT + 1))
-        fi
-
-        echo ""
-        echo "Fallback trigger summary:"
-        echo "  - Successfully triggered: ${TRIGGERED_COUNT}"
-        echo "  - Failed: ${FAILED_COUNT}"
-        echo ""
-
-        if [ "${TRIGGERED_COUNT}" -gt 0 ]; then
-          echo "✅ Fallback triggers completed"
-          echo "   View workflows: https://github.com/${TARGET_REPO}/actions"
-        else
-          echo "⚠️  All fallback triggers failed"
-          echo "   This may indicate:"
-          echo "   - Actions are not enabled (check organization settings)"
-          echo "   - Workflow files are in a non-standard location"
-          echo ""
-          echo "   Manual action may be required:"
-          echo "   https://github.com/${TARGET_REPO}/settings/actions"
-        fi
-
-        echo ""
-        echo "=========================================="
-
-    - name: Enable GitHub Actions
-      shell: bash
-      env:
-        GH_TOKEN: ${{ inputs.admin_token }}
-        SOURCE_REPO: ${{ inputs.source_repo }}
-        TARGET_ORG: ${{ inputs.target_org }}
-        APP_NAME: ${{ inputs.app_name }}
-      run: |
-        set -euo pipefail
-
-        # Extract owner - use target_org if provided, otherwise from source_repo
-        if [ -n "${TARGET_ORG}" ]; then
-          OWNER="${TARGET_ORG}"
-        else
-          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
-        fi
-        TARGET_REPO="${OWNER}/${APP_NAME}"
-
-        echo "🔧 Enabling GitHub Actions for ${TARGET_REPO}..."
-
-        # Wait for repository to be fully initialized
-        # GitHub's API is eventually consistent, so we need a longer wait
-        echo "  ⏳ Waiting for repository initialization..."
-        sleep 8
-
-        # Check current Actions status with retry
-        echo "  🔍 Checking current Actions status..."
-        RETRY_COUNT=0
-        MAX_RETRIES=3
-
-        while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-          CURRENT_STATUS=$(gh api "repos/${TARGET_REPO}/actions/permissions" --jq '.enabled' 2>/dev/null || echo "unknown")
-
-          if [ "${CURRENT_STATUS}" != "unknown" ]; then
-            echo "  📊 Current Actions status: ${CURRENT_STATUS}"
-            break
-          fi
-
-          RETRY_COUNT=$((RETRY_COUNT + 1))
-          if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-            echo "  ⏳ Repository not fully ready, waiting... (attempt $RETRY_COUNT/$MAX_RETRIES)"
-            sleep 3
-          fi
-        done
-
-        if [ "${CURRENT_STATUS}" = "true" ]; then
-          echo "  ✅ Actions already enabled!"
-          exit 0
-        fi
-
-        # Method 1: Try standard API with JSON body
-        echo "  🔧 Method 1: Enabling via standard API..."
-        if gh api "repos/${TARGET_REPO}/actions/permissions" \
-          --method PUT \
-          -H "Accept: application/vnd.github+json" \
-          -H "X-GitHub-Api-Version: 2022-11-28" \
-          --input - <<< '{"enabled":true,"allowed_actions":"all"}' 2>&1; then
-
-          # Verify it actually worked
-          sleep 2
-          VERIFY_STATUS=$(gh api "repos/${TARGET_REPO}/actions/permissions" --jq '.enabled' 2>/dev/null || echo "false")
-          if [ "${VERIFY_STATUS}" = "true" ]; then
-            echo "  ✅ Actions enabled and verified via Method 1"
-            exit 0
-          else
-            echo "  ⚠️  Method 1 API call succeeded but verification failed"
-          fi
-        fi
-
-        # Method 2: Try with individual fields
-        echo "  🔧 Method 2: Enabling via field-based API..."
-        if gh api "repos/${TARGET_REPO}/actions/permissions" \
-          --method PUT \
-          --field enabled=true \
-          --field allowed_actions=all 2>&1; then
-
-          # Verify it actually worked
-          sleep 2
-          VERIFY_STATUS=$(gh api "repos/${TARGET_REPO}/actions/permissions" --jq '.enabled' 2>/dev/null || echo "false")
-          if [ "${VERIFY_STATUS}" = "true" ]; then
-            echo "  ✅ Actions enabled and verified via Method 2"
-            exit 0
-          else
-            echo "  ⚠️  Method 2 API call succeeded but verification failed"
-          fi
-        fi
-
-        # Method 3: Try enabling organization-level access first
-        echo "  🔧 Method 3: Checking organization settings..."
-        if gh api "orgs/${OWNER}/actions/permissions/repositories/${TARGET_REPO##*/}" \
-          --method PUT 2>&1; then
-          echo "  ✅ Granted org-level Actions access"
-
-          # Now try enabling again
-          if gh api "repos/${TARGET_REPO}/actions/permissions" \
-            --method PUT \
-            --input - <<< '{"enabled":true,"allowed_actions":"all"}' 2>&1; then
-
-            # Verify it actually worked
-            sleep 2
-            VERIFY_STATUS=$(gh api "repos/${TARGET_REPO}/actions/permissions" --jq '.enabled' 2>/dev/null || echo "false")
-            if [ "${VERIFY_STATUS}" = "true" ]; then
-              echo "  ✅ Actions enabled and verified after org-level access"
-              exit 0
-            else
-              echo "  ⚠️  Method 3 API call succeeded but verification failed"
-            fi
-          fi
-        fi
-
-        # If all methods fail, provide clear instructions
-        echo ""
-        echo "⚠️  =========================================="
-        echo "⚠️  MANUAL ACTION REQUIRED"
-        echo "⚠️  =========================================="
-        echo "⚠️"
-        echo "⚠️  Could not enable GitHub Actions automatically."
-        echo "⚠️  This may be due to organization-level settings."
-        echo "⚠️"
-        echo "⚠️  Please enable Actions manually:"
-        echo "⚠️  1. Go to: https://github.com/${TARGET_REPO}/settings/actions"
-        echo "⚠️  2. Under 'Actions permissions', select:"
-        echo "⚠️     - 'Allow all actions and reusable workflows'"
-        echo "⚠️  3. Click 'Save'"
-        echo "⚠️"
-        echo "⚠️  Or contact your GitHub org admin to allow Actions"
-        echo "⚠️  for this repository."
-        echo "⚠️  =========================================="
-        echo ""
-
-        # Don't fail the workflow, just warn
-        exit 0
 
     # NOTE: This step is deprecated. Workflows now trigger automatically
     # via the two-phase commit strategy above.
