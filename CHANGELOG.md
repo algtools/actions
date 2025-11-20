@@ -1,3 +1,10 @@
+# [1.29.0](https://github.com/algtools/actions/compare/v1.28.1...v1.29.0) (2025-11-20)
+
+
+### Features
+
+* add dependabot configuration update functionality to template-pack-utility ([ea9ea93](https://github.com/algtools/actions/commit/ea9ea9367121b1f71d716541c8890bc763030081))
+
 ## [1.28.1](https://github.com/algtools/actions/compare/v1.28.0...v1.28.1) (2025-11-20)
 
 
