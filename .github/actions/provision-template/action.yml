@@ -680,6 +680,100 @@ runs:
         echo ""
         echo "✅ All branches created with foundation files!"
 
+    - name: Configure repository variables
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.admin_token }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        TARGET_ORG: ${{ inputs.target_org }}
+        APP_NAME: ${{ inputs.app_name }}
+        DB_NAME: ${{ inputs.database_name }}
+        SENTRY_PROJECT: ${{ inputs.sentry_project }}
+        SENTRY_DSN: ${{ inputs.sentry_dsn }}
+      run: |
+        set -euo pipefail
+
+        # Extract owner - use target_org if provided, otherwise from source_repo
+        if [ -n "${TARGET_ORG}" ]; then
+          OWNER="${TARGET_ORG}"
+        else
+          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        fi
+
+        echo "=========================================="
+        echo "CONFIGURING REPOSITORY VARIABLES"
+        echo "=========================================="
+        echo "Setting variables BEFORE workflows are triggered"
+        echo "This ensures workflows have access to required variables like DB_NAME"
+        echo ""
+
+        gh variable set APP_NAME --repo "${OWNER}/${APP_NAME}" --body "${APP_NAME}"
+        echo "✓ Set APP_NAME variable: ${APP_NAME}"
+
+        # Set DB_NAME if provided (for core-template)
+        if [ -n "${DB_NAME}" ]; then
+          gh variable set DB_NAME --repo "${OWNER}/${APP_NAME}" --body "${DB_NAME}"
+          echo "✓ Set DB_NAME variable: ${DB_NAME}"
+        else
+          echo "  DB_NAME not provided, skipping"
+        fi
+
+        # Set SENTRY_PROJECT (default to APP_NAME if not provided)
+        SENTRY_PROJECT_VALUE="${SENTRY_PROJECT:-${APP_NAME}}"
+        gh variable set SENTRY_PROJECT --repo "${OWNER}/${APP_NAME}" --body "${SENTRY_PROJECT_VALUE}"
+
+        if [ -n "${SENTRY_PROJECT:-}" ]; then
+          echo "✓ Set SENTRY_PROJECT variable: ${SENTRY_PROJECT_VALUE}"
+        else
+          echo "✓ Set SENTRY_PROJECT variable (defaulted to APP_NAME): ${SENTRY_PROJECT_VALUE}"
+        fi
+
+        # Set SENTRY_DSN if provided
+        if [ -n "${SENTRY_DSN:-}" ]; then
+          gh variable set SENTRY_DSN --repo "${OWNER}/${APP_NAME}" --body "${SENTRY_DSN}"
+          echo "✓ Set SENTRY_DSN repository variable"
+        else
+          echo "  SENTRY_DSN not provided, skipping"
+        fi
+
+        echo ""
+        echo "✅ Repository variables configured successfully!"
+        echo "=========================================="
+
+    - name: Configure repository secrets
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.admin_token }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        TARGET_ORG: ${{ inputs.target_org }}
+        APP_NAME: ${{ inputs.app_name }}
+        CHROMATIC_PROJECT_TOKEN: ${{ inputs.chromatic_project_token }}
+      run: |
+        set -euo pipefail
+
+        # Extract owner - use target_org if provided, otherwise from source_repo
+        if [ -n "${TARGET_ORG}" ]; then
+          OWNER="${TARGET_ORG}"
+        else
+          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
+        fi
+
+        echo "=========================================="
+        echo "CONFIGURING REPOSITORY SECRETS"
+        echo "=========================================="
+
+        # Set CHROMATIC_PROJECT_TOKEN as repository secret if provided
+        if [ -n "${CHROMATIC_PROJECT_TOKEN:-}" ]; then
+          echo "${CHROMATIC_PROJECT_TOKEN}" | gh secret set CHROMATIC_PROJECT_TOKEN --repo "${OWNER}/${APP_NAME}"
+          echo "✓ Set CHROMATIC_PROJECT_TOKEN repository secret"
+        else
+          echo "  CHROMATIC_PROJECT_TOKEN not provided, skipping"
+        fi
+
+        echo ""
+        echo "✅ Repository secrets configured successfully!"
+        echo "=========================================="
+
     - name: Wait before pushing workflows and code
       shell: bash
       run: |
@@ -1006,80 +1100,6 @@ runs:
         echo ""
         echo "=========================================="
 
-    - name: Configure repository variables
-      shell: bash
-      env:
-        GH_TOKEN: ${{ inputs.admin_token }}
-        SOURCE_REPO: ${{ inputs.source_repo }}
-        TARGET_ORG: ${{ inputs.target_org }}
-        APP_NAME: ${{ inputs.app_name }}
-        DB_NAME: ${{ inputs.database_name }}
-        SENTRY_PROJECT: ${{ inputs.sentry_project }}
-        SENTRY_DSN: ${{ inputs.sentry_dsn }}
-      run: |
-        set -euo pipefail
-
-        # Extract owner - use target_org if provided, otherwise from source_repo
-        if [ -n "${TARGET_ORG}" ]; then
-          OWNER="${TARGET_ORG}"
-        else
-          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
-        fi
-
-        gh variable set APP_NAME --repo "${OWNER}/${APP_NAME}" --body "${APP_NAME}"
-
-        # Set DB_NAME if provided (for core-template)
-        if [ -n "${DB_NAME}" ]; then
-          gh variable set DB_NAME --repo "${OWNER}/${APP_NAME}" --body "${DB_NAME}"
-          echo "Set DB_NAME variable: ${DB_NAME}"
-        else
-          echo "DB_NAME not provided, skipping"
-        fi
-
-        # Set SENTRY_PROJECT (default to APP_NAME if not provided)
-        SENTRY_PROJECT_VALUE="${SENTRY_PROJECT:-${APP_NAME}}"
-        gh variable set SENTRY_PROJECT --repo "${OWNER}/${APP_NAME}" --body "${SENTRY_PROJECT_VALUE}"
-
-        if [ -n "${SENTRY_PROJECT:-}" ]; then
-          echo "Set SENTRY_PROJECT variable: ${SENTRY_PROJECT_VALUE}"
-        else
-          echo "SENTRY_PROJECT not provided, defaulting to APP_NAME: ${SENTRY_PROJECT_VALUE}"
-        fi
-
-        # Set SENTRY_DSN if provided
-        if [ -n "${SENTRY_DSN:-}" ]; then
-          gh variable set SENTRY_DSN --repo "${OWNER}/${APP_NAME}" --body "${SENTRY_DSN}"
-          echo "Set SENTRY_DSN repository variable"
-        else
-          echo "SENTRY_DSN not provided, skipping"
-        fi
-
-    - name: Configure repository secrets
-      shell: bash
-      env:
-        GH_TOKEN: ${{ inputs.admin_token }}
-        SOURCE_REPO: ${{ inputs.source_repo }}
-        TARGET_ORG: ${{ inputs.target_org }}
-        APP_NAME: ${{ inputs.app_name }}
-        CHROMATIC_PROJECT_TOKEN: ${{ inputs.chromatic_project_token }}
-      run: |
-        set -euo pipefail
-
-        # Extract owner - use target_org if provided, otherwise from source_repo
-        if [ -n "${TARGET_ORG}" ]; then
-          OWNER="${TARGET_ORG}"
-        else
-          IFS='/' read -r OWNER _ <<< "${SOURCE_REPO}"
-        fi
-
-        # Set CHROMATIC_PROJECT_TOKEN as repository secret if provided
-        if [ -n "${CHROMATIC_PROJECT_TOKEN:-}" ]; then
-          echo "${CHROMATIC_PROJECT_TOKEN}" | gh secret set CHROMATIC_PROJECT_TOKEN --repo "${OWNER}/${APP_NAME}"
-          echo "Set CHROMATIC_PROJECT_TOKEN repository secret"
-        else
-          echo "CHROMATIC_PROJECT_TOKEN not provided, skipping"
-        fi
-
     - name: Enable GitHub Actions
       shell: bash
       env:
@@ -1315,7 +1335,9 @@ runs:
           echo "The provision workflow used a clean 2-commit strategy:"
           echo "1. ✅ **Commit 1**: Foundation files (config, docs, dependencies) with \`[skip ci]\`"
           echo "   - No workflows triggered (by design)"
-          echo "2. ✅ **Commit 2**: Workflows and source code (triggers CI/CD)"
+          echo "2. ✅ **Configure Variables & Secrets**: Set before workflows trigger"
+          echo "   - Ensures DB_NAME and other variables are available when workflows run"
+          echo "3. ✅ **Commit 2**: Workflows and source code (triggers CI/CD)"
           echo "   - Automatically triggers release-app.yml on main and qa"
           echo "   - Automatically triggers deploy-dev.yml on dev"
           echo ""
