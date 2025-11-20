@@ -1,3 +1,10 @@
+## [1.29.3](https://github.com/algtools/actions/compare/v1.29.2...v1.29.3) (2025-11-20)
+
+
+### Bug Fixes
+
+* extend wait times for provision-template action ([87793b0](https://github.com/algtools/actions/commit/87793b0765a004d502fedcc3c909637f35ff8280))
+
 ## [1.29.2](https://github.com/algtools/actions/compare/v1.29.1...v1.29.2) (2025-11-20)
 
 
