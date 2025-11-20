@@ -1,3 +1,10 @@
+# [1.30.0](https://github.com/algtools/actions/compare/v1.29.4...v1.30.0) (2025-11-20)
+
+
+### Features
+
+* add optional alias input to provision-template action and update package.json handling ([08005df](https://github.com/algtools/actions/commit/08005df37088e009561d3c3990edbb90a53e0d8e))
+
 ## [1.29.4](https://github.com/algtools/actions/compare/v1.29.3...v1.29.4) (2025-11-20)
 
 
