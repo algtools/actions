@@ -827,8 +827,11 @@ runs:
           git push origin main
           echo "✓ Workflows and code pushed to main (will trigger release-app.yml and deploy-prod.yml)"
 
-          # Wait for GitHub to process the push
-          sleep 5
+          # Wait for GitHub to process the push and register workflow files
+          echo ""
+          echo "Waiting for GitHub to process workflow files..."
+          sleep 10
+          echo "✓ Wait complete - workflows should now be registered"
 
           # Create qa branch from main and push
           echo ""
@@ -837,8 +840,11 @@ runs:
           git push -u origin qa
           echo "✓ QA branch created from main and pushed (will trigger release-app.yml and deploy-qa.yml)"
 
-          # Wait for GitHub to process
-          sleep 5
+          # Wait for GitHub to process qa branch push
+          echo ""
+          echo "Waiting for GitHub to process qa branch..."
+          sleep 10
+          echo "✓ Wait complete - ready to create dev branch"
 
           # Create dev branch from qa and push
           echo ""
