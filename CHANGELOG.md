@@ -1,3 +1,11 @@
+## [1.29.1](https://github.com/algtools/actions/compare/v1.29.0...v1.29.1) (2025-11-20)
+
+
+### Bug Fixes
+
+* enhance provision-template action to set variables and secrets before workflows trigger ([3ef3924](https://github.com/algtools/actions/commit/3ef392429c75a309136ab340348dd5d8cd6e2e29))
+* update template-pack-utility to use pnpm for package management ([7101375](https://github.com/algtools/actions/commit/7101375811a3083ada1c872500a4e4dfd85e686f))
+
 # [1.29.0](https://github.com/algtools/actions/compare/v1.28.1...v1.29.0) (2025-11-20)
 
 
