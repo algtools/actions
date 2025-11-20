@@ -587,16 +587,51 @@ runs:
         echo "Template version: ${RELEASE_TAG}"
         echo ""
 
-        # Stage all files first
-        git add .
+        # Add only specific files/directories for commit 1
+        # Explicitly exclude .github/workflows/, src/, and scripts/
+        echo "Staging foundation files (config, docs, dependencies)..."
+        git add README.md 2>/dev/null || true
+        git add CHANGELOG.md 2>/dev/null || true
+        git add LICENSE 2>/dev/null || true
+        git add .gitignore 2>/dev/null || true
+        git add .nvmrc 2>/dev/null || true
+        git add package.json 2>/dev/null || true
+        git add package-lock.json 2>/dev/null || true
+        git add pnpm-lock.yaml 2>/dev/null || true
+        git add yarn.lock 2>/dev/null || true
+        git add tsconfig*.json 2>/dev/null || true
+        git add *.config.* 2>/dev/null || true
+        git add wrangler.jsonc 2>/dev/null || true
+        git add wrangler.toml 2>/dev/null || true
+        git add .releaserc.json 2>/dev/null || true
+        git add commitlint.config.* 2>/dev/null || true
+        git add .prettierrc* 2>/dev/null || true
+        git add .editorconfig 2>/dev/null || true
+        git add ruleset.json 2>/dev/null || true
+        git add openapi.json 2>/dev/null || true
+        git add .github/template-updates.yml 2>/dev/null || true
+        git add .github/ISSUE_TEMPLATE/ 2>/dev/null || true
+        git add .github/PULL_REQUEST_TEMPLATE* 2>/dev/null || true
+        git add .github/*.md 2>/dev/null || true
+        git add docs/ 2>/dev/null || true
+        git add prisma/ 2>/dev/null || true
+        git add migrations/ 2>/dev/null || true
 
-        # Unstage directories that should NOT be in commit 1
-        # These will be added in commit 2 to trigger workflows
-        git reset HEAD .github/workflows/ 2>/dev/null || true
-        git reset HEAD src/ 2>/dev/null || true
-        git reset HEAD scripts/ 2>/dev/null || true
+        # Verify we staged files
+        if git diff --staged --quiet; then
+          echo "❌ ERROR: No files staged for commit 1!"
+          echo "This might indicate a problem with the template structure."
+          echo ""
+          echo "Working directory contents:"
+          ls -la
+          echo ""
+          echo "Git status:"
+          git status
+          exit 1
+        fi
 
         # Show what we're committing
+        echo ""
         echo "Files included in commit 1 (configuration and documentation):"
         git diff --staged --name-only | head -20
         FILE_COUNT=$(git diff --staged --name-only | wc -l)
@@ -679,14 +714,38 @@ runs:
         echo "This commit will trigger GitHub Actions workflows"
         echo ""
 
+        # Check what files are remaining (should be workflows, src, scripts)
+        echo "Checking for remaining files..."
+        UNTRACKED_COUNT=$(git status --porcelain | wc -l)
+        echo "Untracked/modified files: ${UNTRACKED_COUNT}"
+
+        if [ "${UNTRACKED_COUNT}" -eq 0 ]; then
+          echo "❌ ERROR: No remaining files to commit!"
+          echo "All files were included in commit 1, which should not happen."
+          echo ""
+          echo "Git status:"
+          git status
+          echo ""
+          echo "Working directory contents:"
+          ls -la
+          exit 1
+        fi
+
         # Stage all remaining files (workflows, src, scripts)
-        echo "Staging remaining template files..."
+        echo "Staging remaining template files (workflows, src, scripts)..."
         git add .
+
+        # Verify files were staged
+        STAGED_COUNT=$(git diff --staged --name-only | wc -l)
+        echo "Staged files: ${STAGED_COUNT}"
 
         # Check if there are changes to commit
         if git diff --staged --quiet; then
-          echo "ℹ️  No additional files to commit (all files were in commit 1)"
-          echo "⚠️  This is unexpected - there should be workflows and source code"
+          echo "❌ ERROR: No files were staged for commit 2!"
+          echo "This should not happen - workflows and source code should be present."
+          echo ""
+          git status
+          exit 1
         else
           # Show what we're committing
           echo "Files included in commit 2 (workflows and source code):"
