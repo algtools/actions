@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { execSync } from 'node:child_process';
 import { tokenizeTemplate } from './templateTokenize';
 import { transformTemplateToApp } from './transformTemplateToApp';
+import { updateDependabotConfig } from './updateDependabotConfig';
 
 /**
  * Format files with Prettier to ensure consistency
@@ -51,6 +52,13 @@ async function main(): Promise<void> {
     console.log('Step 1: Tokenizing template');
     console.log('='.repeat(50) + '\n');
     tokenizeTemplate(templateRoot, templateName, buildDir);
+
+    // Step 1.5: Update dependabot.yml in build directory (for provisioned apps)
+    // This adds ignore rules so provisioned apps don't get Dependabot PRs for template dependencies
+    console.log('\n' + '='.repeat(50));
+    console.log('Step 1.5: Updating dependabot.yml for provisioned apps');
+    console.log('='.repeat(50) + '\n');
+    updateDependabotConfig(templateRoot, buildDir);
 
     // Step 2: Transform template to app
     console.log('\n' + '='.repeat(50));

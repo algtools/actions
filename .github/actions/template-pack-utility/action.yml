@@ -42,6 +42,14 @@ runs:
         # Ensure action.yml is not copied (it's not needed)
         rm -f "${{ inputs.working_directory }}/.github/actions/template-pack-utility/action.yml" 2>/dev/null || true
 
+    - name: Install js-yaml for dependabot config updates
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      run: |
+        UTILITY_DIR="${{ inputs.working_directory }}/.github/actions/template-pack-utility"
+        cd "${UTILITY_DIR}"
+        npm install js-yaml@^4.1.0
+
     - name: Run template packaging
       id: pack
       shell: bash
