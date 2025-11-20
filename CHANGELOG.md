@@ -1,3 +1,10 @@
+## [1.28.1](https://github.com/algtools/actions/compare/v1.28.0...v1.28.1) (2025-11-20)
+
+
+### Bug Fixes
+
+* enhance two-phase commit strategy in provision-template action ([718aa72](https://github.com/algtools/actions/commit/718aa725e8df901800287bec4653590f13eb121e))
+
 # [1.28.0](https://github.com/algtools/actions/compare/v1.27.7...v1.28.0) (2025-11-20)
 
 
