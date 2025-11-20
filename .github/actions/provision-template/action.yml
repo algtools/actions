@@ -647,39 +647,6 @@ runs:
 
         echo "✓ Foundation files pushed to main branch with [skip ci]"
 
-    - name: Commit 1 - Create dev and qa branches
-      shell: bash
-      working-directory: template
-      env:
-        ADMIN_TOKEN: ${{ inputs.admin_token }}
-        SOURCE_REPO: ${{ inputs.source_repo }}
-        TARGET_ORG: ${{ inputs.target_org }}
-        APP_NAME: ${{ inputs.app_name }}
-      run: |
-        set -euo pipefail
-
-        echo "=========================================="
-        echo "COMMIT 1: CREATING DEV AND QA BRANCHES"
-        echo "=========================================="
-
-        # Create and push dev branch
-        echo "Creating dev branch..."
-        git checkout -b dev
-        git push -u origin dev
-        echo "✓ Dev branch created and pushed"
-
-        # Create and push qa branch
-        echo "Creating qa branch..."
-        git checkout -b qa
-        git push -u origin qa
-        echo "✓ QA branch created and pushed"
-
-        # Return to main for commit 2
-        git checkout main
-
-        echo ""
-        echo "✅ All branches created with foundation files!"
-
     - name: Configure repository variables
       shell: bash
       env:
@@ -858,32 +825,35 @@ runs:
           # Push to main - this will trigger release-app.yml
           echo "Pushing to main branch..."
           git push origin main
-          echo "✓ Workflows and code pushed to main (will trigger release-app.yml)"
+          echo "✓ Workflows and code pushed to main (will trigger release-app.yml and deploy-prod.yml)"
 
           # Wait for GitHub to process the push
           sleep 5
 
-          # Merge main to dev branch
+          # Create qa branch from main and push
           echo ""
-          echo "Merging to dev branch..."
-          git checkout dev
-          git merge main --no-edit --no-ff
-          git push origin dev
-          echo "✓ Workflows and code pushed to dev (will trigger deploy-dev.yml)"
+          echo "Creating qa branch from main..."
+          git checkout -b qa
+          git push -u origin qa
+          echo "✓ QA branch created from main and pushed (will trigger release-app.yml and deploy-qa.yml)"
 
           # Wait for GitHub to process
           sleep 5
 
-          # Merge main to qa branch
+          # Create dev branch from qa and push
           echo ""
-          echo "Merging to qa branch..."
-          git checkout qa
-          git merge main --no-edit --no-ff
-          git push origin qa
-          echo "✓ Workflows and code pushed to qa (will trigger release-app.yml)"
+          echo "Creating dev branch from qa..."
+          git checkout -b dev
+          git push -u origin dev
+          echo "✓ Dev branch created from qa and pushed (will trigger deploy-dev.yml)"
 
           echo ""
           echo "✅ Workflows and source code deployed to all branches!"
+          echo ""
+          echo "Branch structure:"
+          echo "  - main: base branch with both commits"
+          echo "  - qa:   created from main"
+          echo "  - dev:  created from qa"
           echo ""
           echo "Expected workflow triggers:"
           echo "  - main: release-app.yml → creates v1.0.0 → triggers deploy-prod.yml"
