@@ -1,3 +1,10 @@
+# [1.28.0](https://github.com/algtools/actions/compare/v1.27.7...v1.28.0) (2025-11-20)
+
+
+### Features
+
+* update provision-template action to use a two-phase commit strategy for initial setup ([eef09f3](https://github.com/algtools/actions/commit/eef09f3904602ffd0dd5e9969ef1c4e3210643db))
+
 ## [1.27.7](https://github.com/algtools/actions/compare/v1.27.6...v1.27.7) (2025-11-18)
 
 
