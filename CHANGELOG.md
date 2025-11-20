@@ -1,3 +1,10 @@
+## [1.29.4](https://github.com/algtools/actions/compare/v1.29.3...v1.29.4) (2025-11-20)
+
+
+### Bug Fixes
+
+* improve workflow triggering and owner extraction in provision-template action ([2db4ffa](https://github.com/algtools/actions/commit/2db4ffa9f1366dd8d282f76d9af446e3ccd5b7ad))
+
 ## [1.29.3](https://github.com/algtools/actions/compare/v1.29.2...v1.29.3) (2025-11-20)
 
 
