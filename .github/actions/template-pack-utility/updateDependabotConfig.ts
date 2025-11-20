@@ -43,7 +43,7 @@ function getYamlModule(): {
     // If not available, try installing it in the current directory (utility directory)
     console.log('Installing js-yaml in utility directory...');
     try {
-      execSync('npm install js-yaml@^4.1.0', {
+      execSync('pnpm add js-yaml@^4.1.0', {
         stdio: 'pipe',
       });
       // eslint-disable-next-line @typescript-eslint/no-require-imports

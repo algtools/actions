@@ -48,7 +48,11 @@ runs:
       run: |
         UTILITY_DIR="${{ inputs.working_directory }}/.github/actions/template-pack-utility"
         cd "${UTILITY_DIR}"
-        npm install js-yaml@^4.1.0
+        # Create a minimal package.json if it doesn't exist (required for pnpm)
+        if [ ! -f "package.json" ]; then
+          echo '{"name": "template-pack-utility", "version": "1.0.0"}' > package.json
+        fi
+        pnpm add js-yaml@^4.1.0
 
     - name: Run template packaging
       id: pack
