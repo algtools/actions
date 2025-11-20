@@ -98,11 +98,16 @@ function shouldExclude(filePath: string, templateRoot: string): boolean {
 }
 
 /**
- * Check if file extension is wrappable
+ * Check if file extension is wrappable or if it's a special file
  */
 function isWrappableFile(filePath: string): boolean {
   const ext = path.extname(filePath);
-  return WRAPPABLE_EXTENSIONS.includes(ext);
+  const filename = path.basename(filePath);
+
+  // Special files without extensions that should be included
+  const SPECIAL_FILES = ['LICENSE', '.gitignore', '.editorconfig', '.nvmrc'];
+
+  return WRAPPABLE_EXTENSIONS.includes(ext) || SPECIAL_FILES.includes(filename);
 }
 
 /**

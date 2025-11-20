@@ -46,6 +46,10 @@ inputs:
     description: "Cloudflare Account ID for D1 database creation (optional, core-template only)"
     required: false
     default: ""
+  alias:
+    description: "Optional alias to override the default algtools.alias value in package.json"
+    required: false
+    default: ""
 
 outputs:
   repository_url:
@@ -222,6 +226,7 @@ runs:
       working-directory: template
       env:
         APP_NAME: ${{ inputs.app_name }}
+        ALIAS: ${{ inputs.alias }}
       run: |
         set -euo pipefail
 
@@ -233,11 +238,21 @@ runs:
 
         # Update package name to repo name and version to 0.0.1
         if command -v jq &> /dev/null; then
-          jq --arg name "${APP_NAME}" --arg version "0.0.1" \
-            '.name = $name | .version = $version' \
-            "${PACKAGE_JSON}" > "${PACKAGE_JSON}.tmp" && \
-            mv "${PACKAGE_JSON}.tmp" "${PACKAGE_JSON}"
-          echo "✓ Updated package.json: name=${APP_NAME}, version=0.0.1"
+          if [ -n "${ALIAS}" ]; then
+            # Update name, version, and alias
+            jq --arg name "${APP_NAME}" --arg version "0.0.1" --arg alias "${ALIAS}" \
+              '.name = $name | .version = $version | .algtools.alias = $alias' \
+              "${PACKAGE_JSON}" > "${PACKAGE_JSON}.tmp" && \
+              mv "${PACKAGE_JSON}.tmp" "${PACKAGE_JSON}"
+            echo "✓ Updated package.json: name=${APP_NAME}, version=0.0.1, alias=${ALIAS}"
+          else
+            # Update only name and version
+            jq --arg name "${APP_NAME}" --arg version "0.0.1" \
+              '.name = $name | .version = $version' \
+              "${PACKAGE_JSON}" > "${PACKAGE_JSON}.tmp" && \
+              mv "${PACKAGE_JSON}.tmp" "${PACKAGE_JSON}"
+            echo "✓ Updated package.json: name=${APP_NAME}, version=0.0.1"
+          fi
         else
           echo "jq not available, using sed/awk fallback"
           # Fallback: use sed/awk if jq is not available
@@ -245,11 +260,24 @@ runs:
           if [ "$(uname)" = "Darwin" ]; then
             sed -i '' "s/\"name\":[[:space:]]*\"[^\"]*\"/\"name\": \"${APP_NAME}\"/" "${PACKAGE_JSON}"
             sed -i '' "s/\"version\":[[:space:]]*\"[^\"]*\"/\"version\": \"0.0.1\"/" "${PACKAGE_JSON}"
+            if [ -n "${ALIAS}" ]; then
+              # Update alias within the algtools object
+              sed -i '' "s/\"alias\":[[:space:]]*\"[^\"]*\"/\"alias\": \"${ALIAS}\"/" "${PACKAGE_JSON}"
+              echo "✓ Updated package.json: name=${APP_NAME}, version=0.0.1, alias=${ALIAS}"
+            else
+              echo "✓ Updated package.json: name=${APP_NAME}, version=0.0.1"
+            fi
           else
             sed -i "s/\"name\":[[:space:]]*\"[^\"]*\"/\"name\": \"${APP_NAME}\"/" "${PACKAGE_JSON}"
             sed -i "s/\"version\":[[:space:]]*\"[^\"]*\"/\"version\": \"0.0.1\"/" "${PACKAGE_JSON}"
+            if [ -n "${ALIAS}" ]; then
+              # Update alias within the algtools object
+              sed -i "s/\"alias\":[[:space:]]*\"[^\"]*\"/\"alias\": \"${ALIAS}\"/" "${PACKAGE_JSON}"
+              echo "✓ Updated package.json: name=${APP_NAME}, version=0.0.1, alias=${ALIAS}"
+            else
+              echo "✓ Updated package.json: name=${APP_NAME}, version=0.0.1"
+            fi
           fi
-          echo "✓ Updated package.json: name=${APP_NAME}, version=0.0.1"
         fi
 
     - name: Replace template tokens
