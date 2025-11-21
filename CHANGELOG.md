@@ -1,3 +1,10 @@
+# [1.31.0](https://github.com/algtools/actions/compare/v1.30.5...v1.31.0) (2025-11-21)
+
+
+### Features
+
+* add version display functionality to multiple GitHub actions and workflows ([12e8a66](https://github.com/algtools/actions/commit/12e8a668c29a735024f22ae8f832a0fc1be23c27))
+
 ## [1.30.5](https://github.com/algtools/actions/compare/v1.30.4...v1.30.5) (2025-11-21)
 
 
