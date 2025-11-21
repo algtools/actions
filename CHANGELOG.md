@@ -1,3 +1,10 @@
+## [1.31.1](https://github.com/algtools/actions/compare/v1.31.0...v1.31.1) (2025-11-21)
+
+
+### Bug Fixes
+
+* remove action and workflow version banner actions ([d37b6f4](https://github.com/algtools/actions/commit/d37b6f4157b29bfb4749c28937043d61419b189b))
+
 # [1.31.0](https://github.com/algtools/actions/compare/v1.30.5...v1.31.0) (2025-11-21)
 
 
