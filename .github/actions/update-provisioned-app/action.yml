@@ -489,9 +489,24 @@ runs:
         # Debug: Check template structure
         echo "Checking template structure..."
         if [ -d "${TEMPLATE_DIR}/.github/workflows" ]; then
-          echo "  Template workflows found:"
-          find "${TEMPLATE_DIR}/.github/workflows" -type f -name "*.yml" | head -10 | while read -r file; do
+          echo "  Template workflows found in .github/workflows/:"
+          find "${TEMPLATE_DIR}/.github/workflows" -type f -name "*.yml" | head -20 | while read -r file; do
             echo "    - ${file#${TEMPLATE_DIR}/}"
+          done
+        fi
+        if [ -d "${TEMPLATE_DIR}/.github/workflows/app" ]; then
+          echo "  Template workflows found in .github/workflows/app/:"
+          find "${TEMPLATE_DIR}/.github/workflows/app" -type f -name "*.yml" | head -20 | while read -r file; do
+            echo "    - ${file#${TEMPLATE_DIR}/}"
+          done
+        fi
+
+        # Debug: Check app structure
+        echo "Checking app structure..."
+        if [ -d "${TARGET_REPO_DIR}/.github/workflows" ]; then
+          echo "  App workflows found:"
+          find "${TARGET_REPO_DIR}/.github/workflows" -type f -name "*.yml" | head -20 | while read -r file; do
+            echo "    - ${file#${TARGET_REPO_DIR}/}"
           done
         fi
 
@@ -515,11 +530,25 @@ runs:
 
           # Add all template files
           git add -A
+
+          # Check if there are any files to commit
+          if git diff --cached --quiet && [ -z "$(git ls-files)" ]; then
+            echo "Warning: Template directory appears to be empty"
+            rm -rf "${TEMPLATE_GIT_DIR}"
+            exit 1
+          fi
+
           git commit -m "Template state for merge" || {
-            echo "Warning: Template directory may be empty"
+            echo "Warning: Failed to create template commit"
             rm -rf "${TEMPLATE_GIT_DIR}"
             exit 1
           }
+
+          # Debug: Show what was committed
+          echo "Template commit created with files:"
+          git ls-tree -r --name-only HEAD | head -20 | while read -r file; do
+            echo "  - ${file}"
+          done
         ) || {
           # If commit failed, clean up and exit
           rm -rf "${TEMPLATE_GIT_DIR}"
@@ -547,6 +576,15 @@ runs:
 
         # Get the template branch name
         TEMPLATE_BRANCH=$(cd "${TEMPLATE_GIT_DIR}" && git branch --show-current 2>/dev/null || echo "master")
+
+        echo "Template branch: ${TEMPLATE_BRANCH}"
+        echo "Current app HEAD: $(git rev-parse --short HEAD)"
+
+        # Debug: Show what files are in template that aren't in app
+        echo "Files in template that differ from app:"
+        git diff --name-only HEAD "template-remote/${TEMPLATE_BRANCH}" 2>/dev/null | head -30 | while read -r file; do
+          echo "  - ${file}"
+        done || echo "  (checking differences...)"
 
         # Merge template changes
         # Use merge strategy that shows all changes
@@ -584,24 +622,62 @@ runs:
           echo "Merge conflicts detected - staging for PR review"
         fi
 
-        # Debug: Show what files changed
-        echo "Files changed by merge:"
-        git diff --name-only HEAD 2>/dev/null | head -20 | while read -r file; do
-          echo "  - ${file}"
-        done || echo "  (no changes detected in diff)"
+        # Debug: Show what files changed compared to HEAD
+        echo "Files changed by merge (compared to HEAD):"
+        CHANGED_FILES=$(git diff --name-only HEAD 2>/dev/null || echo "")
+        if [ -n "${CHANGED_FILES}" ]; then
+          echo "${CHANGED_FILES}" | head -30 | while read -r file; do
+            echo "  - ${file}"
+          done
+        else
+          echo "  (no changes detected in diff compared to HEAD)"
+        fi
+
+        # Debug: Show what files are in the merge
+        echo "Files in merge commit:"
+        MERGE_FILES=$(git diff --name-only HEAD "template-remote/${TEMPLATE_BRANCH}" 2>/dev/null || echo "")
+        if [ -n "${MERGE_FILES}" ]; then
+          echo "${MERGE_FILES}" | head -30 | while read -r file; do
+            echo "  - ${file}"
+          done
+        else
+          echo "  (no differences between HEAD and template)"
+        fi
 
         # Debug: Show what files are staged
         echo "Files staged for commit:"
-        git diff --cached --name-only 2>/dev/null | head -20 | while read -r file; do
-          echo "  - ${file}"
-        done || echo "  (no files staged)"
+        STAGED_FILES=$(git diff --cached --name-only 2>/dev/null || echo "")
+        if [ -n "${STAGED_FILES}" ]; then
+          echo "${STAGED_FILES}" | head -30 | while read -r file; do
+            echo "  - ${file}"
+          done
+        else
+          echo "  (no files staged)"
+        fi
 
         # Stage all files (including conflicts - they'll be visible in PR)
+        # This ensures all changes from the merge are staged
         git add -A
 
         # Debug: Show final status
         echo "Final git status:"
-        git status --short | head -20 || echo "  (no changes)"
+        git status --short | head -30 || echo "  (no changes)"
+
+        # Debug: Show a summary of what will be in the commit
+        echo "Summary of changes to be committed:"
+        STAGED_COUNT=$(git diff --cached --name-only 2>/dev/null | wc -l || echo "0")
+        echo "  Total files staged: ${STAGED_COUNT}"
+
+        # Show workflow files specifically
+        WORKFLOW_FILES=$(git diff --cached --name-only 2>/dev/null | grep "\.github/workflows" || echo "")
+        if [ -n "${WORKFLOW_FILES}" ]; then
+          echo "  Workflow files staged:"
+          echo "${WORKFLOW_FILES}" | while read -r file; do
+            echo "    - ${file}"
+          done
+        else
+          echo "  No workflow files staged"
+        fi
 
         # Remove temporary remote and clean up
         git remote remove template-remote 2>/dev/null || true
