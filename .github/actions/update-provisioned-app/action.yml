@@ -591,8 +591,9 @@ runs:
         # For files that exist in both, we'll get conflicts which we'll resolve by preferring template
         # For files only in template, they'll be added
         # For files only in app, they'll be preserved
+        # Use --allow-unrelated-histories because template Git repo has no common history with app
         set +e  # Don't exit on merge conflicts
-        git merge "template-remote/${TEMPLATE_BRANCH}" --no-commit --no-ff 2>&1
+        git merge "template-remote/${TEMPLATE_BRANCH}" --no-commit --no-ff --allow-unrelated-histories 2>&1
         MERGE_EXIT_CODE=$?
         set -e
 
