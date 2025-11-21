@@ -36,19 +36,12 @@ runs:
       shell: bash
       run: |
         ACTION_NAME="Comment PR"
-        # Get the repo root by going up 3 levels from GITHUB_ACTION_PATH
-        REPO_ROOT=$(cd "${GITHUB_ACTION_PATH}/../../.." && pwd)
-        PACKAGE_JSON_PATH="${REPO_ROOT}/package.json"
+        # Change to repo root (3 levels up from action directory)
+        cd "${GITHUB_ACTION_PATH}/../../.."
+        VERSION="v$(jq -r '.version' package.json)"
 
-        if [ -f "$PACKAGE_JSON_PATH" ]; then
-          VERSION=$(node -p "require('$PACKAGE_JSON_PATH').version")
-          VERSION_STRING="v${VERSION}"
-        else
-          VERSION_STRING="unknown"
-        fi
-
-        echo "🔧 Action: ${ACTION_NAME} | Version: ${VERSION_STRING}"
-        echo "## 🔧 ${ACTION_NAME} | ${VERSION_STRING}" >> "$GITHUB_STEP_SUMMARY"
+        echo "🔧 Action: ${ACTION_NAME} | Version: ${VERSION}"
+        echo "## 🔧 ${ACTION_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
     - name: Validate inputs
       shell: bash
