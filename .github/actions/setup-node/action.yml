@@ -50,7 +50,7 @@ runs:
       shell: bash
       run: |
         ACTION_NAME="Setup Node.js"
-        PACKAGE_JSON_PATH="${GITHUB_ACTION_PATH}/../../package.json"
+        PACKAGE_JSON_PATH="${GITHUB_ACTION_PATH}/../../../package.json"
 
         if [ -f "$PACKAGE_JSON_PATH" ]; then
           VERSION=$(node -p "require('$PACKAGE_JSON_PATH').version")
