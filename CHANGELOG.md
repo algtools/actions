@@ -1,3 +1,10 @@
+## [1.31.2](https://github.com/algtools/actions/compare/v1.31.1...v1.31.2) (2025-11-21)
+
+
+### Bug Fixes
+
+* update package.json path in multiple GitHub actions for correct referencing ([d64a5f2](https://github.com/algtools/actions/commit/d64a5f24b01cd72b2650ef11c91058849b46f69e))
+
 ## [1.31.1](https://github.com/algtools/actions/compare/v1.31.0...v1.31.1) (2025-11-21)
 
 
