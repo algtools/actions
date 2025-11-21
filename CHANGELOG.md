@@ -1,3 +1,10 @@
+## [1.31.7](https://github.com/algtools/actions/compare/v1.31.6...v1.31.7) (2025-11-21)
+
+
+### Bug Fixes
+
+* allow unrelated histories in git merge for update-provisioned-app action ([b4661ff](https://github.com/algtools/actions/commit/b4661ff08eb9a526405713a92b5c205d3042b7de))
+
 ## [1.31.6](https://github.com/algtools/actions/compare/v1.31.5...v1.31.6) (2025-11-21)
 
 
