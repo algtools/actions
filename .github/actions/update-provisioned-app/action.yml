@@ -355,6 +355,29 @@ runs:
         echo "exclude_patterns=${EXCLUDE_JSON}" >> $GITHUB_OUTPUT
         echo "exclude_count=${#EXCLUDE_PATTERNS[@]}" >> $GITHUB_OUTPUT
 
+    - name: Preserve app-specific files
+      shell: bash
+      working-directory: target-repo
+      run: |
+        set -euo pipefail
+
+        echo "Preserving app-specific files before template update..."
+
+        # Create backup directory
+        mkdir -p .template-update-backup
+
+        # Preserve template-updates.yml (should never be updated)
+        if [ -f ".github/template-updates.yml" ]; then
+          cp ".github/template-updates.yml" ".template-update-backup/template-updates.yml"
+          echo "✓ Preserved .github/template-updates.yml"
+        fi
+
+        # Preserve package.json name and version (app-specific)
+        if [ -f "package.json" ]; then
+          cp "package.json" ".template-update-backup/package.json"
+          echo "✓ Preserved package.json"
+        fi
+
     - name: Apply template changes
       shell: bash
       working-directory: target-repo
@@ -389,6 +412,7 @@ runs:
           ".cursorrules"
           ".github/template-updates.yml"
           ".template-app"
+          ".template-update-backup"
         )
 
         # Try to override with patterns from JSON if available
@@ -399,6 +423,8 @@ runs:
           # Use JSON patterns if successfully parsed
           if [ ${#PATTERNS_FROM_JSON[@]} -gt 0 ]; then
             EXCLUDE_PATTERNS=("${PATTERNS_FROM_JSON[@]}")
+            # Always ensure template-updates.yml and backup directory are excluded
+            EXCLUDE_PATTERNS+=(".github/template-updates.yml" ".template-update-backup")
             echo "Using exclude patterns from template configuration (${#EXCLUDE_PATTERNS[@]} patterns)"
           else
             echo "Using default exclude patterns (${#EXCLUDE_PATTERNS[@]} patterns)"
@@ -436,6 +462,32 @@ runs:
 
         echo "Template changes applied"
 
+    - name: Restore app-specific files
+      shell: bash
+      working-directory: target-repo
+      run: |
+        set -euo pipefail
+
+        echo "Restoring app-specific files after template update..."
+
+        # Always restore template-updates.yml from git (should never be updated from template)
+        # This preserves the app's specific source_repo value (or placeholder if it was never replaced)
+        if git show HEAD:.github/template-updates.yml > /tmp/original-template-updates.yml 2>/dev/null; then
+          cp /tmp/original-template-updates.yml ".github/template-updates.yml"
+          echo "✓ Restored .github/template-updates.yml from git (preserved app-specific configuration)"
+        elif [ -f ".template-update-backup/template-updates.yml" ]; then
+          cp ".template-update-backup/template-updates.yml" ".github/template-updates.yml"
+          echo "✓ Restored .github/template-updates.yml from backup (preserved app-specific configuration)"
+        else
+          echo "⚠️  No original template-updates.yml found, skipping restore"
+        fi
+
+        # Clean up backup directory and temp files
+        rm -rf .template-update-backup
+        rm -f /tmp/original-template-updates.yml
+
+        echo "✓ App-specific files restored"
+
     - name: Smart merge package.json
       shell: bash
       working-directory: target-repo
@@ -445,6 +497,16 @@ runs:
         set -euo pipefail
 
         echo "Smart merging package.json..."
+
+        # Get original app package.json from git (before rsync overwrote it)
+        # We'll use this to preserve app-specific fields and find app-only dependencies
+        ORIGINAL_PKG="/tmp/original-package.json"
+        if ! git show HEAD:package.json > "${ORIGINAL_PKG}" 2>/dev/null; then
+          echo "Warning: Could not read original package.json from git"
+          ORIGINAL_PKG=""
+        else
+          echo "✓ Read original package.json from git (for preserving app-specific fields)"
+        fi
 
         if [ ! -f "package.json" ]; then
           echo "No package.json in target repo, skipping merge"
@@ -460,53 +522,130 @@ runs:
         node -e "
           const fs = require('fs');
 
-          const appPkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          // Read template package.json (source of truth for template structure and latest updates)
           const templatePkg = JSON.parse(fs.readFileSync('${TEMPLATE_DIR}/package.json', 'utf8'));
 
-          // Preserve app-specific fields
-          const preservedFields = {
-            name: appPkg.name,
-            version: appPkg.version,
-            __template: appPkg.__template
-          };
-
-          // Preserve private field if it exists in app
-          if (appPkg.private !== undefined) {
-            preservedFields.private = appPkg.private;
+          // Read original app package.json (for preserving app-specific fields)
+          let originalPkg = null;
+          if ('${ORIGINAL_PKG}' && fs.existsSync('${ORIGINAL_PKG}')) {
+            originalPkg = JSON.parse(fs.readFileSync('${ORIGINAL_PKG}', 'utf8'));
           }
 
-          // Deep merge dependencies - app first, then template (template versions win)
+          // App-specific fields that should NEVER be updated from template
+          const appSpecificFields = [
+            'name',
+            'version',
+            '__template',
+            'private',
+            'description',  // App description might be different from template
+            'author',       // App author might be different
+            'license',      // App license might be different
+            'repository',   // App repository is different
+            'homepage',     // App homepage is different
+            'bugs',         // App bugs URL is different
+          ];
+
+          // Preserve app-specific fields from original (if available)
+          const preservedFields = {};
+          if (originalPkg) {
+            for (const field of appSpecificFields) {
+              if (originalPkg[field] !== undefined) {
+                preservedFields[field] = originalPkg[field];
+              }
+            }
+          } else {
+            // Fallback: try to read from current package.json if original not available
+            try {
+              const currentPkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+              for (const field of appSpecificFields) {
+                if (currentPkg[field] !== undefined) {
+                  preservedFields[field] = currentPkg[field];
+                }
+              }
+            } catch (e) {
+              console.log('Warning: Could not read current package.json for fallback');
+            }
+          }
+
+          // Merge dependencies: start with template (has latest versions), add app-only deps
+          // Template versions always win for packages that exist in both
           const mergedDependencies = {
-            ...(appPkg.dependencies || {}),
             ...(templatePkg.dependencies || {})
           };
-
-          // Deep merge devDependencies - app first, then template (template versions win)
-          const mergedDevDependencies = {
-            ...(appPkg.devDependencies || {}),
-            ...(templatePkg.devDependencies || {})
-          };
-
-          // Deep merge scripts - app first, then template (template scripts win)
-          const mergedScripts = {
-            ...(appPkg.scripts || {}),
-            ...(templatePkg.scripts || {})
-          };
-
-          // Detect and log conflicts
-          const conflicts = [];
-          if (appPkg.dependencies && templatePkg.dependencies) {
-            for (const pkg of Object.keys(appPkg.dependencies)) {
-              if (templatePkg.dependencies[pkg] && appPkg.dependencies[pkg] !== templatePkg.dependencies[pkg]) {
-                conflicts.push(\`  - \${pkg}: \${appPkg.dependencies[pkg]} → \${templatePkg.dependencies[pkg]}\`);
+          // Add app-only dependencies (not in template)
+          if (originalPkg?.dependencies) {
+            for (const [pkg, version] of Object.entries(originalPkg.dependencies)) {
+              if (!templatePkg.dependencies || !templatePkg.dependencies[pkg]) {
+                mergedDependencies[pkg] = version;
               }
             }
           }
 
-          // Final merge: start with template structure, override with preserved fields and merged collections
+          // Merge devDependencies: start with template, add app-only deps
+          const mergedDevDependencies = {
+            ...(templatePkg.devDependencies || {})
+          };
+          // Add app-only devDependencies (not in template)
+          if (originalPkg?.devDependencies) {
+            for (const [pkg, version] of Object.entries(originalPkg.devDependencies)) {
+              if (!templatePkg.devDependencies || !templatePkg.devDependencies[pkg]) {
+                mergedDevDependencies[pkg] = version;
+              }
+            }
+          }
+
+          // Merge scripts: template scripts win, but keep app-only scripts
+          const mergedScripts = {
+            ...(templatePkg.scripts || {})
+          };
+          // Add app-only scripts (not in template)
+          if (originalPkg?.scripts) {
+            for (const [script, command] of Object.entries(originalPkg.scripts)) {
+              if (!templatePkg.scripts || !templatePkg.scripts[script]) {
+                mergedScripts[script] = command;
+              }
+            }
+          }
+
+          // Detect and log version updates
+          const updates = [];
+          if (originalPkg?.dependencies && templatePkg.dependencies) {
+            for (const pkg of Object.keys(templatePkg.dependencies)) {
+              if (originalPkg.dependencies[pkg] && originalPkg.dependencies[pkg] !== templatePkg.dependencies[pkg]) {
+                updates.push(\`  - \${pkg}: \${originalPkg.dependencies[pkg]} → \${templatePkg.dependencies[pkg]}\`);
+              }
+            }
+          }
+          if (originalPkg?.devDependencies && templatePkg.devDependencies) {
+            for (const pkg of Object.keys(templatePkg.devDependencies)) {
+              if (originalPkg.devDependencies[pkg] && originalPkg.devDependencies[pkg] !== templatePkg.devDependencies[pkg]) {
+                updates.push(\`  - \${pkg} (dev): \${originalPkg.devDependencies[pkg]} → \${templatePkg.devDependencies[pkg]}\`);
+              }
+            }
+          }
+
+          // Find app-only dependencies (not in template)
+          const appOnlyDeps = [];
+          if (originalPkg?.dependencies) {
+            for (const pkg of Object.keys(originalPkg.dependencies)) {
+              if (!templatePkg.dependencies || !templatePkg.dependencies[pkg]) {
+                appOnlyDeps.push(\`  - \${pkg}: \${originalPkg.dependencies[pkg]}\`);
+              }
+            }
+          }
+          const appOnlyDevDeps = [];
+          if (originalPkg?.devDependencies) {
+            for (const pkg of Object.keys(originalPkg.devDependencies)) {
+              if (!templatePkg.devDependencies || !templatePkg.devDependencies[pkg]) {
+                appOnlyDevDeps.push(\`  - \${pkg}: \${originalPkg.devDependencies[pkg]}\`);
+              }
+            }
+          }
+
+          // Final merge: start with template structure (has all latest updates), override with preserved fields and merged collections
           const merged = {
-            ...templatePkg,
-            ...preservedFields,
+            ...templatePkg,  // Start with template (has all latest structure and updates)
+            ...preservedFields,  // Override with app-specific fields (name, version, etc.)
             dependencies: Object.keys(mergedDependencies).length > 0 ? mergedDependencies : undefined,
             devDependencies: Object.keys(mergedDevDependencies).length > 0 ? mergedDevDependencies : undefined,
             scripts: Object.keys(mergedScripts).length > 0 ? mergedScripts : undefined
@@ -519,13 +658,18 @@ runs:
           fs.writeFileSync('package.json', JSON.stringify(merged, null, 2) + '\n');
 
           console.log('✓ package.json smart merged');
-          console.log('  Preserved: name, version, __template' + (preservedFields.private !== undefined ? ', private' : ''));
+          console.log('  Preserved app-specific fields: ' + Object.keys(preservedFields).join(', '));
           console.log('  Dependencies: ' + Object.keys(mergedDependencies).length + ' total');
           console.log('  DevDependencies: ' + Object.keys(mergedDevDependencies).length + ' total');
           console.log('  Scripts: ' + Object.keys(mergedScripts).length + ' total');
-          if (conflicts.length > 0) {
-            console.log('  ⚠️  Updated versions (template wins):');
-            conflicts.forEach(c => console.log(c));
+          if (updates.length > 0) {
+            console.log('  📦 Updated versions from template:');
+            updates.forEach(u => console.log(u));
+          }
+          if (appOnlyDeps.length > 0 || appOnlyDevDeps.length > 0) {
+            console.log('  ➕ Preserved app-only dependencies:');
+            appOnlyDeps.forEach(d => console.log(d));
+            appOnlyDevDeps.forEach(d => console.log(d));
           }
         " || {
           echo "Warning: Smart merge failed, package.json was excluded by rsync"
