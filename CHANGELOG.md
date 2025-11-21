@@ -1,3 +1,10 @@
+## [1.31.3](https://github.com/algtools/actions/compare/v1.31.2...v1.31.3) (2025-11-21)
+
+
+### Bug Fixes
+
+* standardize package.json path retrieval ([f7ca27e](https://github.com/algtools/actions/commit/f7ca27edff321bf361208300a31c14a96225d730))
+
 ## [1.31.2](https://github.com/algtools/actions/compare/v1.31.1...v1.31.2) (2025-11-21)
 
 
