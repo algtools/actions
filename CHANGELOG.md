@@ -1,3 +1,10 @@
+## [1.30.1](https://github.com/algtools/actions/compare/v1.30.0...v1.30.1) (2025-11-21)
+
+
+### Bug Fixes
+
+* enhance template update process by handling app-specific files ([08264b5](https://github.com/algtools/actions/commit/08264b5185f002ca3afbb98452cdb79c56c100c3))
+
 # [1.30.0](https://github.com/algtools/actions/compare/v1.29.4...v1.30.0) (2025-11-20)
 
 
