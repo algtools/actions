@@ -1,3 +1,10 @@
+## [1.30.4](https://github.com/algtools/actions/compare/v1.30.3...v1.30.4) (2025-11-21)
+
+
+### Bug Fixes
+
+* implement template structure transformation to align app and workflow directories ([8e30344](https://github.com/algtools/actions/commit/8e30344413643a100bbd793d2580a8dd657f24bb))
+
 ## [1.30.3](https://github.com/algtools/actions/compare/v1.30.2...v1.30.3) (2025-11-21)
 
 
