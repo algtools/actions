@@ -475,6 +475,36 @@ runs:
 
         echo "✓ Excluded files removed from template"
 
+        # Transform template structure to match app structure (move .github/workflows/app/* to .github/workflows/*)
+        echo "Transforming template structure to match app structure..."
+        (
+          cd "${TEMPLATE_DIR}"
+
+          # Move .github/workflows/app/* to .github/workflows/* (if app/ directory exists)
+          if [ -d ".github/workflows/app" ]; then
+            echo "  Moving .github/workflows/app/* to .github/workflows/*"
+            # Ensure workflows directory exists
+            mkdir -p ".github/workflows"
+            # Move files from app/ subdirectory to workflows/ root
+            mv .github/workflows/app/* .github/workflows/ 2>/dev/null || true
+            # Remove empty app/ directory
+            rmdir .github/workflows/app 2>/dev/null || true
+            echo "  ✓ Workflows moved from app/ subdirectory"
+          fi
+
+          # Move .github/actions/app/* to .github/actions/* (if app/ directory exists)
+          if [ -d ".github/actions/app" ]; then
+            echo "  Moving .github/actions/app/* to .github/actions/*"
+            # Ensure actions directory exists
+            mkdir -p ".github/actions"
+            # Move files from app/ subdirectory to actions/ root
+            mv .github/actions/app/* .github/actions/ 2>/dev/null || true
+            # Remove empty app/ directory
+            rmdir .github/actions/app 2>/dev/null || true
+            echo "  ✓ Actions moved from app/ subdirectory"
+          fi
+        )
+
         # Prepare template for Git merge by creating a temporary Git repository
         echo "Preparing template for Git merge..."
         TEMPLATE_GIT_DIR="/tmp/template-git-$$"
