@@ -366,19 +366,34 @@ runs:
         # Create backup directory
         mkdir -p .template-update-backup
 
-        # Preserve template-updates.yml (should never be updated)
-        if [ -f ".github/template-updates.yml" ]; then
-          cp ".github/template-updates.yml" ".template-update-backup/template-updates.yml"
-          echo "✓ Preserved .github/template-updates.yml"
-        fi
+        # Files that should NEVER be updated from template (always preserve app version)
+        EXCLUDED_FILES=(
+          ".github/template-updates.yml"
+          "CHANGELOG.md"
+          "pnpm-lock.yaml"
+          "package-lock.json"
+          "yarn.lock"
+        )
 
-        # Preserve package.json name and version (app-specific)
+        # Backup excluded files
+        for file in "${EXCLUDED_FILES[@]}"; do
+          if [ -f "${file}" ]; then
+            # Create directory structure in backup
+            mkdir -p ".template-update-backup/$(dirname "${file}")"
+            cp "${file}" ".template-update-backup/${file}"
+            echo "✓ Preserved ${file}"
+          fi
+        done
+
+        # Also backup package.json for smart merge (will be handled separately)
         if [ -f "package.json" ]; then
           cp "package.json" ".template-update-backup/package.json"
-          echo "✓ Preserved package.json"
+          echo "✓ Preserved package.json (for smart merge)"
         fi
 
-    - name: Apply template changes
+        echo "✓ All app-specific files preserved"
+
+    - name: Apply template changes using Git merge
       shell: bash
       working-directory: target-repo
       env:
@@ -387,9 +402,9 @@ runs:
       run: |
         set -euo pipefail
 
-        echo "Applying template changes..."
+        echo "Applying template changes using Git merge strategy..."
 
-        # Define default exclude patterns
+        # Define files/patterns to exclude from merge (remove from template before merging)
         EXCLUDE_PATTERNS=(
           ".git"
           "node_modules"
@@ -417,14 +432,11 @@ runs:
 
         # Try to override with patterns from JSON if available
         if command -v jq &> /dev/null && [ -n "${EXCLUDE_PATTERNS_JSON}" ]; then
-          # Use mapfile to safely read patterns into array (handles special characters)
           mapfile -t PATTERNS_FROM_JSON < <(echo "${EXCLUDE_PATTERNS_JSON}" | jq -r '.[]' 2>/dev/null)
-
-          # Use JSON patterns if successfully parsed
           if [ ${#PATTERNS_FROM_JSON[@]} -gt 0 ]; then
             EXCLUDE_PATTERNS=("${PATTERNS_FROM_JSON[@]}")
-            # Always ensure template-updates.yml and backup directory are excluded
-            EXCLUDE_PATTERNS+=(".github/template-updates.yml" ".template-update-backup")
+            # Always ensure critical files are excluded
+            EXCLUDE_PATTERNS+=(".github/template-updates.yml" ".template-update-backup" "CHANGELOG.md")
             echo "Using exclude patterns from template configuration (${#EXCLUDE_PATTERNS[@]} patterns)"
           else
             echo "Using default exclude patterns (${#EXCLUDE_PATTERNS[@]} patterns)"
@@ -433,34 +445,116 @@ runs:
           echo "Using default exclude patterns (${#EXCLUDE_PATTERNS[@]} patterns)"
         fi
 
-        # Build rsync exclude string
-        EXCLUDE_ARGS=()
+        # Remove excluded files/patterns from template directory before merge
+        echo "Removing excluded files from template directory..."
+        cd "${TEMPLATE_DIR}"
         for pattern in "${EXCLUDE_PATTERNS[@]}"; do
-          EXCLUDE_ARGS+=("--exclude=${pattern}")
-        done
-
-        # Use rsync to copy template files, excluding specified patterns
-        rsync -av "${EXCLUDE_ARGS[@]}" "${TEMPLATE_DIR}/" . || {
-          echo "Warning: rsync failed, trying alternative method with cp"
-          # Fallback: use find and cp
-          find "${TEMPLATE_DIR}" -type f | while read -r file; do
-            rel_path="${file#${TEMPLATE_DIR}/}"
-            # Skip excluded patterns
-            skip=false
-            for pattern in "${EXCLUDE_PATTERNS[@]}"; do
-              if [[ "${rel_path}" == *"${pattern}"* ]]; then
-                skip=true
-                break
-              fi
-            done
-            if [ "${skip}" = "false" ]; then
-              mkdir -p "$(dirname "${rel_path}")"
-              cp "${file}" "${rel_path}" || true
+          # Handle glob patterns and directories
+          if [[ "${pattern}" == *"*"* ]]; then
+            # Glob pattern - use find
+            find . -name "${pattern}" -type f -delete 2>/dev/null || true
+            find . -path "*/${pattern}" -type f -delete 2>/dev/null || true
+          else
+            # Exact path or directory
+            if [ -e "${pattern}" ] || [ -e "./${pattern}" ]; then
+              rm -rf "${pattern}" "./${pattern}" 2>/dev/null || true
             fi
-          done
+            # Also remove from subdirectories
+            find . -path "*/${pattern}" -type f -delete 2>/dev/null || true
+            find . -path "*/${pattern}" -type d -exec rm -rf {} + 2>/dev/null || true
+          fi
+        done
+        cd - > /dev/null
+
+        echo "✓ Excluded files removed from template"
+
+        # Prepare template for Git merge by creating a temporary Git repository
+        echo "Preparing template for Git merge..."
+        TEMPLATE_GIT_DIR="/tmp/template-git-$$"
+        mkdir -p "${TEMPLATE_GIT_DIR}"
+
+        # Copy template files to temporary directory (excluding .git if it exists)
+        rsync -a --exclude='.git' "${TEMPLATE_DIR}/" "${TEMPLATE_GIT_DIR}/" || {
+          # Fallback if rsync not available
+          find "${TEMPLATE_DIR}" -mindepth 1 -maxdepth 1 ! -name '.git' -exec cp -r {} "${TEMPLATE_GIT_DIR}/" \; 2>/dev/null || true
         }
 
-        echo "Template changes applied"
+        # Initialize git repo in temporary directory
+        cd "${TEMPLATE_GIT_DIR}"
+        git init
+        git config user.name "template-update[bot]"
+        git config user.email "template-update[bot]@users.noreply.github.com"
+
+        # Add all template files
+        git add -A
+        git commit -m "Template state for merge" || {
+          echo "Warning: Template directory may be empty"
+          cd - > /dev/null
+          rm -rf "${TEMPLATE_GIT_DIR}"
+          exit 1
+        }
+        cd - > /dev/null
+
+        # Now merge template changes into app using Git
+        echo "Merging template changes into app..."
+        cd target-repo
+
+        # Save current HEAD for reference
+        CURRENT_HEAD=$(git rev-parse HEAD)
+
+        # Add template git directory as a temporary remote
+        git remote add template-remote "${TEMPLATE_GIT_DIR}" 2>/dev/null || {
+          git remote set-url template-remote "${TEMPLATE_GIT_DIR}"
+        }
+
+        # Fetch template (default branch is usually master or main)
+        git fetch template-remote master 2>/dev/null || git fetch template-remote main 2>/dev/null || {
+          # Try to find the branch
+          TEMPLATE_BRANCH=$(cd "${TEMPLATE_GIT_DIR}" && git branch --show-current 2>/dev/null || echo "master")
+          git fetch template-remote "${TEMPLATE_BRANCH}"
+        }
+
+        # Get the template branch name
+        TEMPLATE_BRANCH=$(cd "${TEMPLATE_GIT_DIR}" && git branch --show-current 2>/dev/null || echo "master")
+
+        # Merge template changes
+        # Use -X theirs to prefer template for non-conflicting changes
+        # Conflicts will be marked for manual resolution in PR
+        set +e  # Don't exit on merge conflicts
+        git merge "template-remote/${TEMPLATE_BRANCH}" --no-commit --no-ff -X theirs 2>&1
+        MERGE_EXIT_CODE=$?
+        set -e
+
+        if [ $MERGE_EXIT_CODE -eq 1 ]; then
+          # Merge conflicts detected - this is expected and OK
+          echo "⚠️  Merge conflicts detected (this is normal when app has customizations)"
+          CONFLICT_FILES=$(git diff --name-only --diff-filter=U 2>/dev/null || echo "")
+          if [ -n "${CONFLICT_FILES}" ]; then
+            echo "Files with conflicts (will be committed for PR review):"
+            echo "${CONFLICT_FILES}" | while read -r file; do
+              echo "  - ${file}"
+            done
+          fi
+        elif [ $MERGE_EXIT_CODE -eq 0 ]; then
+          echo "✓ Merge completed without conflicts"
+        else
+          echo "Error during merge (exit code: ${MERGE_EXIT_CODE})"
+          # Continue anyway - let Git state show what happened
+        fi
+
+        # Check if there are unmerged files (conflicts)
+        if git ls-files --unmerged | grep -q .; then
+          echo "Merge conflicts detected - staging for PR review"
+        fi
+
+        # Stage all files (including conflicts - they'll be visible in PR)
+        git add -A
+
+        # Remove temporary remote and clean up
+        git remote remove template-remote 2>/dev/null || true
+        rm -rf "${TEMPLATE_GIT_DIR}"
+
+        echo "✓ Template changes merged using Git"
 
     - name: Restore app-specific files
       shell: bash
@@ -470,23 +564,38 @@ runs:
 
         echo "Restoring app-specific files after template update..."
 
-        # Always restore template-updates.yml from git (should never be updated from template)
-        # This preserves the app's specific source_repo value (or placeholder if it was never replaced)
-        if git show HEAD:.github/template-updates.yml > /tmp/original-template-updates.yml 2>/dev/null; then
-          cp /tmp/original-template-updates.yml ".github/template-updates.yml"
-          echo "✓ Restored .github/template-updates.yml from git (preserved app-specific configuration)"
-        elif [ -f ".template-update-backup/template-updates.yml" ]; then
-          cp ".template-update-backup/template-updates.yml" ".github/template-updates.yml"
-          echo "✓ Restored .github/template-updates.yml from backup (preserved app-specific configuration)"
-        else
-          echo "⚠️  No original template-updates.yml found, skipping restore"
-        fi
+        # Files that should NEVER be updated from template (always restore app version)
+        EXCLUDED_FILES=(
+          ".github/template-updates.yml"
+          "CHANGELOG.md"
+          "pnpm-lock.yaml"
+          "package-lock.json"
+          "yarn.lock"
+        )
+
+        # Restore each excluded file from backup or git
+        for file in "${EXCLUDED_FILES[@]}"; do
+          # Try to restore from git first (most reliable)
+          if git show HEAD:"${file}" > "/tmp/restore-$(basename ${file})" 2>/dev/null; then
+            mkdir -p "$(dirname "${file}")"
+            cp "/tmp/restore-$(basename ${file})" "${file}"
+            rm -f "/tmp/restore-$(basename ${file})"
+            echo "✓ Restored ${file} from git"
+          # Fallback to backup
+          elif [ -f ".template-update-backup/${file}" ]; then
+            mkdir -p "$(dirname "${file}")"
+            cp ".template-update-backup/${file}" "${file}"
+            echo "✓ Restored ${file} from backup"
+          else
+            echo "⚠️  No original ${file} found, skipping restore"
+          fi
+        done
 
         # Clean up backup directory and temp files
         rm -rf .template-update-backup
-        rm -f /tmp/original-template-updates.yml
+        rm -f /tmp/restore-*
 
-        echo "✓ App-specific files restored"
+        echo "✓ All app-specific files restored"
 
     - name: Smart merge package.json
       shell: bash
@@ -498,7 +607,7 @@ runs:
 
         echo "Smart merging package.json..."
 
-        # Get original app package.json from git (before rsync overwrote it)
+        # Get original app package.json from git (before git merge)
         # We'll use this to preserve app-specific fields and find app-only dependencies
         ORIGINAL_PKG="/tmp/original-package.json"
         if ! git show HEAD:package.json > "${ORIGINAL_PKG}" 2>/dev/null; then
@@ -890,11 +999,35 @@ runs:
       run: |
         set -euo pipefail
 
+        # Check for merge conflicts
+        CONFLICT_FILES=$(git ls-files --unmerged 2>/dev/null | cut -f2 | sort -u || echo "")
+
         git add -A
-        git commit -m "fix: update template to ${RELEASE_TAG}" || {
-          echo "Warning: Commit failed (might be empty or no changes)"
-          exit 0
-        }
+
+        # Create commit message
+        if [ -n "${CONFLICT_FILES}" ]; then
+          # Create commit message with conflict list
+          COMMIT_MSG_FILE=$(mktemp)
+          echo "fix: update template to ${RELEASE_TAG}" > "${COMMIT_MSG_FILE}"
+          echo "" >> "${COMMIT_MSG_FILE}"
+          echo "⚠️  Merge conflicts detected in:" >> "${COMMIT_MSG_FILE}"
+          echo "${CONFLICT_FILES}" | sed 's/^/  - /' >> "${COMMIT_MSG_FILE}"
+          echo "" >> "${COMMIT_MSG_FILE}"
+          echo "Please resolve conflicts manually in PR review." >> "${COMMIT_MSG_FILE}"
+
+          git commit -F "${COMMIT_MSG_FILE}" || {
+            rm -f "${COMMIT_MSG_FILE}"
+            echo "Warning: Commit failed (might be empty or no changes)"
+            exit 0
+          }
+          rm -f "${COMMIT_MSG_FILE}"
+          echo "⚠️  Committed with merge conflicts - review required"
+        else
+          git commit -m "fix: update template to ${RELEASE_TAG}" || {
+            echo "Warning: Commit failed (might be empty or no changes)"
+            exit 0
+          }
+        fi
 
     - name: Push branch
       if: steps.check-changes.outputs.has_changes == 'true'
