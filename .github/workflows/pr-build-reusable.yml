@@ -111,6 +111,11 @@ jobs:
       build_status: ${{ steps.build.outputs.build_status }}
 
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "PR Build - Reusable Workflow"
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -171,6 +176,11 @@ jobs:
       deployment_status: ${{ steps.deploy-worker.outputs.deployment_status }}
 
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "PR Build - Reusable Workflow (Deploy Job)"
+
       - name: Validate deployment inputs
         run: |
           echo "::group::Validating deployment configuration"

@@ -1,0 +1,32 @@
+name: "Action Version Banner"
+description: "Displays the action name and version for tracking purposes"
+author: "Algenium Systems"
+
+inputs:
+  action_name:
+    description: "Name of the action to display"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Display Action Version
+      shell: bash
+      run: |
+        ACTION_NAME="${{ inputs.action_name }}"
+
+        # Read version from package.json at repo root
+        PACKAGE_JSON_PATH="${GITHUB_ACTION_PATH}/../../package.json"
+
+        if [ -f "$PACKAGE_JSON_PATH" ]; then
+          VERSION=$(node -p "require('$PACKAGE_JSON_PATH').version")
+          VERSION_STRING="v${VERSION}"
+        else
+          VERSION_STRING="unknown"
+        fi
+
+        # Console output
+        echo "🔧 Action: ${ACTION_NAME} | Version: ${VERSION_STRING}"
+
+        # GitHub Actions summary output
+        echo "## 🔧 ${ACTION_NAME} | ${VERSION_STRING}" >> "$GITHUB_STEP_SUMMARY"

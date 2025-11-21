@@ -89,6 +89,11 @@ jobs:
       preview_url: ${{ steps.construct-url.outputs.url }}
 
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "Cleanup Preview - Reusable Workflow"
+
       - name: Construct preview URL
         id: construct-url
         run: |

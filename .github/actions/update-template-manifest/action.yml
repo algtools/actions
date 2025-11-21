@@ -10,6 +10,11 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Display Action Version
+      uses: ../../action-version-banner
+      with:
+        action_name: "Update Template Manifest"
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:

@@ -241,6 +241,11 @@ jobs:
       artifact_source: ${{ steps.download.outcome == 'success' && 'downloaded' || 'built' }}
 
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "Preview Deploy - Reusable Workflow (Build)"
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -315,6 +320,11 @@ jobs:
       seeding_status: ${{ steps.manage-db.outputs.seeding_status }}
 
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "Preview Deploy - Reusable Workflow (Manage DB)"
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -379,6 +389,11 @@ jobs:
       worker_name: ${{ steps.worker-name.outputs.name }}
 
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "Preview Deploy - Reusable Workflow (Deploy)"
+
       - name: Resolve PR number
         id: resolve-pr
         run: |
@@ -508,6 +523,11 @@ jobs:
       chromatic_url: ${{ steps.chromatic-upload.outputs.chromatic_url }}
 
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "Preview Deploy - Reusable Workflow (Chromatic)"
+
       - name: Validate Chromatic inputs
         id: validate
         run: |
@@ -549,6 +569,11 @@ jobs:
       api_docs_status: ${{ steps.generate-api-docs.outputs.status }}
 
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "Preview Deploy - Reusable Workflow (API Docs)"
+
       - name: Validate API docs inputs
         run: |
           echo "::group::Validating API documentation configuration"
@@ -746,6 +771,11 @@ jobs:
       comment_url: ${{ steps.comment-pr.outputs.comment_url }}
 
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "Preview Deploy - Reusable Workflow (Comment)"
+
       - name: Comment on PR
         id: comment-pr
         uses: algtools/actions/.github/actions/comment-pr@main

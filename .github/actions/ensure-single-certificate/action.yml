@@ -38,6 +38,11 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Display Action Version
+      uses: ../../action-version-banner
+      with:
+        action_name: "Ensure Single Certificate"
+
     - name: Validate inputs
       shell: bash
       run: |

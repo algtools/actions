@@ -70,6 +70,11 @@ jobs:
       repository_url: ${{ steps.provision.outputs.repository_url }}
       release_tag: ${{ steps.provision.outputs.release_tag }}
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "Provision Template - Reusable Workflow"
+
       - name: Provision template repository
         id: provision
         uses: algtools/actions/.github/actions/provision-template@main

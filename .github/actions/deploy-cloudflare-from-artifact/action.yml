@@ -57,6 +57,11 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Display Action Version
+      uses: ../../action-version-banner
+      with:
+        action_name: "Deploy Cloudflare Worker from Artifact"
+
     - name: Validate inputs
       shell: bash
       run: |

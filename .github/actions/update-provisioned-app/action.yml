@@ -49,6 +49,11 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Display Action Version
+      uses: ../../action-version-banner
+      with:
+        action_name: "Update Provisioned App"
+
     - name: Mask sensitive tokens
       shell: bash
       run: |

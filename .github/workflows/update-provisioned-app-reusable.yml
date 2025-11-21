@@ -64,6 +64,11 @@ jobs:
       release_tag: ${{ steps.update.outputs.release_tag }}
       branch_name: ${{ steps.update.outputs.branch_name }}
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "Update Provisioned App - Reusable Workflow"
+
       - name: Update provisioned app
         id: update
         uses: algtools/actions/.github/actions/update-provisioned-app@main

@@ -157,6 +157,11 @@ jobs:
     outputs:
       test_status: ${{ steps.test.outputs.test_status }}
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "Build, Test, and Artifact - Reusable (Test)"
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -216,6 +221,11 @@ jobs:
     name: Lint & Format
     runs-on: ubuntu-latest
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "Build, Test, and Artifact - Reusable (Lint)"
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -235,6 +245,11 @@ jobs:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "Build, Test, and Artifact - Reusable (Type Check)"
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -257,6 +272,11 @@ jobs:
     outputs:
       build_status: ${{ steps.build.outputs.build_status }}
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "Build, Test, and Artifact - Reusable (Build)"
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -373,6 +393,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test, lint, type-check]
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "Build, Test, and Artifact - Reusable (Storybook)"
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -437,6 +462,11 @@ jobs:
       total_files: ${{ steps.upload.outputs.total_files }}
       total_size: ${{ steps.upload.outputs.total_size }}
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "Build, Test, and Artifact - Reusable (Upload)"
+
       - name: Checkout repository (for artifact paths)
         uses: actions/checkout@v4
 

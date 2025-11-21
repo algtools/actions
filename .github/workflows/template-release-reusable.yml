@@ -46,6 +46,11 @@ jobs:
       version: ${{ steps.get-version.outputs.version }}
       tarball_url: ${{ steps.upload.outputs.artifact-url }}
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "Template Release - Reusable Workflow"
+
       - name: Checkout
         uses: actions/checkout@v4
         with:

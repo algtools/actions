@@ -26,6 +26,11 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Display Action Version
+      uses: ../../action-version-banner
+      with:
+        action_name: "Create Template Release"
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:

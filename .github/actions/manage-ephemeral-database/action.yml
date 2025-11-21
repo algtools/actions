@@ -102,6 +102,11 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Display Action Version
+      uses: ../../action-version-banner
+      with:
+        action_name: "Manage Ephemeral D1 Database"
+
     - name: Validate inputs
       shell: bash
       run: |

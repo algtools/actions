@@ -111,6 +111,11 @@ jobs:
       worker_name: ${{ steps.worker-name.outputs.name }}
 
     steps:
+      - name: Display Workflow Version
+        uses: algtools/actions/.github/actions/workflow-version-banner@main
+        with:
+          workflow_name: "Environment Deploy - Reusable Workflow"
+
       - name: Validate inputs
         run: |
           echo "::group::Validating workflow inputs"
