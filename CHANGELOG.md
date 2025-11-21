@@ -1,3 +1,10 @@
+## [1.31.6](https://github.com/algtools/actions/compare/v1.31.5...v1.31.6) (2025-11-21)
+
+
+### Bug Fixes
+
+* enhance debugging output in update-provisioned-app action ([18ac0fd](https://github.com/algtools/actions/commit/18ac0fd8608a78a726957760390ed99c99982982))
+
 ## [1.31.5](https://github.com/algtools/actions/compare/v1.31.4...v1.31.5) (2025-11-21)
 
 
