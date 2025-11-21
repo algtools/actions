@@ -1,3 +1,10 @@
+## [1.30.2](https://github.com/algtools/actions/compare/v1.30.1...v1.30.2) (2025-11-21)
+
+
+### Bug Fixes
+
+* enhance template update process with improved file preservation and Git merge strategy ([08519f6](https://github.com/algtools/actions/commit/08519f65eae5e4581f931e7f6f77a167e21183b4))
+
 ## [1.30.1](https://github.com/algtools/actions/compare/v1.30.0...v1.30.1) (2025-11-21)
 
 
