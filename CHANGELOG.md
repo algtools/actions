@@ -1,3 +1,10 @@
+## [1.30.5](https://github.com/algtools/actions/compare/v1.30.4...v1.30.5) (2025-11-21)
+
+
+### Bug Fixes
+
+* improve template update process with enhanced conflict resolution and debugging output ([c0eaa2c](https://github.com/algtools/actions/commit/c0eaa2cab7d9a4f0f4cfe0a5d031f2430758557e))
+
 ## [1.30.4](https://github.com/algtools/actions/compare/v1.30.3...v1.30.4) (2025-11-21)
 
 
