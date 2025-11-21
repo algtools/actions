@@ -19,9 +19,20 @@ runs:
   using: "composite"
   steps:
     - name: Display Action Version
-      uses: ../../action-version-banner
-      with:
-        action_name: "Template Pack Utility"
+      shell: bash
+      run: |
+        ACTION_NAME="Template Pack Utility"
+        PACKAGE_JSON_PATH="${GITHUB_ACTION_PATH}/../../package.json"
+
+        if [ -f "$PACKAGE_JSON_PATH" ]; then
+          VERSION=$(node -p "require('$PACKAGE_JSON_PATH').version")
+          VERSION_STRING="v${VERSION}"
+        else
+          VERSION_STRING="unknown"
+        fi
+
+        echo "🔧 Action: ${ACTION_NAME} | Version: ${VERSION_STRING}"
+        echo "## 🔧 ${ACTION_NAME} | ${VERSION_STRING}" >> "$GITHUB_STEP_SUMMARY"
 
     - name: Setup Node.js
       uses: actions/setup-node@v4

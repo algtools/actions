@@ -90,9 +90,17 @@ jobs:
 
     steps:
       - name: Display Workflow Version
-        uses: algtools/actions/.github/actions/workflow-version-banner@main
-        with:
-          workflow_name: "Cleanup Preview - Reusable Workflow"
+        run: |
+          WORKFLOW_NAME="Cleanup Preview - Reusable Workflow"
+          VERSION="${{ github.action_repository }}@${{ github.action_ref }}"
+
+          # Try to get version from package.json if running from algtools/actions
+          if [ "${{ github.action_repository }}" = "algtools/actions" ]; then
+            VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
+          fi
+
+          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Construct preview URL
         id: construct-url

@@ -158,9 +158,17 @@ jobs:
       test_status: ${{ steps.test.outputs.test_status }}
     steps:
       - name: Display Workflow Version
-        uses: algtools/actions/.github/actions/workflow-version-banner@main
-        with:
-          workflow_name: "Build, Test, and Artifact - Reusable (Test)"
+        run: |
+          WORKFLOW_NAME="Build, Test, and Artifact - Reusable (Test)"
+          VERSION="${{ github.action_repository }}@${{ github.action_ref }}"
+
+          # Try to get version from package.json if running from algtools/actions
+          if [ "${{ github.action_repository }}" = "algtools/actions" ]; then
+            VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
+          fi
+
+          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -222,9 +230,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Display Workflow Version
-        uses: algtools/actions/.github/actions/workflow-version-banner@main
-        with:
-          workflow_name: "Build, Test, and Artifact - Reusable (Lint)"
+        run: |
+          WORKFLOW_NAME="Build, Test, and Artifact - Reusable (Lint)"
+          VERSION="${{ github.action_repository }}@${{ github.action_ref }}"
+
+          # Try to get version from package.json if running from algtools/actions
+          if [ "${{ github.action_repository }}" = "algtools/actions" ]; then
+            VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
+          fi
+
+          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -246,9 +262,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Display Workflow Version
-        uses: algtools/actions/.github/actions/workflow-version-banner@main
-        with:
-          workflow_name: "Build, Test, and Artifact - Reusable (Type Check)"
+        run: |
+          WORKFLOW_NAME="Build, Test, and Artifact - Reusable (Type Check)"
+          VERSION="${{ github.action_repository }}@${{ github.action_ref }}"
+
+          # Try to get version from package.json if running from algtools/actions
+          if [ "${{ github.action_repository }}" = "algtools/actions" ]; then
+            VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
+          fi
+
+          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -273,9 +297,17 @@ jobs:
       build_status: ${{ steps.build.outputs.build_status }}
     steps:
       - name: Display Workflow Version
-        uses: algtools/actions/.github/actions/workflow-version-banner@main
-        with:
-          workflow_name: "Build, Test, and Artifact - Reusable (Build)"
+        run: |
+          WORKFLOW_NAME="Build, Test, and Artifact - Reusable (Build)"
+          VERSION="${{ github.action_repository }}@${{ github.action_ref }}"
+
+          # Try to get version from package.json if running from algtools/actions
+          if [ "${{ github.action_repository }}" = "algtools/actions" ]; then
+            VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
+          fi
+
+          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -394,9 +426,17 @@ jobs:
     needs: [test, lint, type-check]
     steps:
       - name: Display Workflow Version
-        uses: algtools/actions/.github/actions/workflow-version-banner@main
-        with:
-          workflow_name: "Build, Test, and Artifact - Reusable (Storybook)"
+        run: |
+          WORKFLOW_NAME="Build, Test, and Artifact - Reusable (Storybook)"
+          VERSION="${{ github.action_repository }}@${{ github.action_ref }}"
+
+          # Try to get version from package.json if running from algtools/actions
+          if [ "${{ github.action_repository }}" = "algtools/actions" ]; then
+            VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
+          fi
+
+          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -463,9 +503,17 @@ jobs:
       total_size: ${{ steps.upload.outputs.total_size }}
     steps:
       - name: Display Workflow Version
-        uses: algtools/actions/.github/actions/workflow-version-banner@main
-        with:
-          workflow_name: "Build, Test, and Artifact - Reusable (Upload)"
+        run: |
+          WORKFLOW_NAME="Build, Test, and Artifact - Reusable (Upload)"
+          VERSION="${{ github.action_repository }}@${{ github.action_ref }}"
+
+          # Try to get version from package.json if running from algtools/actions
+          if [ "${{ github.action_repository }}" = "algtools/actions" ]; then
+            VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
+          fi
+
+          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Checkout repository (for artifact paths)
         uses: actions/checkout@v4

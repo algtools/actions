@@ -65,9 +65,17 @@ jobs:
       branch_name: ${{ steps.update.outputs.branch_name }}
     steps:
       - name: Display Workflow Version
-        uses: algtools/actions/.github/actions/workflow-version-banner@main
-        with:
-          workflow_name: "Update Provisioned App - Reusable Workflow"
+        run: |
+          WORKFLOW_NAME="Update Provisioned App - Reusable Workflow"
+          VERSION="${{ github.action_repository }}@${{ github.action_ref }}"
+
+          # Try to get version from package.json if running from algtools/actions
+          if [ "${{ github.action_repository }}" = "algtools/actions" ]; then
+            VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
+          fi
+
+          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Update provisioned app
         id: update

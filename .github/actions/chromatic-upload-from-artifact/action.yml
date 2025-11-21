@@ -42,9 +42,20 @@ runs:
   using: "composite"
   steps:
     - name: Display Action Version
-      uses: ../../action-version-banner
-      with:
-        action_name: "Upload Storybook to Chromatic from Artifact"
+      shell: bash
+      run: |
+        ACTION_NAME="Upload Storybook to Chromatic from Artifact"
+        PACKAGE_JSON_PATH="${GITHUB_ACTION_PATH}/../../package.json"
+
+        if [ -f "$PACKAGE_JSON_PATH" ]; then
+          VERSION=$(node -p "require('$PACKAGE_JSON_PATH').version")
+          VERSION_STRING="v${VERSION}"
+        else
+          VERSION_STRING="unknown"
+        fi
+
+        echo "🔧 Action: ${ACTION_NAME} | Version: ${VERSION_STRING}"
+        echo "## 🔧 ${ACTION_NAME} | ${VERSION_STRING}" >> "$GITHUB_STEP_SUMMARY"
 
     - name: Checkout repository
       uses: actions/checkout@v4

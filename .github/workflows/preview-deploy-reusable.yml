@@ -242,9 +242,17 @@ jobs:
 
     steps:
       - name: Display Workflow Version
-        uses: algtools/actions/.github/actions/workflow-version-banner@main
-        with:
-          workflow_name: "Preview Deploy - Reusable Workflow (Build)"
+        run: |
+          WORKFLOW_NAME="Preview Deploy - Reusable Workflow (Build)"
+          VERSION="${{ github.action_repository }}@${{ github.action_ref }}"
+
+          # Try to get version from package.json if running from algtools/actions
+          if [ "${{ github.action_repository }}" = "algtools/actions" ]; then
+            VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
+          fi
+
+          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -321,9 +329,17 @@ jobs:
 
     steps:
       - name: Display Workflow Version
-        uses: algtools/actions/.github/actions/workflow-version-banner@main
-        with:
-          workflow_name: "Preview Deploy - Reusable Workflow (Manage DB)"
+        run: |
+          WORKFLOW_NAME="Preview Deploy - Reusable Workflow (Manage DB)"
+          VERSION="${{ github.action_repository }}@${{ github.action_ref }}"
+
+          # Try to get version from package.json if running from algtools/actions
+          if [ "${{ github.action_repository }}" = "algtools/actions" ]; then
+            VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
+          fi
+
+          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -390,9 +406,17 @@ jobs:
 
     steps:
       - name: Display Workflow Version
-        uses: algtools/actions/.github/actions/workflow-version-banner@main
-        with:
-          workflow_name: "Preview Deploy - Reusable Workflow (Deploy)"
+        run: |
+          WORKFLOW_NAME="Preview Deploy - Reusable Workflow (Deploy)"
+          VERSION="${{ github.action_repository }}@${{ github.action_ref }}"
+
+          # Try to get version from package.json if running from algtools/actions
+          if [ "${{ github.action_repository }}" = "algtools/actions" ]; then
+            VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
+          fi
+
+          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Resolve PR number
         id: resolve-pr
@@ -524,9 +548,17 @@ jobs:
 
     steps:
       - name: Display Workflow Version
-        uses: algtools/actions/.github/actions/workflow-version-banner@main
-        with:
-          workflow_name: "Preview Deploy - Reusable Workflow (Chromatic)"
+        run: |
+          WORKFLOW_NAME="Preview Deploy - Reusable Workflow (Chromatic)"
+          VERSION="${{ github.action_repository }}@${{ github.action_ref }}"
+
+          # Try to get version from package.json if running from algtools/actions
+          if [ "${{ github.action_repository }}" = "algtools/actions" ]; then
+            VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
+          fi
+
+          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Validate Chromatic inputs
         id: validate
@@ -570,9 +602,17 @@ jobs:
 
     steps:
       - name: Display Workflow Version
-        uses: algtools/actions/.github/actions/workflow-version-banner@main
-        with:
-          workflow_name: "Preview Deploy - Reusable Workflow (API Docs)"
+        run: |
+          WORKFLOW_NAME="Preview Deploy - Reusable Workflow (API Docs)"
+          VERSION="${{ github.action_repository }}@${{ github.action_ref }}"
+
+          # Try to get version from package.json if running from algtools/actions
+          if [ "${{ github.action_repository }}" = "algtools/actions" ]; then
+            VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
+          fi
+
+          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Validate API docs inputs
         run: |
@@ -772,9 +812,17 @@ jobs:
 
     steps:
       - name: Display Workflow Version
-        uses: algtools/actions/.github/actions/workflow-version-banner@main
-        with:
-          workflow_name: "Preview Deploy - Reusable Workflow (Comment)"
+        run: |
+          WORKFLOW_NAME="Preview Deploy - Reusable Workflow (Comment)"
+          VERSION="${{ github.action_repository }}@${{ github.action_ref }}"
+
+          # Try to get version from package.json if running from algtools/actions
+          if [ "${{ github.action_repository }}" = "algtools/actions" ]; then
+            VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
+          fi
+
+          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Comment on PR
         id: comment-pr
