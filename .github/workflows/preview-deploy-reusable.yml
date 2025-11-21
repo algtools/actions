@@ -251,7 +251,7 @@ jobs:
             VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
           fi
 
-          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "🔄 algtools/actions workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
           echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Checkout repository
@@ -338,7 +338,7 @@ jobs:
             VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
           fi
 
-          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "🔄 algtools/actions workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
           echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Checkout repository
@@ -415,7 +415,7 @@ jobs:
             VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
           fi
 
-          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "🔄 algtools/actions workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
           echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Resolve PR number
@@ -557,7 +557,7 @@ jobs:
             VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
           fi
 
-          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "🔄 algtools/actions workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
           echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Validate Chromatic inputs
@@ -611,7 +611,7 @@ jobs:
             VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
           fi
 
-          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "🔄 algtools/actions workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
           echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Validate API docs inputs
@@ -821,7 +821,7 @@ jobs:
             VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
           fi
 
-          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "🔄 algtools/actions workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
           echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Comment on PR

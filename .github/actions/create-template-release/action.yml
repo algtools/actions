@@ -34,7 +34,7 @@ runs:
         cd "${GITHUB_ACTION_PATH}/../../.."
         VERSION="v$(jq -r '.version' package.json)"
 
-        echo "🔧 Action: ${ACTION_NAME} | Version: ${VERSION}"
+        echo "🔧 algtools/actions: ${ACTION_NAME} | Version: ${VERSION}"
         echo "## 🔧 ${ACTION_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
     - name: Setup Node.js

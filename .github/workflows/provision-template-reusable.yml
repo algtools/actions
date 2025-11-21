@@ -80,7 +80,7 @@ jobs:
             VERSION="v$(curl -sL https://raw.githubusercontent.com/algtools/actions/${{ github.action_ref }}/package.json | jq -r '.version')"
           fi
 
-          echo "🔄 Workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
+          echo "🔄 algtools/actions workflow: ${WORKFLOW_NAME} | Version: ${VERSION}"
           echo "## 🔄 ${WORKFLOW_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Provision template repository
