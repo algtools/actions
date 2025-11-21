@@ -1,3 +1,10 @@
+## [1.31.4](https://github.com/algtools/actions/compare/v1.31.3...v1.31.4) (2025-11-21)
+
+
+### Bug Fixes
+
+* streamline version retrieval in GitHub actions ([273768d](https://github.com/algtools/actions/commit/273768d74984825a99dd57361b9b6f431173c00f))
+
 ## [1.31.3](https://github.com/algtools/actions/compare/v1.31.2...v1.31.3) (2025-11-21)
 
 
