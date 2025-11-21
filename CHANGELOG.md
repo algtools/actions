@@ -1,3 +1,10 @@
+## [1.31.5](https://github.com/algtools/actions/compare/v1.31.4...v1.31.5) (2025-11-21)
+
+
+### Bug Fixes
+
+* standardize action version display format across multiple GitHub actions ([8505c4f](https://github.com/algtools/actions/commit/8505c4fe3ef3cf69a095c11005f2aea92729ed57))
+
 ## [1.31.4](https://github.com/algtools/actions/compare/v1.31.3...v1.31.4) (2025-11-21)
 
 
