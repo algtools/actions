@@ -1,3 +1,10 @@
+## [1.30.3](https://github.com/algtools/actions/compare/v1.30.2...v1.30.3) (2025-11-21)
+
+
+### Bug Fixes
+
+* refine file exclusion and merging logic in template update process ([6757d6d](https://github.com/algtools/actions/commit/6757d6de30704cdeea63f1a4c7a1d482aa34933a))
+
 ## [1.30.2](https://github.com/algtools/actions/compare/v1.30.1...v1.30.2) (2025-11-21)
 
 
