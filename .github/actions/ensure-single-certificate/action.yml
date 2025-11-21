@@ -42,7 +42,9 @@ runs:
       shell: bash
       run: |
         ACTION_NAME="Ensure Single Certificate"
-        PACKAGE_JSON_PATH="${GITHUB_ACTION_PATH}/../../../package.json"
+        # Get the repo root by going up 3 levels from GITHUB_ACTION_PATH
+        REPO_ROOT=$(cd "${GITHUB_ACTION_PATH}/../../.." && pwd)
+        PACKAGE_JSON_PATH="${REPO_ROOT}/package.json"
 
         if [ -f "$PACKAGE_JSON_PATH" ]; then
           VERSION=$(node -p "require('$PACKAGE_JSON_PATH').version")
