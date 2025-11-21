@@ -475,35 +475,14 @@ runs:
 
         echo "✓ Excluded files removed from template"
 
-        # Transform template structure to match app structure (move .github/workflows/app/* to .github/workflows/*)
-        echo "Transforming template structure to match app structure..."
-        (
-          cd "${TEMPLATE_DIR}"
-
-          # Move .github/workflows/app/* to .github/workflows/* (if app/ directory exists)
-          if [ -d ".github/workflows/app" ]; then
-            echo "  Moving .github/workflows/app/* to .github/workflows/*"
-            # Ensure workflows directory exists
-            mkdir -p ".github/workflows"
-            # Move files from app/ subdirectory to workflows/ root
-            mv .github/workflows/app/* .github/workflows/ 2>/dev/null || true
-            # Remove empty app/ directory
-            rmdir .github/workflows/app 2>/dev/null || true
-            echo "  ✓ Workflows moved from app/ subdirectory"
-          fi
-
-          # Move .github/actions/app/* to .github/actions/* (if app/ directory exists)
-          if [ -d ".github/actions/app" ]; then
-            echo "  Moving .github/actions/app/* to .github/actions/*"
-            # Ensure actions directory exists
-            mkdir -p ".github/actions"
-            # Move files from app/ subdirectory to actions/ root
-            mv .github/actions/app/* .github/actions/ 2>/dev/null || true
-            # Remove empty app/ directory
-            rmdir .github/actions/app 2>/dev/null || true
-            echo "  ✓ Actions moved from app/ subdirectory"
-          fi
-        )
+        # Debug: Check template structure
+        echo "Checking template structure..."
+        if [ -d "${TEMPLATE_DIR}/.github/workflows" ]; then
+          echo "  Template workflows found:"
+          find "${TEMPLATE_DIR}/.github/workflows" -type f -name "*.yml" | head -10 | while read -r file; do
+            echo "    - ${file#${TEMPLATE_DIR}/}"
+          done
+        fi
 
         # Prepare template for Git merge by creating a temporary Git repository
         echo "Preparing template for Git merge..."
@@ -559,22 +538,28 @@ runs:
         TEMPLATE_BRANCH=$(cd "${TEMPLATE_GIT_DIR}" && git branch --show-current 2>/dev/null || echo "master")
 
         # Merge template changes
-        # Use -X theirs to prefer template for non-conflicting changes
-        # Conflicts will be marked for manual resolution in PR
+        # Use merge strategy that shows all changes
+        # For files that exist in both, we'll get conflicts which we'll resolve by preferring template
+        # For files only in template, they'll be added
+        # For files only in app, they'll be preserved
         set +e  # Don't exit on merge conflicts
-        git merge "template-remote/${TEMPLATE_BRANCH}" --no-commit --no-ff -X theirs 2>&1
+        git merge "template-remote/${TEMPLATE_BRANCH}" --no-commit --no-ff 2>&1
         MERGE_EXIT_CODE=$?
         set -e
 
         if [ $MERGE_EXIT_CODE -eq 1 ]; then
-          # Merge conflicts detected - this is expected and OK
-          echo "⚠️  Merge conflicts detected (this is normal when app has customizations)"
+          # Merge conflicts detected - resolve by preferring template version
+          echo "⚠️  Merge conflicts detected - resolving by preferring template version"
           CONFLICT_FILES=$(git diff --name-only --diff-filter=U 2>/dev/null || echo "")
           if [ -n "${CONFLICT_FILES}" ]; then
-            echo "Files with conflicts (will be committed for PR review):"
+            echo "Files with conflicts (resolving by preferring template):"
             echo "${CONFLICT_FILES}" | while read -r file; do
               echo "  - ${file}"
+              # Resolve conflict by taking template version
+              git checkout --theirs "${file}" 2>/dev/null || true
             done
+            # Stage resolved conflicts
+            git add -A
           fi
         elif [ $MERGE_EXIT_CODE -eq 0 ]; then
           echo "✓ Merge completed without conflicts"
@@ -588,8 +573,24 @@ runs:
           echo "Merge conflicts detected - staging for PR review"
         fi
 
+        # Debug: Show what files changed
+        echo "Files changed by merge:"
+        git diff --name-only HEAD 2>/dev/null | head -20 | while read -r file; do
+          echo "  - ${file}"
+        done || echo "  (no changes detected in diff)"
+
+        # Debug: Show what files are staged
+        echo "Files staged for commit:"
+        git diff --cached --name-only 2>/dev/null | head -20 | while read -r file; do
+          echo "  - ${file}"
+        done || echo "  (no files staged)"
+
         # Stage all files (including conflicts - they'll be visible in PR)
         git add -A
+
+        # Debug: Show final status
+        echo "Final git status:"
+        git status --short | head -20 || echo "  (no changes)"
 
         # Remove temporary remote and clean up
         git remote remove template-remote 2>/dev/null || true
