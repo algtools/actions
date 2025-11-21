@@ -404,7 +404,11 @@ runs:
 
         echo "Applying template changes using Git merge strategy..."
 
+        # Save the target repo directory (we're already in it due to working-directory)
+        TARGET_REPO_DIR=$(pwd)
+
         # Define files/patterns to exclude from merge (remove from template before merging)
+        # These files are handled by smart merge or should never be updated
         EXCLUDE_PATTERNS=(
           ".git"
           "node_modules"
@@ -428,6 +432,8 @@ runs:
           ".github/template-updates.yml"
           ".template-app"
           ".template-update-backup"
+          "wrangler.jsonc"  # Handled by smart merge (preserves app-specific IDs)
+          "package.json"   # Handled by smart merge (preserves app name/version)
         )
 
         # Try to override with patterns from JSON if available
@@ -447,24 +453,25 @@ runs:
 
         # Remove excluded files/patterns from template directory before merge
         echo "Removing excluded files from template directory..."
-        cd "${TEMPLATE_DIR}"
-        for pattern in "${EXCLUDE_PATTERNS[@]}"; do
-          # Handle glob patterns and directories
-          if [[ "${pattern}" == *"*"* ]]; then
-            # Glob pattern - use find
-            find . -name "${pattern}" -type f -delete 2>/dev/null || true
-            find . -path "*/${pattern}" -type f -delete 2>/dev/null || true
-          else
-            # Exact path or directory
-            if [ -e "${pattern}" ] || [ -e "./${pattern}" ]; then
-              rm -rf "${pattern}" "./${pattern}" 2>/dev/null || true
+        (
+          cd "${TEMPLATE_DIR}"
+          for pattern in "${EXCLUDE_PATTERNS[@]}"; do
+            # Handle glob patterns and directories
+            if [[ "${pattern}" == *"*"* ]]; then
+              # Glob pattern - use find
+              find . -name "${pattern}" -type f -delete 2>/dev/null || true
+              find . -path "*/${pattern}" -type f -delete 2>/dev/null || true
+            else
+              # Exact path or directory
+              if [ -e "${pattern}" ] || [ -e "./${pattern}" ]; then
+                rm -rf "${pattern}" "./${pattern}" 2>/dev/null || true
+              fi
+              # Also remove from subdirectories
+              find . -path "*/${pattern}" -type f -delete 2>/dev/null || true
+              find . -path "*/${pattern}" -type d -exec rm -rf {} + 2>/dev/null || true
             fi
-            # Also remove from subdirectories
-            find . -path "*/${pattern}" -type f -delete 2>/dev/null || true
-            find . -path "*/${pattern}" -type d -exec rm -rf {} + 2>/dev/null || true
-          fi
-        done
-        cd - > /dev/null
+          done
+        )
 
         echo "✓ Excluded files removed from template"
 
@@ -480,24 +487,28 @@ runs:
         }
 
         # Initialize git repo in temporary directory
-        cd "${TEMPLATE_GIT_DIR}"
-        git init
-        git config user.name "template-update[bot]"
-        git config user.email "template-update[bot]@users.noreply.github.com"
+        (
+          cd "${TEMPLATE_GIT_DIR}"
+          git init
+          git config user.name "template-update[bot]"
+          git config user.email "template-update[bot]@users.noreply.github.com"
 
-        # Add all template files
-        git add -A
-        git commit -m "Template state for merge" || {
-          echo "Warning: Template directory may be empty"
-          cd - > /dev/null
+          # Add all template files
+          git add -A
+          git commit -m "Template state for merge" || {
+            echo "Warning: Template directory may be empty"
+            rm -rf "${TEMPLATE_GIT_DIR}"
+            exit 1
+          }
+        ) || {
+          # If commit failed, clean up and exit
           rm -rf "${TEMPLATE_GIT_DIR}"
           exit 1
         }
-        cd - > /dev/null
 
         # Now merge template changes into app using Git
         echo "Merging template changes into app..."
-        cd target-repo
+        cd "${TARGET_REPO_DIR}"
 
         # Save current HEAD for reference
         CURRENT_HEAD=$(git rev-parse HEAD)
@@ -781,7 +792,7 @@ runs:
             appOnlyDevDeps.forEach(d => console.log(d));
           }
         " || {
-          echo "Warning: Smart merge failed, package.json was excluded by rsync"
+          echo "Warning: Smart merge failed for package.json"
           exit 0
         }
 
@@ -794,6 +805,16 @@ runs:
         set -euo pipefail
 
         echo "Smart merging wrangler.jsonc..."
+
+        # Get original app wrangler.jsonc from git (before git merge)
+        # This preserves app-specific database IDs and names
+        ORIGINAL_WRANGLER="/tmp/original-wrangler.jsonc"
+        if ! git show HEAD:wrangler.jsonc > "${ORIGINAL_WRANGLER}" 2>/dev/null; then
+          echo "Warning: Could not read original wrangler.jsonc from git"
+          ORIGINAL_WRANGLER=""
+        else
+          echo "✓ Read original wrangler.jsonc from git (for preserving app-specific IDs)"
+        fi
 
         if [ ! -f "wrangler.jsonc" ]; then
           echo "No wrangler.jsonc in target repo, skipping merge"
@@ -818,7 +839,15 @@ runs:
             return JSON.parse(cleaned);
           }
 
-          const appConfig = parseJSONC(fs.readFileSync('wrangler.jsonc', 'utf8'));
+          // Read original app config from git (before merge) to preserve app-specific IDs
+          let appConfig = null;
+          if ('${ORIGINAL_WRANGLER}' && fs.existsSync('${ORIGINAL_WRANGLER}')) {
+            appConfig = parseJSONC(fs.readFileSync('${ORIGINAL_WRANGLER}', 'utf8'));
+          } else {
+            // Fallback: read current file if git version not available
+            appConfig = parseJSONC(fs.readFileSync('wrangler.jsonc', 'utf8'));
+          }
+
           const templateConfig = parseJSONC(fs.readFileSync('${TEMPLATE_DIR}/wrangler.jsonc', 'utf8'));
 
           // Helper to merge bindings by name, preserving app-specific IDs
