@@ -1,3 +1,10 @@
+# [1.32.0](https://github.com/algtools/actions/compare/v1.31.17...v1.32.0) (2025-11-22)
+
+
+### Features
+
+* enhance template management by adding metadata tracking and improving error handling ([755b825](https://github.com/algtools/actions/commit/755b825b4eac16b452173fb3efc49ab1b288c669))
+
 ## [1.31.17](https://github.com/algtools/actions/compare/v1.31.16...v1.31.17) (2025-11-22)
 
 
