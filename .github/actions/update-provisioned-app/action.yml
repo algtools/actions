@@ -587,24 +587,30 @@ runs:
         done || echo "  (checking differences...)"
 
         # Merge template changes
-        # Strategy: Apply template updates, but preserve app customizations when detected
+        # Strategy: Preserve app customizations by default, apply template updates where safe
         # - Files only in template: Add them (new template features)
         # - Files only in app: Keep them (app customizations)
-        # - Files in both: Apply template updates, but check for app customizations
+        # - Files in both: Preserve app version (prevents overwriting developer work)
         # Use --allow-unrelated-histories because template Git repo has no common history with app
-        # Use -X theirs to apply template updates by default
+        # Use -X ours to preserve app customizations - this ensures developer work is never lost
         set +e  # Don't exit on merge conflicts
-        git merge "template-remote/${TEMPLATE_BRANCH}" --no-commit --no-ff --allow-unrelated-histories -X theirs 2>&1
+        git merge "template-remote/${TEMPLATE_BRANCH}" --no-commit --no-ff --allow-unrelated-histories -X ours 2>&1
         MERGE_EXIT_CODE=$?
         set -e
 
         if [ $MERGE_EXIT_CODE -eq 1 ]; then
-          # Merge conflicts detected - resolve by preferring template, then check for app customizations
-          echo "⚠️  Merge conflicts detected - applying template updates, then checking for app customizations"
+          # Merge conflicts detected - resolved by preserving app version (-X ours)
+          echo "⚠️  Merge conflicts detected - preserving app customizations"
           CONFLICT_FILES=$(git diff --name-only --diff-filter=U 2>/dev/null || echo "")
           if [ -n "${CONFLICT_FILES}" ]; then
-            echo "Files with conflicts (template version applied, checking for customizations):"
-            # Resolve conflicts by taking template version (already done by -X theirs)
+            echo "Files with conflicts (app version preserved to prevent losing developer work):"
+            echo "${CONFLICT_FILES}" | head -20 | while read -r file; do
+              echo "  - ${file}"
+            done
+            echo ""
+            echo "App customizations preserved. Template updates for these files are available in the PR diff."
+            echo "Review the PR to manually merge template updates if desired."
+            # Conflicts are already resolved by -X ours (app version preferred)
             git add -A
           fi
         elif [ $MERGE_EXIT_CODE -eq 0 ]; then
@@ -614,10 +620,26 @@ runs:
           # Continue anyway - let Git state show what happened
         fi
 
-        # After merge, check if any files that existed in app HEAD are now missing or significantly changed
-        # This helps detect if app customizations were overwritten
+        # After merge, add any new files from template that don't exist in app
         echo ""
-        echo "Template updates applied. Review PR diff to verify app customizations are preserved."
+        echo "Checking for new template files to add..."
+        NEW_FILES=$(git diff --name-only --diff-filter=A HEAD "template-remote/${TEMPLATE_BRANCH}" 2>/dev/null || echo "")
+        if [ -n "${NEW_FILES}" ]; then
+          echo "New files from template (will be added):"
+          echo "${NEW_FILES}" | head -20 | while read -r file; do
+            # Check if file exists in template but not in app
+            if [ ! -f "${file}" ] && git show "template-remote/${TEMPLATE_BRANCH}:${file}" >/dev/null 2>&1; then
+              echo "  - ${file}"
+              # Copy from template
+              mkdir -p "$(dirname "${file}")"
+              git show "template-remote/${TEMPLATE_BRANCH}:${file}" > "${file}" 2>/dev/null || true
+            fi
+          done
+          git add -A
+        fi
+
+        echo ""
+        echo "✓ App customizations preserved. Template updates shown in PR diff for manual review."
 
         # Check if there are any remaining unmerged files
         if git ls-files --unmerged | grep -q .; then
