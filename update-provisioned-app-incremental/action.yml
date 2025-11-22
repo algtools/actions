@@ -1,0 +1,386 @@
+name: "Update Provisioned App (Incremental)"
+description: "Updates a provisioned app using incremental diffs from intermediate versions"
+author: "Algtools"
+
+branding:
+  icon: "refresh-cw"
+  color: "blue"
+
+inputs:
+  source_repo:
+    description: "Source template repository (e.g., algtools/bff-template)"
+    required: true
+  target_repo:
+    description: "Target repository to update (e.g., owner/my-app)"
+    required: true
+  version:
+    description: 'Target template version (e.g., v1.8.2 or "latest")'
+    required: false
+    default: "latest"
+  base_branch:
+    description: "Base branch to create PR against"
+    required: false
+    default: "main"
+  branch_name:
+    description: "Name for the update branch (default: algtools/{template_name}-{version})"
+    required: false
+    default: ""
+  pr_title:
+    description: "Title for the pull request (auto-generated if not provided)"
+    required: false
+    default: ""
+  pr_body:
+    description: "Body for the pull request (auto-generated if not provided)"
+    required: false
+    default: ""
+  github_token:
+    description: "GitHub token with repo permissions"
+    required: true
+  use_incremental:
+    description: "Use incremental diff approach (true) or simple replacement (false)"
+    required: false
+    default: "true"
+  dry_run:
+    description: "Perform a dry run without creating PR"
+    required: false
+    default: "false"
+
+outputs:
+  pr_url:
+    description: "URL of the created pull request"
+    value: ${{ steps.create-pr.outputs.pr_url }}
+  pr_number:
+    description: "Number of the created pull request"
+    value: ${{ steps.create-pr.outputs.pr_number }}
+  release_tag:
+    description: "Template version used for the update"
+    value: ${{ steps.resolve-version.outputs.version }}
+  branch_name:
+    description: "Name of the branch created"
+    value: ${{ steps.setup.outputs.branch_name }}
+  versions_applied:
+    description: "Number of versions applied"
+    value: ${{ steps.apply-diffs.outputs.versions_applied }}
+  files_changed:
+    description: "Total number of files changed"
+    value: ${{ steps.apply-diffs.outputs.files_changed }}
+  conflicts:
+    description: "Number of conflicts encountered"
+    value: ${{ steps.apply-diffs.outputs.conflicts }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout target repository
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ inputs.target_repo }}
+        token: ${{ inputs.github_token }}
+        fetch-depth: 0
+        path: target-repo
+
+    - name: Setup dependencies
+      shell: bash
+      run: |
+        # Install jq if not available
+        if ! command -v jq &> /dev/null; then
+          echo "Installing jq..."
+          if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            sudo apt-get update && sudo apt-get install -y jq
+          elif [[ "$OSTYPE" == "darwin"* ]]; then
+            brew install jq
+          fi
+        fi
+
+        echo "jq version: $(jq --version)"
+
+    - name: Detect current version
+      id: detect-version
+      shell: bash
+      working-directory: target-repo
+      run: |
+        echo "Detecting current template version..."
+
+        if [ ! -f ".template.config.json" ]; then
+          echo "::warning::No .template.config.json found. This may not be a provisioned app."
+          echo "current_version=unknown" >> $GITHUB_OUTPUT
+          echo "template_name=unknown" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        version_info=$(bash "${{ github.action_path }}/scripts/detect-version.sh")
+        current_version=$(echo "$version_info" | jq -r '.currentVersion')
+        template_name=$(echo "$version_info" | jq -r '.templateName')
+
+        echo "current_version=$current_version" >> $GITHUB_OUTPUT
+        echo "template_name=$template_name" >> $GITHUB_OUTPUT
+
+        echo "::notice::Current version: $current_version"
+        echo "::notice::Template name: $template_name"
+
+    - name: Resolve target version
+      id: resolve-version
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+      run: |
+        target_version="${{ inputs.version }}"
+
+        if [ "$target_version" = "latest" ]; then
+          echo "Resolving latest version..."
+          latest_release=$(curl -sH "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ inputs.source_repo }}/releases/latest")
+
+          target_version=$(echo "$latest_release" | jq -r '.tag_name')
+
+          if [ "$target_version" = "null" ] || [ -z "$target_version" ]; then
+            echo "::error::Could not resolve latest version"
+            exit 1
+          fi
+        fi
+
+        echo "version=$target_version" >> $GITHUB_OUTPUT
+        echo "::notice::Target version: $target_version"
+
+    - name: Check if update needed
+      id: check-update
+      shell: bash
+      run: |
+        current="${{ steps.detect-version.outputs.current_version }}"
+        target="${{ steps.resolve-version.outputs.version }}"
+
+        if [ "$current" = "$target" ]; then
+          echo "::notice::Already on target version $target. No update needed."
+          echo "update_needed=false" >> $GITHUB_OUTPUT
+        else
+          echo "::notice::Update needed: $current → $target"
+          echo "update_needed=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Query intermediate versions
+      id: query-versions
+      if: steps.check-update.outputs.update_needed == 'true' && inputs.use_incremental == 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+      run: |
+        current_version="${{ steps.detect-version.outputs.current_version }}"
+        target_version="${{ steps.resolve-version.outputs.version }}"
+
+        echo "Querying versions between $current_version and $target_version..."
+
+        versions_json=$(bash "${{ github.action_path }}/scripts/query-versions.sh" \
+          --repo "${{ inputs.source_repo }}" \
+          --from "$current_version" \
+          --to "$target_version" \
+          --token "$GITHUB_TOKEN")
+
+        versions_count=$(echo "$versions_json" | jq 'length')
+        echo "versions_count=$versions_count" >> $GITHUB_OUTPUT
+
+        # Save versions to file
+        echo "$versions_json" > versions.json
+
+        echo "::notice::Found $versions_count intermediate version(s)"
+
+        if [ "$versions_count" -eq 0 ]; then
+          echo "::warning::No intermediate versions found. Will use simple update."
+          echo "use_incremental=false" >> $GITHUB_OUTPUT
+        else
+          echo "use_incremental=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Collect version diffs
+      id: collect-diffs
+      if: steps.check-update.outputs.update_needed == 'true' && steps.query-versions.outputs.use_incremental == 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+      run: |
+        echo "Collecting diffs for intermediate versions..."
+
+        mkdir -p diffs
+
+        bash "${{ github.action_path }}/scripts/collect-diffs.sh" \
+          --repo "${{ inputs.source_repo }}" \
+          --versions versions.json \
+          --output diffs \
+          --token "$GITHUB_TOKEN" > diffs-metadata.json
+
+        echo "::notice::Diffs collected successfully"
+
+    - name: Setup branch
+      id: setup
+      if: steps.check-update.outputs.update_needed == 'true'
+      shell: bash
+      working-directory: target-repo
+      run: |
+        template_name="${{ steps.detect-version.outputs.template_name }}"
+        target_version="${{ steps.resolve-version.outputs.version }}"
+
+        # Generate branch name
+        if [ -n "${{ inputs.branch_name }}" ]; then
+          branch_name="${{ inputs.branch_name }}"
+        else
+          # Convert version to branch-friendly format (e.g., v1.8.2 -> 1-8-2)
+          version_slug=$(echo "$target_version" | sed 's/v//g' | sed 's/\./-/g')
+          branch_name="algtools/${template_name}-${version_slug}"
+        fi
+
+        echo "branch_name=$branch_name" >> $GITHUB_OUTPUT
+
+        # Create and checkout branch
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        git checkout -b "$branch_name" || git checkout "$branch_name"
+
+        echo "::notice::Working on branch: $branch_name"
+
+    - name: Apply incremental diffs
+      id: apply-diffs
+      if: steps.check-update.outputs.update_needed == 'true' && steps.query-versions.outputs.use_incremental == 'true'
+      shell: bash
+      run: |
+        echo "Applying incremental diffs..."
+
+        dry_run_flag=""
+        if [ "${{ inputs.dry_run }}" = "true" ]; then
+          dry_run_flag="--dry-run"
+        fi
+
+        bash "${{ github.action_path }}/scripts/apply-incremental-diffs.sh" \
+          --target target-repo \
+          --diffs-dir diffs \
+          --metadata diffs-metadata.json \
+          $dry_run_flag > application-report.json || true
+
+        # Extract stats
+        versions_applied=$(jq -r '.applied' application-report.json)
+        files_changed=$(jq -r '.files_changed' application-report.json)
+        conflicts=$(jq -r '.conflicts' application-report.json)
+
+        echo "versions_applied=$versions_applied" >> $GITHUB_OUTPUT
+        echo "files_changed=$files_changed" >> $GITHUB_OUTPUT
+        echo "conflicts=$conflicts" >> $GITHUB_OUTPUT
+
+        echo "::notice::Applied $versions_applied version(s), changed $files_changed file(s), $conflicts conflict(s)"
+
+    - name: Generate PR description
+      id: generate-pr-desc
+      if: steps.check-update.outputs.update_needed == 'true' && steps.query-versions.outputs.use_incremental == 'true'
+      shell: bash
+      run: |
+        echo "Generating PR description..."
+
+        pr_desc=$(bash "${{ github.action_path }}/scripts/generate-pr-description.sh" \
+          --from "${{ steps.detect-version.outputs.current_version }}" \
+          --to "${{ steps.resolve-version.outputs.version }}" \
+          --metadata diffs-metadata.json \
+          --application-report application-report.json \
+          --template-name "${{ steps.detect-version.outputs.template_name }}")
+
+        # Save to file for PR creation
+        echo "$pr_desc" > pr-description.md
+
+        echo "::notice::PR description generated"
+
+    - name: Push changes
+      if: steps.check-update.outputs.update_needed == 'true' && inputs.dry_run == 'false'
+      shell: bash
+      working-directory: target-repo
+      run: |
+        git add -A
+
+        if git diff --staged --quiet; then
+          echo "::notice::No changes to commit"
+        else
+          git commit -m "chore: update template from ${{ steps.detect-version.outputs.current_version }} to ${{ steps.resolve-version.outputs.version }}"
+          git push -u origin "${{ steps.setup.outputs.branch_name }}" --force
+          echo "::notice::Changes pushed to branch"
+        fi
+
+    - name: Create Pull Request
+      id: create-pr
+      if: steps.check-update.outputs.update_needed == 'true' && inputs.dry_run == 'false'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+      run: |
+        cd target-repo
+
+        # Generate PR title
+        if [ -n "${{ inputs.pr_title }}" ]; then
+          pr_title="${{ inputs.pr_title }}"
+        else
+          pr_title="chore: update template to ${{ steps.resolve-version.outputs.version }}"
+        fi
+
+        # Use generated description or custom
+        if [ -f "../pr-description.md" ]; then
+          pr_body=$(cat ../pr-description.md)
+        elif [ -n "${{ inputs.pr_body }}" ]; then
+          pr_body="${{ inputs.pr_body }}"
+        else
+          pr_body="Updates template from ${{ steps.detect-version.outputs.current_version }} to ${{ steps.resolve-version.outputs.version }}"
+        fi
+
+        # Create or update PR
+        existing_pr=$(gh pr list --head "${{ steps.setup.outputs.branch_name }}" --json number --jq '.[0].number' || echo "")
+
+        if [ -n "$existing_pr" ]; then
+          echo "::notice::Updating existing PR #$existing_pr"
+          gh pr edit "$existing_pr" --title "$pr_title" --body "$pr_body"
+          pr_url=$(gh pr view "$existing_pr" --json url --jq '.url')
+          echo "pr_number=$existing_pr" >> $GITHUB_OUTPUT
+        else
+          echo "::notice::Creating new PR"
+          pr_url=$(gh pr create \
+            --title "$pr_title" \
+            --body "$pr_body" \
+            --base "${{ inputs.base_branch }}" \
+            --head "${{ steps.setup.outputs.branch_name }}" \
+            --label "template-update" \
+            --label "dependencies")
+
+          pr_number=$(gh pr view --json number --jq '.number')
+          echo "pr_number=$pr_number" >> $GITHUB_OUTPUT
+        fi
+
+        echo "pr_url=$pr_url" >> $GITHUB_OUTPUT
+        echo "::notice::Pull request: $pr_url"
+
+    - name: Summary
+      if: always()
+      shell: bash
+      run: |
+        echo "## Template Update Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        if [ "${{ steps.check-update.outputs.update_needed }}" != "true" ]; then
+          echo "✅ Already on latest version - no update needed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### Update Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **From Version:** ${{ steps.detect-version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **To Version:** ${{ steps.resolve-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Template:** ${{ steps.detect-version.outputs.template_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Method:** ${{ inputs.use_incremental == 'true' && 'Incremental Diffs' || 'Simple Update' }}" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.query-versions.outputs.use_incremental }}" = "true" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Statistics" >> $GITHUB_STEP_SUMMARY
+            echo "- **Versions Applied:** ${{ steps.apply-diffs.outputs.versions_applied }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Files Changed:** ${{ steps.apply-diffs.outputs.files_changed }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Conflicts:** ${{ steps.apply-diffs.outputs.conflicts }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "🔍 **Dry Run Mode** - No PR was created" >> $GITHUB_STEP_SUMMARY
+          elif [ -n "${{ steps.create-pr.outputs.pr_url }}" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Pull Request" >> $GITHUB_STEP_SUMMARY
+            echo "🔗 [${{ steps.create-pr.outputs.pr_url }}](${{ steps.create-pr.outputs.pr_url }})" >> $GITHUB_STEP_SUMMARY
+          fi
+        fi
