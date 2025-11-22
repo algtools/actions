@@ -1,3 +1,10 @@
+## [1.31.9](https://github.com/algtools/actions/compare/v1.31.8...v1.31.9) (2025-11-22)
+
+
+### Bug Fixes
+
+* update merge strategy in update-provisioned-app ([282c109](https://github.com/algtools/actions/commit/282c1094649bf07ec4d85425e5e2a888b122a82e))
+
 ## [1.31.8](https://github.com/algtools/actions/compare/v1.31.7...v1.31.8) (2025-11-22)
 
 
