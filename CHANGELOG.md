@@ -1,3 +1,10 @@
+## [1.31.16](https://github.com/algtools/actions/compare/v1.31.15...v1.31.16) (2025-11-22)
+
+
+### Bug Fixes
+
+* optimize file handling and error management in app customization restoration ([c7d091f](https://github.com/algtools/actions/commit/c7d091f063432c83e55494d418e03c9df2826fb4))
+
 ## [1.31.15](https://github.com/algtools/actions/compare/v1.31.14...v1.31.15) (2025-11-22)
 
 
