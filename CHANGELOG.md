@@ -1,3 +1,10 @@
+## [1.31.10](https://github.com/algtools/actions/compare/v1.31.9...v1.31.10) (2025-11-22)
+
+
+### Bug Fixes
+
+* enhance wrangler.jsonc restoration ([602bb91](https://github.com/algtools/actions/commit/602bb91d7dcd94f5d5afb0905c8d3fac6d868fb5))
+
 ## [1.31.9](https://github.com/algtools/actions/compare/v1.31.8...v1.31.9) (2025-11-22)
 
 
