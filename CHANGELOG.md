@@ -1,3 +1,10 @@
+## [1.31.11](https://github.com/algtools/actions/compare/v1.31.10...v1.31.11) (2025-11-22)
+
+
+### Bug Fixes
+
+* refine merge strategy to better preserve app customizations in update-provisioned-app action ([7cdf0ee](https://github.com/algtools/actions/commit/7cdf0ee4f6ce754af40d07c81f98816e41b86642))
+
 ## [1.31.10](https://github.com/algtools/actions/compare/v1.31.9...v1.31.10) (2025-11-22)
 
 
