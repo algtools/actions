@@ -1,3 +1,10 @@
+## [1.31.17](https://github.com/algtools/actions/compare/v1.31.16...v1.31.17) (2025-11-22)
+
+
+### Bug Fixes
+
+* refine customization detection to focus on source code files ([47cb81d](https://github.com/algtools/actions/commit/47cb81d2ac68521fb1e145ad058646b0c8a9300d))
+
 ## [1.31.16](https://github.com/algtools/actions/compare/v1.31.15...v1.31.16) (2025-11-22)
 
 
