@@ -1,3 +1,10 @@
+## [1.31.13](https://github.com/algtools/actions/compare/v1.31.12...v1.31.13) (2025-11-22)
+
+
+### Bug Fixes
+
+* improve customization detection in update-provisioned-app ([55c0aa1](https://github.com/algtools/actions/commit/55c0aa1eb1caa281fcea3175049776bca69a502e))
+
 ## [1.31.12](https://github.com/algtools/actions/compare/v1.31.11...v1.31.12) (2025-11-22)
 
 
