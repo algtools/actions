@@ -1,3 +1,10 @@
+# [1.33.0](https://github.com/algtools/actions/compare/v1.32.1...v1.33.0) (2025-11-22)
+
+
+### Features
+
+* implement incremental template update ([8e7f4f1](https://github.com/algtools/actions/commit/8e7f4f1c9a9d926fb06df61d0d25242324f4aeef))
+
 ## [1.32.1](https://github.com/algtools/actions/compare/v1.32.0...v1.32.1) (2025-11-22)
 
 
