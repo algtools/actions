@@ -622,6 +622,9 @@ runs:
         echo "Detecting app customizations to preserve..."
         CUSTOMIZED_FILES=""
 
+        # Temporarily disable exit on error for this section (we want to continue even if some files fail)
+        set +e
+
         # Get list of files that exist in both app and template
         for file in $(git diff --name-only HEAD "template-remote/${TEMPLATE_BRANCH}" 2>/dev/null | grep -v "^\.github/template-updates.yml$" | grep -v "^CHANGELOG.md$" | grep -v "^package.json$" | grep -v "^wrangler.jsonc$" | grep -v "^pnpm-lock.yaml$" || true); do
           # Skip if file doesn't exist in app HEAD
@@ -634,13 +637,26 @@ runs:
             continue
           fi
 
+          # Skip binary files or very large files (over 1MB) - comparison would be too slow/risky
+          FILE_SIZE=$(wc -c < "${file}" 2>/dev/null || echo "0")
+          if [ "${FILE_SIZE}" -gt 1048576 ]; then
+            echo "  ⚠️  ${file} - File too large (${FILE_SIZE} bytes), skipping customization detection"
+            continue
+          fi
+
           # Get app version, template version, and merged version
+          # Use subshells to prevent failures from affecting the main script
           APP_CONTENT=$(git show HEAD:"${file}" 2>/dev/null || echo "")
           TEMPLATE_CONTENT=$(git show "template-remote/${TEMPLATE_BRANCH}:${file}" 2>/dev/null || echo "")
           MERGED_CONTENT=$(cat "${file}" 2>/dev/null || echo "")
 
+          # Skip if we couldn't read any of the versions
+          if [ -z "${APP_CONTENT}" ] || [ -z "${TEMPLATE_CONTENT}" ] || [ -z "${MERGED_CONTENT}" ]; then
+            continue
+          fi
+
           # If app version differs from template version, it might be customized
-          if [ -n "${APP_CONTENT}" ] && [ -n "${TEMPLATE_CONTENT}" ] && [ "${APP_CONTENT}" != "${TEMPLATE_CONTENT}" ]; then
+          if [ "${APP_CONTENT}" != "${TEMPLATE_CONTENT}" ]; then
             # If merged version matches template (meaning app customization was lost), restore app version
             if [ "${MERGED_CONTENT}" = "${TEMPLATE_CONTENT}" ]; then
               CUSTOMIZED_FILES="${CUSTOMIZED_FILES}${file}\n"
@@ -649,6 +665,12 @@ runs:
             fi
           fi
         done
+
+        # Re-enable exit on error
+        set -e
+
+        # Re-enable exit on error
+        set -e
 
         if [ -n "${CUSTOMIZED_FILES}" ]; then
           echo ""
@@ -659,7 +681,10 @@ runs:
           echo ""
           echo "These files had app customizations that differed from the template."
           echo "App versions were restored. Template updates for these files are not applied."
-          git add -A
+          # Stage the restored files
+          git add -A || {
+            echo "Warning: Failed to stage restored files, continuing anyway"
+          }
         else
           echo "  No app customizations detected - template updates applied"
         fi
