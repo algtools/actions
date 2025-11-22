@@ -1,3 +1,10 @@
+## [1.31.8](https://github.com/algtools/actions/compare/v1.31.7...v1.31.8) (2025-11-22)
+
+
+### Bug Fixes
+
+* improve conflict handling in update-provisioned-app action ([abfdfc7](https://github.com/algtools/actions/commit/abfdfc7dbcbfd91ce8740cd4c537fc0a0ec7a2fa))
+
 ## [1.31.7](https://github.com/algtools/actions/compare/v1.31.6...v1.31.7) (2025-11-21)
 
 
