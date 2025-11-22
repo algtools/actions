@@ -676,41 +676,75 @@ runs:
         if [ -n "${CUSTOMIZED_FILES}" ]; then
           echo ""
           echo "✓ Restored app customizations for files that were customized:"
-          # Print the list of files - handle potential failures gracefully
-          set +e
-          echo -e "${CUSTOMIZED_FILES}" | while IFS= read -r file || true; do
-            if [ -n "${file}" ]; then
-              echo "    - ${file}"
-            fi
-          done || true
-          set -e
+          # Print the list of files - use a simple approach that won't hang
+          # Write to temp file first, then read from it to avoid pipe issues
+          TEMP_CUSTOMIZED="/tmp/customized-files-$$.txt"
+          printf "%s" "${CUSTOMIZED_FILES}" > "${TEMP_CUSTOMIZED}" 2>/dev/null || true
+          if [ -f "${TEMP_CUSTOMIZED}" ]; then
+            while IFS= read -r file || [ -n "${file}" ]; do
+              if [ -n "${file}" ] && [ "${file}" != "" ]; then
+                echo "    - ${file}"
+              fi
+            done < "${TEMP_CUSTOMIZED}"
+            rm -f "${TEMP_CUSTOMIZED}" 2>/dev/null || true
+          fi
           echo ""
           echo "These files had app customizations that differed from the template."
           echo "App versions were restored. Template updates for these files are not applied."
-          # Stage the restored files (disable exit on error temporarily for this command)
-          set +e
-          git add -A || true
-          set -e
+          # Stage the restored files
+          git add -A || echo "Warning: git add failed, continuing anyway"
         else
           echo "  No app customizations detected - template updates applied"
         fi
 
         # Add any new files from template that don't exist in app
+        # Use git diff to find files that exist in template but not in app
         echo ""
         echo "Checking for new template files to add..."
-        NEW_FILES=$(git diff --name-only --diff-filter=A HEAD "template-remote/${TEMPLATE_BRANCH}" 2>/dev/null || echo "")
+        set +e
+        NEW_FILES=$(git diff --name-only --diff-filter=A HEAD "template-remote/${TEMPLATE_BRANCH}" 2>/dev/null | head -50 || echo "")
+        NEW_FILES_COUNT=0
         if [ -n "${NEW_FILES}" ]; then
-          echo "New files from template (will be added):"
-          echo "${NEW_FILES}" | head -20 | while read -r file; do
+          # Use a temp file to track files we've added (to avoid subshell variable scope issues)
+          TEMP_NEW_FILES="/tmp/new-files-$$.txt"
+          touch "${TEMP_NEW_FILES}"
+          echo "${NEW_FILES}" | while IFS= read -r file || [ -n "${file}" ]; do
+            if [ -z "${file}" ]; then
+              continue
+            fi
+            # Skip excluded files
+            if [[ "${file}" == ".github/template-updates.yml" ]] || \
+               [[ "${file}" == "CHANGELOG.md" ]] || \
+               [[ "${file}" == "package.json" ]] || \
+               [[ "${file}" == "wrangler.jsonc" ]] || \
+               [[ "${file}" == "pnpm-lock.yaml" ]] || \
+               [[ "${file}" == .template-app/* ]] || \
+               [[ "${file}" == .template-update-backup/* ]]; then
+              continue
+            fi
             # Check if file exists in template but not in app
             if [ ! -f "${file}" ] && git show "template-remote/${TEMPLATE_BRANCH}:${file}" >/dev/null 2>&1; then
               echo "  - ${file}"
               # Copy from template
-              mkdir -p "$(dirname "${file}")"
-              git show "template-remote/${TEMPLATE_BRANCH}:${file}" > "${file}" 2>/dev/null || true
+              mkdir -p "$(dirname "${file}")" 2>/dev/null || true
+              if git show "template-remote/${TEMPLATE_BRANCH}:${file}" > "${file}" 2>/dev/null; then
+                echo "${file}" >> "${TEMP_NEW_FILES}"
+              fi
             fi
           done
-          git add -A
+          # Count files we added
+          if [ -f "${TEMP_NEW_FILES}" ]; then
+            NEW_FILES_COUNT=$(wc -l < "${TEMP_NEW_FILES}" 2>/dev/null || echo "0")
+            rm -f "${TEMP_NEW_FILES}" 2>/dev/null || true
+          fi
+        fi
+        set -e
+
+        if [ "${NEW_FILES_COUNT}" -gt 0 ]; then
+          echo "  Added ${NEW_FILES_COUNT} new file(s) from template"
+          git add -A || echo "Warning: git add failed for new files, continuing anyway"
+        else
+          echo "  No new template files to add"
         fi
 
         echo ""
