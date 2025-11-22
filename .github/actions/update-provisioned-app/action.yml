@@ -617,9 +617,12 @@ runs:
         fi
 
         # After merge, detect and restore app customizations
-        # Compare merged files against original app HEAD to find customizations
+        # Only restore files in paths where developers commonly make customizations
+        # This prevents restoring files that are just different due to template updates
         echo ""
         echo "Detecting app customizations to preserve..."
+        echo "Note: Only checking source code files (src/**, scripts/**) for customizations."
+        echo "Workflow and config files will receive template updates unless manually customized."
         CUSTOMIZED_FILES=""
 
         # Temporarily disable exit on error for this section (we want to continue even if some files fail)
@@ -627,8 +630,28 @@ runs:
         set +e
         set +u
 
-        # Get list of files that exist in both app and template
+        # Only check files in source code directories where developers commonly customize
+        # This prevents restoring workflow/config files that should receive template updates
+        CUSTOMIZATION_PATHS=(
+          "src/"
+          "scripts/"
+        )
+
+        # Get list of files that exist in both app and template, filtered by customization paths
         for file in $(git diff --name-only HEAD "template-remote/${TEMPLATE_BRANCH}" 2>/dev/null | grep -v "^\.github/template-updates.yml$" | grep -v "^CHANGELOG.md$" | grep -v "^package.json$" | grep -v "^wrangler.jsonc$" | grep -v "^pnpm-lock.yaml$" || true); do
+          # Only check files in customization paths
+          IS_CUSTOMIZATION_PATH=false
+          for path in "${CUSTOMIZATION_PATHS[@]}"; do
+            if [[ "${file}" == ${path}* ]]; then
+              IS_CUSTOMIZATION_PATH=true
+              break
+            fi
+          done
+
+          if [ "${IS_CUSTOMIZATION_PATH}" = "false" ]; then
+            continue
+          fi
+
           # Skip if file doesn't exist in app HEAD
           if ! git show HEAD:"${file}" >/dev/null 2>&1; then
             continue
