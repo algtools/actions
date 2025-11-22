@@ -1,3 +1,10 @@
+## [1.31.12](https://github.com/algtools/actions/compare/v1.31.11...v1.31.12) (2025-11-22)
+
+
+### Bug Fixes
+
+* update merge strategy to apply template updates and restore app customizations ([cb6bb17](https://github.com/algtools/actions/commit/cb6bb170f1cd84b5ad7d5eb4a9a7545ad8242d38))
+
 ## [1.31.11](https://github.com/algtools/actions/compare/v1.31.10...v1.31.11) (2025-11-22)
 
 
