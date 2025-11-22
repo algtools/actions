@@ -1,3 +1,10 @@
+## [1.32.1](https://github.com/algtools/actions/compare/v1.32.0...v1.32.1) (2025-11-22)
+
+
+### Bug Fixes
+
+* add alias input to provision template workflow ([32fd888](https://github.com/algtools/actions/commit/32fd8889bbc288b5f8dfaf268fa4a9e0e3367275))
+
 # [1.32.0](https://github.com/algtools/actions/compare/v1.31.17...v1.32.0) (2025-11-22)
 
 
