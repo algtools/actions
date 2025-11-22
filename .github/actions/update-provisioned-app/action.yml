@@ -587,30 +587,26 @@ runs:
         done || echo "  (checking differences...)"
 
         # Merge template changes
-        # Strategy: Preserve app customizations by default, apply template updates where safe
+        # Strategy: Apply template updates, then detect and restore app customizations
         # - Files only in template: Add them (new template features)
         # - Files only in app: Keep them (app customizations)
-        # - Files in both: Preserve app version (prevents overwriting developer work)
+        # - Files in both: Apply template updates, then restore app customizations if detected
         # Use --allow-unrelated-histories because template Git repo has no common history with app
-        # Use -X ours to preserve app customizations - this ensures developer work is never lost
+        # Use -X theirs to apply template updates first
         set +e  # Don't exit on merge conflicts
-        git merge "template-remote/${TEMPLATE_BRANCH}" --no-commit --no-ff --allow-unrelated-histories -X ours 2>&1
+        git merge "template-remote/${TEMPLATE_BRANCH}" --no-commit --no-ff --allow-unrelated-histories -X theirs 2>&1
         MERGE_EXIT_CODE=$?
         set -e
 
         if [ $MERGE_EXIT_CODE -eq 1 ]; then
-          # Merge conflicts detected - resolved by preserving app version (-X ours)
-          echo "⚠️  Merge conflicts detected - preserving app customizations"
+          # Merge conflicts detected - resolved by preferring template (-X theirs)
+          echo "⚠️  Merge conflicts detected - template updates applied"
           CONFLICT_FILES=$(git diff --name-only --diff-filter=U 2>/dev/null || echo "")
           if [ -n "${CONFLICT_FILES}" ]; then
-            echo "Files with conflicts (app version preserved to prevent losing developer work):"
+            echo "Files with conflicts (template version applied):"
             echo "${CONFLICT_FILES}" | head -20 | while read -r file; do
               echo "  - ${file}"
             done
-            echo ""
-            echo "App customizations preserved. Template updates for these files are available in the PR diff."
-            echo "Review the PR to manually merge template updates if desired."
-            # Conflicts are already resolved by -X ours (app version preferred)
             git add -A
           fi
         elif [ $MERGE_EXIT_CODE -eq 0 ]; then
@@ -620,7 +616,55 @@ runs:
           # Continue anyway - let Git state show what happened
         fi
 
-        # After merge, add any new files from template that don't exist in app
+        # After merge, detect and restore app customizations
+        # Compare merged files against original app HEAD to find customizations
+        echo ""
+        echo "Detecting app customizations to preserve..."
+        CUSTOMIZED_FILES=""
+
+        # Get list of files that exist in both app and template
+        for file in $(git diff --name-only HEAD "template-remote/${TEMPLATE_BRANCH}" 2>/dev/null | grep -v "^\.github/template-updates.yml$" | grep -v "^CHANGELOG.md$" | grep -v "^package.json$" | grep -v "^wrangler.jsonc$" | grep -v "^pnpm-lock.yaml$" || true); do
+          # Skip if file doesn't exist in app HEAD
+          if ! git show HEAD:"${file}" >/dev/null 2>&1; then
+            continue
+          fi
+
+          # Skip if file doesn't exist after merge
+          if [ ! -f "${file}" ]; then
+            continue
+          fi
+
+          # Get app version, template version, and merged version
+          APP_CONTENT=$(git show HEAD:"${file}" 2>/dev/null || echo "")
+          TEMPLATE_CONTENT=$(git show "template-remote/${TEMPLATE_BRANCH}:${file}" 2>/dev/null || echo "")
+          MERGED_CONTENT=$(cat "${file}" 2>/dev/null || echo "")
+
+          # If app version differs from template version, it might be customized
+          if [ -n "${APP_CONTENT}" ] && [ -n "${TEMPLATE_CONTENT}" ] && [ "${APP_CONTENT}" != "${TEMPLATE_CONTENT}" ]; then
+            # If merged version matches template (meaning app customization was lost), restore app version
+            if [ "${MERGED_CONTENT}" = "${TEMPLATE_CONTENT}" ]; then
+              CUSTOMIZED_FILES="${CUSTOMIZED_FILES}${file}\n"
+              echo "  ⚠️  ${file} - App customization detected, restoring app version"
+              git checkout HEAD -- "${file}" 2>/dev/null || true
+            fi
+          fi
+        done
+
+        if [ -n "${CUSTOMIZED_FILES}" ]; then
+          echo ""
+          echo "✓ Restored app customizations for files that were customized:"
+          echo -e "${CUSTOMIZED_FILES}" | while read -r file; do
+            [ -n "${file}" ] && echo "    - ${file}"
+          done
+          echo ""
+          echo "These files had app customizations that differed from the template."
+          echo "App versions were restored. Template updates for these files are not applied."
+          git add -A
+        else
+          echo "  No app customizations detected - template updates applied"
+        fi
+
+        # Add any new files from template that don't exist in app
         echo ""
         echo "Checking for new template files to add..."
         NEW_FILES=$(git diff --name-only --diff-filter=A HEAD "template-remote/${TEMPLATE_BRANCH}" 2>/dev/null || echo "")
@@ -639,7 +683,7 @@ runs:
         fi
 
         echo ""
-        echo "✓ App customizations preserved. Template updates shown in PR diff for manual review."
+        echo "✓ Template updates applied. App customizations preserved."
 
         # Check if there are any remaining unmerged files
         if git ls-files --unmerged | grep -q .; then
