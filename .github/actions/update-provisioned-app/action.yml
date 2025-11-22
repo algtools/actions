@@ -623,7 +623,9 @@ runs:
         CUSTOMIZED_FILES=""
 
         # Temporarily disable exit on error for this section (we want to continue even if some files fail)
+        # Also disable unset variable errors since we're building up CUSTOMIZED_FILES
         set +e
+        set +u
 
         # Get list of files that exist in both app and template
         for file in $(git diff --name-only HEAD "template-remote/${TEMPLATE_BRANCH}" 2>/dev/null | grep -v "^\.github/template-updates.yml$" | grep -v "^CHANGELOG.md$" | grep -v "^package.json$" | grep -v "^wrangler.jsonc$" | grep -v "^pnpm-lock.yaml$" || true); do
@@ -666,25 +668,36 @@ runs:
           fi
         done
 
-        # Re-enable exit on error
+        # Re-enable exit on error and unset variable checking
         set -e
-
-        # Re-enable exit on error
-        set -e
+        set -u
 
         if [ -n "${CUSTOMIZED_FILES}" ]; then
           echo ""
           echo "✓ Restored app customizations for files that were customized:"
-          echo -e "${CUSTOMIZED_FILES}" | while read -r file; do
-            [ -n "${file}" ] && echo "    - ${file}"
+          # Print the list of files - use echo -e with proper error handling
+          set +e
+          echo -e "${CUSTOMIZED_FILES}" | while IFS= read -r file; do
+            if [ -n "${file}" ]; then
+              echo "    - ${file}"
+            fi
           done
+          PRINT_EXIT=$?
+          set -e
+          if [ $PRINT_EXIT -ne 0 ]; then
+            echo "Warning: Error printing file list, continuing anyway"
+          fi
           echo ""
           echo "These files had app customizations that differed from the template."
           echo "App versions were restored. Template updates for these files are not applied."
-          # Stage the restored files
-          git add -A || {
-            echo "Warning: Failed to stage restored files, continuing anyway"
-          }
+          # Stage the restored files (disable exit on error temporarily for this command)
+          set +e
+          git add -A
+          GIT_ADD_EXIT=$?
+          set -e
+          if [ $GIT_ADD_EXIT -ne 0 ]; then
+            echo "Warning: Failed to stage restored files (exit code: ${GIT_ADD_EXIT}), continuing anyway"
+          fi
         else
           echo "  No app customizations detected - template updates applied"
         fi
