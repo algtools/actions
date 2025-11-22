@@ -1,3 +1,10 @@
+## [1.31.14](https://github.com/algtools/actions/compare/v1.31.13...v1.31.14) (2025-11-22)
+
+
+### Bug Fixes
+
+* enhance error handling in app customization restoration process ([d83a364](https://github.com/algtools/actions/commit/d83a3645328e3f405c478f8200088514084d514e))
+
 ## [1.31.13](https://github.com/algtools/actions/compare/v1.31.12...v1.31.13) (2025-11-22)
 
 
