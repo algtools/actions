@@ -87,32 +87,14 @@ runs:
         echo "Testing API access to repository..."
         if ! gh api "/repos/${SOURCE_REPO}" --jq '.name' >/dev/null 2>&1; then
           echo "::error::Cannot access repository ${SOURCE_REPO}"
-          echo ""
-          echo "ERROR: Unable to access repository ${SOURCE_REPO}."
-          echo ""
-          echo "Possible reasons:"
-          echo "1. The repository doesn't exist"
-          echo "2. The repository is private and the token doesn't have access"
-          echo "3. The repository name is incorrect"
-          echo ""
-          echo "Current token scopes: $(gh auth status 2>&1 || echo 'Unable to check')"
           exit 1
         fi
 
-        # List releases to debug
+        # Fetch releases
         echo "Fetching releases from ${SOURCE_REPO}..."
         RELEASES_LIST=$(gh api "/repos/${SOURCE_REPO}/releases" --jq '.[].tag_name' 2>&1 || echo "")
         if [ -z "${RELEASES_LIST}" ]; then
           echo "::error::No releases found in ${SOURCE_REPO}"
-          echo ""
-          echo "ERROR: Repository ${SOURCE_REPO} has no releases."
-          echo ""
-          echo "To create a release:"
-          echo "1. Go to https://github.com/${SOURCE_REPO}/releases"
-          echo "2. Click 'Create a new release' or 'Draft a new release'"
-          echo "3. Tag version (e.g., v1.0.0)"
-          echo "4. Attach the packaged template tarball"
-          echo "5. Publish the release"
           exit 1
         fi
 
@@ -120,28 +102,15 @@ runs:
         echo "${RELEASES_LIST}"
 
         if [ "${VERSION}" = "latest" ]; then
-          echo ""
           echo "Fetching latest release..."
           RELEASE_DATA=$(gh api "/repos/${SOURCE_REPO}/releases/latest" 2>&1) || {
             echo "::error::Failed to fetch latest release"
-            echo ""
-            echo "API response:"
-            echo "${RELEASE_DATA}"
-            echo ""
-            echo "Available releases: ${RELEASES_LIST}"
             exit 1
           }
         else
-          echo ""
           echo "Fetching release with tag: ${VERSION}"
           RELEASE_DATA=$(gh api "/repos/${SOURCE_REPO}/releases/tags/${VERSION}" 2>&1) || {
             echo "::error::Release tag ${VERSION} not found"
-            echo ""
-            echo "API response:"
-            echo "${RELEASE_DATA}"
-            echo ""
-            echo "Available releases:"
-            echo "${RELEASES_LIST}"
             exit 1
           }
         fi
@@ -150,7 +119,7 @@ runs:
         echo "Found release: ${RELEASE_TAG}"
         echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
 
-        # Look for custom template asset (e.g., bff-template-v1.10.1.tgz)
+        # Look for template asset
         ASSET_NAME=$(echo "${RELEASE_DATA}" | jq -r '.assets[] | select(.name | endswith(".tar.gz") or endswith(".tgz")) | .name' | head -n 1)
 
         if [ -n "${ASSET_NAME}" ]; then
@@ -158,17 +127,6 @@ runs:
           echo "asset_name=${ASSET_NAME}" >> $GITHUB_OUTPUT
         else
           echo "::error::No template package found in release ${RELEASE_TAG}"
-          echo ""
-          echo "ERROR: Release ${RELEASE_TAG} does not contain a packaged template tarball."
-          echo ""
-          echo "The release must include a .tgz or .tar.gz file with the packaged template."
-          echo "GitHub source archives cannot be used because they contain template-specific"
-          echo "files that should not be included in provisioned apps."
-          echo ""
-          echo "To fix this:"
-          echo "1. Run 'pnpm run template:pack' in the template repository"
-          echo "2. Upload the generated tarball to the release"
-          echo "3. Or ensure your release workflow includes the template packaging step"
           exit 1
         fi
 
@@ -218,6 +176,8 @@ runs:
           mv "${FIRST_DIR}" template
         fi
 
+        echo "✓ Template extracted (workflows already transformed to app structure)"
+
     - name: Clone target repository
       shell: bash
       env:
@@ -238,16 +198,15 @@ runs:
         # Fetch all branches
         git fetch origin
 
-        # Try to checkout base branch, fallback to main if it doesn't exist
+        # Try to checkout base branch
         if git show-ref --verify --quiet "refs/remotes/origin/${BASE_BRANCH}"; then
           echo "Checking out base branch: ${BASE_BRANCH}"
           git checkout "${BASE_BRANCH}" || git checkout -B "${BASE_BRANCH}" "origin/${BASE_BRANCH}"
         elif git show-ref --verify --quiet "refs/remotes/origin/main"; then
           echo "Base branch ${BASE_BRANCH} not found, using main instead"
           git checkout main || git checkout -B main "origin/main"
-          BASE_BRANCH="main"
         else
-          echo "Warning: Neither ${BASE_BRANCH} nor main branch found, creating new branch"
+          echo "Warning: Neither ${BASE_BRANCH} nor main branch found"
           git checkout -b "${BASE_BRANCH}"
         fi
 
@@ -265,14 +224,11 @@ runs:
         if [ -n "${BRANCH_NAME_INPUT}" ]; then
           BRANCH_NAME="${BRANCH_NAME_INPUT}"
         else
-          # Extract source org from SOURCE_REPO (e.g., "algtools" from "algtools/web-template")
+          # Extract source org and repo name
           SOURCE_ORG=$(echo "${SOURCE_REPO}" | cut -d'/' -f1)
-
-          # Extract repo name (e.g., "web-template" from "algtools/web-template")
           REPO_NAME=$(echo "${SOURCE_REPO}" | cut -d'/' -f2)
 
           # Format: {org}/{template_name}-{version}
-          # Example: algtools/web-template-1-16-4
           VERSION_SLUG=$(echo "${RELEASE_TAG}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
           BRANCH_NAME="${SOURCE_ORG}/${REPO_NAME}-${VERSION_SLUG}"
         fi
@@ -297,228 +253,26 @@ runs:
           git checkout -b "${BRANCH_NAME}"
         fi
 
-    - name: Read template exclude patterns
-      id: exclude-patterns
-      shell: bash
-      env:
-        TEMPLATE_DIR: ../template
-      run: |
-        set -euo pipefail
-
-        # Template-specific excludes (files that shouldn't be in apps)
-        TEMPLATE_SPECIFIC_EXCLUDES=(
-          ".github/workflows/release-template.yml"
-          ".github/workflows/retry-release.yml"
-          ".github/workflows/provision-template.yml"
-          ".cursorrules"
-          "scripts/templateWrap.ts"
-          "scripts/templateTokenize.ts"
-          "scripts/templatePack.ts"
-          "scripts/templateRelease.ts"
-        )
-
-        # User/build file excludes (should never be overwritten)
-        USER_FILE_EXCLUDES=(
-          ".git"
-          "node_modules"
-          ".next"
-          "dist"
-          "build"
-          ".env"
-          ".env.local"
-          ".env.*.local"
-          "*.log"
-          ".DS_Store"
-          ".idea"
-          ".vscode"
-          "coverage"
-          ".nyc_output"
-          "pnpm-lock.yaml"
-          "package-lock.json"
-          "yarn.lock"
-          "CHANGELOG.md"
-          ".cursorrules"
-        )
-
-        # Try to read exclude.json from template (may not exist if .template-app was removed)
-        EXCLUDE_CONFIG="${TEMPLATE_DIR}/.template-app/exclude.json"
-        if [ -f "${EXCLUDE_CONFIG}" ]; then
-          echo "Reading exclude patterns from .template-app/exclude.json"
-          if command -v jq &> /dev/null; then
-            TEMPLATE_EXCLUDES=$(jq -r '.[]' "${EXCLUDE_CONFIG}" 2>/dev/null || echo "")
-            if [ -n "${TEMPLATE_EXCLUDES}" ]; then
-              # Use template-specific excludes from config
-              TEMPLATE_SPECIFIC_EXCLUDES=()
-              while IFS= read -r pattern; do
-                TEMPLATE_SPECIFIC_EXCLUDES+=("${pattern}")
-              done <<< "${TEMPLATE_EXCLUDES}"
-            fi
-          fi
-        else
-          echo "No .template-app/exclude.json found, using default template-specific excludes"
-        fi
-
-        # Combine all excludes
-        EXCLUDE_PATTERNS=("${TEMPLATE_SPECIFIC_EXCLUDES[@]}" "${USER_FILE_EXCLUDES[@]}")
-
-        # Convert array to JSON for output (use -c for compact single-line output)
-        EXCLUDE_JSON=$(printf '%s\n' "${EXCLUDE_PATTERNS[@]}" | jq -R . | jq -sc . 2>/dev/null || echo "[]")
-        echo "exclude_patterns=${EXCLUDE_JSON}" >> $GITHUB_OUTPUT
-        echo "exclude_count=${#EXCLUDE_PATTERNS[@]}" >> $GITHUB_OUTPUT
-
-    - name: Preserve app-specific files
-      shell: bash
-      working-directory: target-repo
-      run: |
-        set -euo pipefail
-
-        echo "Preserving app-specific files before template update..."
-
-        # Create backup directory
-        mkdir -p .template-update-backup
-
-        # Files that should NEVER be updated from template (always preserve app version)
-        EXCLUDED_FILES=(
-          ".github/template-updates.yml"
-          "CHANGELOG.md"
-          "pnpm-lock.yaml"
-          "package-lock.json"
-          "yarn.lock"
-        )
-
-        # Backup excluded files
-        for file in "${EXCLUDED_FILES[@]}"; do
-          if [ -f "${file}" ]; then
-            # Create directory structure in backup
-            mkdir -p ".template-update-backup/$(dirname "${file}")"
-            cp "${file}" ".template-update-backup/${file}"
-            echo "✓ Preserved ${file}"
-          fi
-        done
-
-        # Also backup package.json for smart merge (will be handled separately)
-        if [ -f "package.json" ]; then
-          cp "package.json" ".template-update-backup/package.json"
-          echo "✓ Preserved package.json (for smart merge)"
-        fi
-
-        echo "✓ All app-specific files preserved"
-
-    - name: Apply template changes using Git merge
+    - name: Apply template updates using Git merge
       shell: bash
       working-directory: target-repo
       env:
         TEMPLATE_DIR: ../template
-        EXCLUDE_PATTERNS_JSON: ${{ steps.exclude-patterns.outputs.exclude_patterns }}
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
       run: |
         set -euo pipefail
 
-        echo "Applying template changes using Git merge strategy..."
-
-        # Save the target repo directory (we're already in it due to working-directory)
-        TARGET_REPO_DIR=$(pwd)
-
-        # Define files/patterns to exclude from merge (remove from template before merging)
-        # These files are handled by smart merge or should never be updated
-        EXCLUDE_PATTERNS=(
-          ".git"
-          "node_modules"
-          ".next"
-          "dist"
-          "build"
-          ".env"
-          ".env.local"
-          ".env.*.local"
-          "*.log"
-          ".DS_Store"
-          ".idea"
-          ".vscode"
-          "coverage"
-          ".nyc_output"
-          "pnpm-lock.yaml"
-          "package-lock.json"
-          "yarn.lock"
-          "CHANGELOG.md"
-          ".cursorrules"
-          ".github/template-updates.yml"
-          ".template-app"
-          ".template-update-backup"
-          "wrangler.jsonc"  # Handled by smart merge (preserves app-specific IDs)
-          "package.json"   # Handled by smart merge (preserves app name/version)
-        )
-
-        # Try to override with patterns from JSON if available
-        if command -v jq &> /dev/null && [ -n "${EXCLUDE_PATTERNS_JSON}" ]; then
-          mapfile -t PATTERNS_FROM_JSON < <(echo "${EXCLUDE_PATTERNS_JSON}" | jq -r '.[]' 2>/dev/null)
-          if [ ${#PATTERNS_FROM_JSON[@]} -gt 0 ]; then
-            EXCLUDE_PATTERNS=("${PATTERNS_FROM_JSON[@]}")
-            # Always ensure critical files are excluded
-            EXCLUDE_PATTERNS+=(".github/template-updates.yml" ".template-update-backup" "CHANGELOG.md")
-            echo "Using exclude patterns from template configuration (${#EXCLUDE_PATTERNS[@]} patterns)"
-          else
-            echo "Using default exclude patterns (${#EXCLUDE_PATTERNS[@]} patterns)"
-          fi
-        else
-          echo "Using default exclude patterns (${#EXCLUDE_PATTERNS[@]} patterns)"
-        fi
-
-        # Remove excluded files/patterns from template directory before merge
-        echo "Removing excluded files from template directory..."
-        (
-          cd "${TEMPLATE_DIR}"
-          for pattern in "${EXCLUDE_PATTERNS[@]}"; do
-            # Handle glob patterns and directories
-            if [[ "${pattern}" == *"*"* ]]; then
-              # Glob pattern - use find
-              find . -name "${pattern}" -type f -delete 2>/dev/null || true
-              find . -path "*/${pattern}" -type f -delete 2>/dev/null || true
-            else
-              # Exact path or directory
-              if [ -e "${pattern}" ] || [ -e "./${pattern}" ]; then
-                rm -rf "${pattern}" "./${pattern}" 2>/dev/null || true
-              fi
-              # Also remove from subdirectories
-              find . -path "*/${pattern}" -type f -delete 2>/dev/null || true
-              find . -path "*/${pattern}" -type d -exec rm -rf {} + 2>/dev/null || true
-            fi
-          done
-        )
-
-        echo "✓ Excluded files removed from template"
-
-        # Debug: Check template structure
-        echo "Checking template structure..."
-        if [ -d "${TEMPLATE_DIR}/.github/workflows" ]; then
-          echo "  Template workflows found in .github/workflows/:"
-          find "${TEMPLATE_DIR}/.github/workflows" -type f -name "*.yml" | head -20 | while read -r file; do
-            echo "    - ${file#${TEMPLATE_DIR}/}"
-          done
-        fi
-        if [ -d "${TEMPLATE_DIR}/.github/workflows/app" ]; then
-          echo "  Template workflows found in .github/workflows/app/:"
-          find "${TEMPLATE_DIR}/.github/workflows/app" -type f -name "*.yml" | head -20 | while read -r file; do
-            echo "    - ${file#${TEMPLATE_DIR}/}"
-          done
-        fi
-
-        # Debug: Check app structure
-        echo "Checking app structure..."
-        if [ -d "${TARGET_REPO_DIR}/.github/workflows" ]; then
-          echo "  App workflows found:"
-          find "${TARGET_REPO_DIR}/.github/workflows" -type f -name "*.yml" | head -20 | while read -r file; do
-            echo "    - ${file#${TARGET_REPO_DIR}/}"
-          done
-        fi
+        echo "Applying template changes using Git merge..."
 
         # Prepare template for Git merge by creating a temporary Git repository
-        echo "Preparing template for Git merge..."
         TEMPLATE_GIT_DIR="/tmp/template-git-$$"
         mkdir -p "${TEMPLATE_GIT_DIR}"
 
-        # Copy template files to temporary directory (excluding .git if it exists)
+        # Copy template files to temporary directory
+        echo "Copying template files..."
         rsync -a --exclude='.git' "${TEMPLATE_DIR}/" "${TEMPLATE_GIT_DIR}/" || {
-          # Fallback if rsync not available
-          find "${TEMPLATE_DIR}" -mindepth 1 -maxdepth 1 ! -name '.git' -exec cp -r {} "${TEMPLATE_GIT_DIR}/" \; 2>/dev/null || true
+          cp -r "${TEMPLATE_DIR}"/* "${TEMPLATE_GIT_DIR}/"
         }
 
         # Initialize git repo in temporary directory
@@ -531,319 +285,50 @@ runs:
           # Add all template files
           git add -A
 
-          # Check if there are any files to commit
-          if git diff --cached --quiet && [ -z "$(git ls-files)" ]; then
-            echo "Warning: Template directory appears to be empty"
-            rm -rf "${TEMPLATE_GIT_DIR}"
-            exit 1
-          fi
-
-          git commit -m "Template state for merge" || {
+          # Create commit
+          git commit -m "Template state for ${RELEASE_TAG}" || {
             echo "Warning: Failed to create template commit"
-            rm -rf "${TEMPLATE_GIT_DIR}"
             exit 1
           }
 
-          # Debug: Show what was committed
-          echo "Template commit created with files:"
-          git ls-tree -r --name-only HEAD | head -20 | while read -r file; do
-            echo "  - ${file}"
-          done
-        ) || {
-          # If commit failed, clean up and exit
-          rm -rf "${TEMPLATE_GIT_DIR}"
-          exit 1
-        }
-
-        # Now merge template changes into app using Git
-        echo "Merging template changes into app..."
-        cd "${TARGET_REPO_DIR}"
-
-        # Save current HEAD for reference
-        CURRENT_HEAD=$(git rev-parse HEAD)
+          echo "Template commit created"
+        )
 
         # Add template git directory as a temporary remote
+        echo "Setting up template remote..."
         git remote add template-remote "${TEMPLATE_GIT_DIR}" 2>/dev/null || {
           git remote set-url template-remote "${TEMPLATE_GIT_DIR}"
         }
 
-        # Fetch template (default branch is usually master or main)
-        git fetch template-remote master 2>/dev/null || git fetch template-remote main 2>/dev/null || {
-          # Try to find the branch
-          TEMPLATE_BRANCH=$(cd "${TEMPLATE_GIT_DIR}" && git branch --show-current 2>/dev/null || echo "master")
-          git fetch template-remote "${TEMPLATE_BRANCH}"
-        }
-
-        # Get the template branch name
+        # Fetch template
         TEMPLATE_BRANCH=$(cd "${TEMPLATE_GIT_DIR}" && git branch --show-current 2>/dev/null || echo "master")
+        git fetch template-remote "${TEMPLATE_BRANCH}"
 
-        echo "Template branch: ${TEMPLATE_BRANCH}"
-        echo "Current app HEAD: $(git rev-parse --short HEAD)"
+        echo "Merging template changes (this may create conflicts)..."
 
-        # Debug: Show what files are in template that aren't in app
-        echo "Files in template that differ from app:"
-        git diff --name-only HEAD "template-remote/${TEMPLATE_BRANCH}" 2>/dev/null | head -30 | while read -r file; do
-          echo "  - ${file}"
-        done || echo "  (checking differences...)"
-
-        # Merge template changes
-        # Strategy: Apply template updates, then detect and restore app customizations
-        # - Files only in template: Add them (new template features)
-        # - Files only in app: Keep them (app customizations)
-        # - Files in both: Apply template updates, then restore app customizations if detected
-        # Use --allow-unrelated-histories because template Git repo has no common history with app
-        # Use -X theirs to apply template updates first
-        set +e  # Don't exit on merge conflicts
-        git merge "template-remote/${TEMPLATE_BRANCH}" --no-commit --no-ff --allow-unrelated-histories -X theirs 2>&1
+        # Perform merge with --allow-unrelated-histories
+        # Use -X ours as the default strategy to prefer app code when there are conflicts
+        # This is opposite to -X theirs - we want to keep app changes by default
+        set +e
+        git merge "template-remote/${TEMPLATE_BRANCH}" --no-commit --no-ff --allow-unrelated-histories -X ours 2>&1
         MERGE_EXIT_CODE=$?
         set -e
 
         if [ $MERGE_EXIT_CODE -eq 1 ]; then
-          # Merge conflicts detected - resolved by preferring template (-X theirs)
-          echo "⚠️  Merge conflicts detected - template updates applied"
-          CONFLICT_FILES=$(git diff --name-only --diff-filter=U 2>/dev/null || echo "")
-          if [ -n "${CONFLICT_FILES}" ]; then
-            echo "Files with conflicts (template version applied):"
-            echo "${CONFLICT_FILES}" | head -20 | while read -r file; do
-              echo "  - ${file}"
-            done
-            git add -A
-          fi
+          echo "⚠️  Merge conflicts detected - will be visible in PR for manual resolution"
+          # Stage all files including conflicts
+          git add -A || true
         elif [ $MERGE_EXIT_CODE -eq 0 ]; then
           echo "✓ Merge completed without conflicts"
         else
           echo "Error during merge (exit code: ${MERGE_EXIT_CODE})"
-          # Continue anyway - let Git state show what happened
         fi
 
-        # After merge, detect and restore app customizations
-        # Only restore files in paths where developers commonly make customizations
-        # This prevents restoring files that are just different due to template updates
-        echo ""
-        echo "Detecting app customizations to preserve..."
-        echo "Note: Only checking source code files (src/**, scripts/**) for customizations."
-        echo "Workflow and config files will receive template updates unless manually customized."
-        CUSTOMIZED_FILES=""
-
-        # Temporarily disable exit on error for this section (we want to continue even if some files fail)
-        # Also disable unset variable errors since we're building up CUSTOMIZED_FILES
-        set +e
-        set +u
-
-        # Only check files in source code directories where developers commonly customize
-        # This prevents restoring workflow/config files that should receive template updates
-        CUSTOMIZATION_PATHS=(
-          "src/"
-          "scripts/"
-        )
-
-        # Get list of files that exist in both app and template, filtered by customization paths
-        for file in $(git diff --name-only HEAD "template-remote/${TEMPLATE_BRANCH}" 2>/dev/null | grep -v "^\.github/template-updates.yml$" | grep -v "^CHANGELOG.md$" | grep -v "^package.json$" | grep -v "^wrangler.jsonc$" | grep -v "^pnpm-lock.yaml$" || true); do
-          # Only check files in customization paths
-          IS_CUSTOMIZATION_PATH=false
-          for path in "${CUSTOMIZATION_PATHS[@]}"; do
-            if [[ "${file}" == ${path}* ]]; then
-              IS_CUSTOMIZATION_PATH=true
-              break
-            fi
-          done
-
-          if [ "${IS_CUSTOMIZATION_PATH}" = "false" ]; then
-            continue
-          fi
-
-          # Skip if file doesn't exist in app HEAD
-          if ! git show HEAD:"${file}" >/dev/null 2>&1; then
-            continue
-          fi
-
-          # Skip if file doesn't exist after merge
-          if [ ! -f "${file}" ]; then
-            continue
-          fi
-
-          # Skip binary files or very large files (over 1MB) - comparison would be too slow/risky
-          FILE_SIZE=$(wc -c < "${file}" 2>/dev/null || echo "0")
-          if [ "${FILE_SIZE}" -gt 1048576 ]; then
-            echo "  ⚠️  ${file} - File too large (${FILE_SIZE} bytes), skipping customization detection"
-            continue
-          fi
-
-          # Get app version, template version, and merged version
-          # Use subshells to prevent failures from affecting the main script
-          APP_CONTENT=$(git show HEAD:"${file}" 2>/dev/null || echo "")
-          TEMPLATE_CONTENT=$(git show "template-remote/${TEMPLATE_BRANCH}:${file}" 2>/dev/null || echo "")
-          MERGED_CONTENT=$(cat "${file}" 2>/dev/null || echo "")
-
-          # Skip if we couldn't read any of the versions
-          if [ -z "${APP_CONTENT}" ] || [ -z "${TEMPLATE_CONTENT}" ] || [ -z "${MERGED_CONTENT}" ]; then
-            continue
-          fi
-
-          # If app version differs from template version, it might be customized
-          if [ "${APP_CONTENT}" != "${TEMPLATE_CONTENT}" ]; then
-            # If merged version matches template (meaning app customization was lost), restore app version
-            if [ "${MERGED_CONTENT}" = "${TEMPLATE_CONTENT}" ]; then
-              CUSTOMIZED_FILES="${CUSTOMIZED_FILES}${file}\n"
-              echo "  ⚠️  ${file} - App customization detected, restoring app version"
-              git checkout HEAD -- "${file}" 2>/dev/null || true
-            fi
-          fi
-        done
-
-        # Re-enable exit on error and unset variable checking
-        set -e
-        set -u
-
-        # Check if we found any customizations and handle them
-        if [ -n "${CUSTOMIZED_FILES}" ]; then
-          echo ""
-          echo "✓ Restored app customizations for files that were customized:"
-          # Print the list of files - use a simple approach that won't hang
-          # Write to temp file first, then read from it to avoid pipe issues
-          TEMP_CUSTOMIZED="/tmp/customized-files-$$.txt"
-          printf "%s" "${CUSTOMIZED_FILES}" > "${TEMP_CUSTOMIZED}" 2>/dev/null || true
-          if [ -f "${TEMP_CUSTOMIZED}" ]; then
-            while IFS= read -r file || [ -n "${file}" ]; do
-              if [ -n "${file}" ] && [ "${file}" != "" ]; then
-                echo "    - ${file}"
-              fi
-            done < "${TEMP_CUSTOMIZED}"
-            rm -f "${TEMP_CUSTOMIZED}" 2>/dev/null || true
-          fi
-          echo ""
-          echo "These files had app customizations that differed from the template."
-          echo "App versions were restored. Template updates for these files are not applied."
-          # Stage the restored files
-          git add -A || echo "Warning: git add failed, continuing anyway"
-        else
-          echo "  No app customizations detected - template updates applied"
-        fi
-
-        # Add any new files from template that don't exist in app
-        # Use git diff to find files that exist in template but not in app
-        echo ""
-        echo "Checking for new template files to add..."
-        set +e
-        NEW_FILES=$(git diff --name-only --diff-filter=A HEAD "template-remote/${TEMPLATE_BRANCH}" 2>/dev/null | head -50 || echo "")
-        NEW_FILES_COUNT=0
-        if [ -n "${NEW_FILES}" ]; then
-          # Use a temp file to track files we've added (to avoid subshell variable scope issues)
-          TEMP_NEW_FILES="/tmp/new-files-$$.txt"
-          touch "${TEMP_NEW_FILES}"
-          echo "${NEW_FILES}" | while IFS= read -r file || [ -n "${file}" ]; do
-            if [ -z "${file}" ]; then
-              continue
-            fi
-            # Skip excluded files
-            if [[ "${file}" == ".github/template-updates.yml" ]] || \
-               [[ "${file}" == "CHANGELOG.md" ]] || \
-               [[ "${file}" == "package.json" ]] || \
-               [[ "${file}" == "wrangler.jsonc" ]] || \
-               [[ "${file}" == "pnpm-lock.yaml" ]] || \
-               [[ "${file}" == .template-app/* ]] || \
-               [[ "${file}" == .template-update-backup/* ]]; then
-              continue
-            fi
-            # Check if file exists in template but not in app
-            if [ ! -f "${file}" ] && git show "template-remote/${TEMPLATE_BRANCH}:${file}" >/dev/null 2>&1; then
-              echo "  - ${file}"
-              # Copy from template
-              mkdir -p "$(dirname "${file}")" 2>/dev/null || true
-              if git show "template-remote/${TEMPLATE_BRANCH}:${file}" > "${file}" 2>/dev/null; then
-                echo "${file}" >> "${TEMP_NEW_FILES}"
-              fi
-            fi
-          done
-          # Count files we added
-          if [ -f "${TEMP_NEW_FILES}" ]; then
-            NEW_FILES_COUNT=$(wc -l < "${TEMP_NEW_FILES}" 2>/dev/null || echo "0")
-            rm -f "${TEMP_NEW_FILES}" 2>/dev/null || true
-          fi
-        fi
-        set -e
-
-        if [ "${NEW_FILES_COUNT}" -gt 0 ]; then
-          echo "  Added ${NEW_FILES_COUNT} new file(s) from template"
-          git add -A || echo "Warning: git add failed for new files, continuing anyway"
-        else
-          echo "  No new template files to add"
-        fi
-
-        echo ""
-        echo "✓ Template updates applied. App customizations preserved."
-
-        # Check if there are any remaining unmerged files
-        if git ls-files --unmerged | grep -q .; then
-          echo "⚠️  Some files remain unmerged - staging them for PR review"
-          git ls-files --unmerged | cut -f2 | sort -u | while read -r file; do
-            echo "  - ${file} (needs manual resolution)"
-          done
-          git add -A
-        fi
-
-        # Debug: Show what files changed compared to HEAD
-        echo "Files changed by merge (compared to HEAD):"
-        CHANGED_FILES=$(git diff --name-only HEAD 2>/dev/null || echo "")
-        if [ -n "${CHANGED_FILES}" ]; then
-          echo "${CHANGED_FILES}" | head -30 | while read -r file; do
-            echo "  - ${file}"
-          done
-        else
-          echo "  (no changes detected in diff compared to HEAD)"
-        fi
-
-        # Debug: Show what files are in the merge
-        echo "Files in merge commit:"
-        MERGE_FILES=$(git diff --name-only HEAD "template-remote/${TEMPLATE_BRANCH}" 2>/dev/null || echo "")
-        if [ -n "${MERGE_FILES}" ]; then
-          echo "${MERGE_FILES}" | head -30 | while read -r file; do
-            echo "  - ${file}"
-          done
-        else
-          echo "  (no differences between HEAD and template)"
-        fi
-
-        # Debug: Show what files are staged
-        echo "Files staged for commit:"
-        STAGED_FILES=$(git diff --cached --name-only 2>/dev/null || echo "")
-        if [ -n "${STAGED_FILES}" ]; then
-          echo "${STAGED_FILES}" | head -30 | while read -r file; do
-            echo "  - ${file}"
-          done
-        else
-          echo "  (no files staged)"
-        fi
-
-        # Stage all files (including conflicts - they'll be visible in PR)
-        # This ensures all changes from the merge are staged
-        git add -A
-
-        # Debug: Show final status
-        echo "Final git status:"
-        git status --short | head -30 || echo "  (no changes)"
-
-        # Debug: Show a summary of what will be in the commit
-        echo "Summary of changes to be committed:"
-        STAGED_COUNT=$(git diff --cached --name-only 2>/dev/null | wc -l || echo "0")
-        echo "  Total files staged: ${STAGED_COUNT}"
-
-        # Show workflow files specifically
-        WORKFLOW_FILES=$(git diff --cached --name-only 2>/dev/null | grep "\.github/workflows" || echo "")
-        if [ -n "${WORKFLOW_FILES}" ]; then
-          echo "  Workflow files staged:"
-          echo "${WORKFLOW_FILES}" | while read -r file; do
-            echo "    - ${file}"
-          done
-        else
-          echo "  No workflow files staged"
-        fi
-
-        # Remove temporary remote and clean up
+        # Remove temporary remote
         git remote remove template-remote 2>/dev/null || true
         rm -rf "${TEMPLATE_GIT_DIR}"
 
-        echo "✓ Template changes merged using Git"
+        echo "✓ Template changes merged"
 
     - name: Restore app-specific files
       shell: bash
@@ -851,9 +336,9 @@ runs:
       run: |
         set -euo pipefail
 
-        echo "Restoring app-specific files after template update..."
+        echo "Restoring app-specific files that should never be updated..."
 
-        # Files that should NEVER be updated from template (always restore app version)
+        # Files that should NEVER be updated from template
         EXCLUDED_FILES=(
           ".github/template-updates.yml"
           "CHANGELOG.md"
@@ -862,29 +347,17 @@ runs:
           "yarn.lock"
         )
 
-        # Restore each excluded file from backup or git
+        # Restore each excluded file from git HEAD
         for file in "${EXCLUDED_FILES[@]}"; do
-          # Try to restore from git first (most reliable)
-          if git show HEAD:"${file}" > "/tmp/restore-$(basename ${file})" 2>/dev/null; then
+          if git show HEAD:"${file}" > "/tmp/restore-$$-$(basename ${file})" 2>/dev/null; then
             mkdir -p "$(dirname "${file}")"
-            cp "/tmp/restore-$(basename ${file})" "${file}"
-            rm -f "/tmp/restore-$(basename ${file})"
-            echo "✓ Restored ${file} from git"
-          # Fallback to backup
-          elif [ -f ".template-update-backup/${file}" ]; then
-            mkdir -p "$(dirname "${file}")"
-            cp ".template-update-backup/${file}" "${file}"
-            echo "✓ Restored ${file} from backup"
-          else
-            echo "⚠️  No original ${file} found, skipping restore"
+            cp "/tmp/restore-$$-$(basename ${file})" "${file}"
+            rm -f "/tmp/restore-$$-$(basename ${file})"
+            echo "✓ Restored ${file} from HEAD"
           fi
         done
 
-        # Clean up backup directory and temp files
-        rm -rf .template-update-backup
-        rm -f /tmp/restore-*
-
-        echo "✓ All app-specific files restored"
+        echo "✓ App-specific files restored"
 
     - name: Smart merge package.json
       shell: bash
@@ -896,82 +369,39 @@ runs:
 
         echo "Smart merging package.json..."
 
-        # Get original app package.json from git (before git merge)
-        # We'll use this to preserve app-specific fields and find app-only dependencies
+        # Get original app package.json from git HEAD
         ORIGINAL_PKG="/tmp/original-package.json"
         if ! git show HEAD:package.json > "${ORIGINAL_PKG}" 2>/dev/null; then
           echo "Warning: Could not read original package.json from git"
-          ORIGINAL_PKG=""
-        else
-          echo "✓ Read original package.json from git (for preserving app-specific fields)"
-        fi
-
-        if [ ! -f "package.json" ]; then
-          echo "No package.json in target repo, skipping merge"
           exit 0
         fi
 
-        if [ ! -f "${TEMPLATE_DIR}/package.json" ]; then
-          echo "No package.json in template, skipping merge"
+        if [ ! -f "package.json" ] || [ ! -f "${TEMPLATE_DIR}/package.json" ]; then
+          echo "No package.json to merge, skipping"
           exit 0
         fi
 
-        # Use Node.js to perform smart merge with deep merge logic
+        # Use Node.js to perform smart merge
         node -e "
           const fs = require('fs');
 
-          // Read template package.json (source of truth for template structure and latest updates)
           const templatePkg = JSON.parse(fs.readFileSync('${TEMPLATE_DIR}/package.json', 'utf8'));
-
-          // Read original app package.json (for preserving app-specific fields)
-          let originalPkg = null;
-          if ('${ORIGINAL_PKG}' && fs.existsSync('${ORIGINAL_PKG}')) {
-            originalPkg = JSON.parse(fs.readFileSync('${ORIGINAL_PKG}', 'utf8'));
-          }
+          const originalPkg = JSON.parse(fs.readFileSync('${ORIGINAL_PKG}', 'utf8'));
 
           // App-specific fields that should NEVER be updated from template
-          const appSpecificFields = [
-            'name',
-            'version',
-            '__template',
-            'private',
-            'description',  // App description might be different from template
-            'author',       // App author might be different
-            'license',      // App license might be different
-            'repository',   // App repository is different
-            'homepage',     // App homepage is different
-            'bugs',         // App bugs URL is different
-          ];
+          const appSpecificFields = ['name', 'version', '__template', 'private', 'description', 'author', 'license', 'repository', 'homepage', 'bugs'];
 
-          // Preserve app-specific fields from original (if available)
+          // Preserve app-specific fields
           const preservedFields = {};
-          if (originalPkg) {
-            for (const field of appSpecificFields) {
-              if (originalPkg[field] !== undefined) {
-                preservedFields[field] = originalPkg[field];
-              }
-            }
-          } else {
-            // Fallback: try to read from current package.json if original not available
-            try {
-              const currentPkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-              for (const field of appSpecificFields) {
-                if (currentPkg[field] !== undefined) {
-                  preservedFields[field] = currentPkg[field];
-                }
-              }
-            } catch (e) {
-              console.log('Warning: Could not read current package.json for fallback');
+          for (const field of appSpecificFields) {
+            if (originalPkg[field] !== undefined) {
+              preservedFields[field] = originalPkg[field];
             }
           }
 
-          // Merge dependencies: start with template (has latest versions), add app-only deps
-          // Template versions always win for packages that exist in both
-          const mergedDependencies = {
-            ...(templatePkg.dependencies || {})
-          };
-          // Add app-only dependencies (not in template)
-          if (originalPkg?.dependencies) {
+          // Merge dependencies: template versions + app-only deps
+          const mergedDependencies = { ...(templatePkg.dependencies || {}) };
+          if (originalPkg.dependencies) {
             for (const [pkg, version] of Object.entries(originalPkg.dependencies)) {
               if (!templatePkg.dependencies || !templatePkg.dependencies[pkg]) {
                 mergedDependencies[pkg] = version;
@@ -979,12 +409,9 @@ runs:
             }
           }
 
-          // Merge devDependencies: start with template, add app-only deps
-          const mergedDevDependencies = {
-            ...(templatePkg.devDependencies || {})
-          };
-          // Add app-only devDependencies (not in template)
-          if (originalPkg?.devDependencies) {
+          // Merge devDependencies: template versions + app-only deps
+          const mergedDevDependencies = { ...(templatePkg.devDependencies || {}) };
+          if (originalPkg.devDependencies) {
             for (const [pkg, version] of Object.entries(originalPkg.devDependencies)) {
               if (!templatePkg.devDependencies || !templatePkg.devDependencies[pkg]) {
                 mergedDevDependencies[pkg] = version;
@@ -992,12 +419,9 @@ runs:
             }
           }
 
-          // Merge scripts: template scripts win, but keep app-only scripts
-          const mergedScripts = {
-            ...(templatePkg.scripts || {})
-          };
-          // Add app-only scripts (not in template)
-          if (originalPkg?.scripts) {
+          // Merge scripts: template scripts + app-only scripts
+          const mergedScripts = { ...(templatePkg.scripts || {}) };
+          if (originalPkg.scripts) {
             for (const [script, command] of Object.entries(originalPkg.scripts)) {
               if (!templatePkg.scripts || !templatePkg.scripts[script]) {
                 mergedScripts[script] = command;
@@ -1005,45 +429,10 @@ runs:
             }
           }
 
-          // Detect and log version updates
-          const updates = [];
-          if (originalPkg?.dependencies && templatePkg.dependencies) {
-            for (const pkg of Object.keys(templatePkg.dependencies)) {
-              if (originalPkg.dependencies[pkg] && originalPkg.dependencies[pkg] !== templatePkg.dependencies[pkg]) {
-                updates.push(\`  - \${pkg}: \${originalPkg.dependencies[pkg]} → \${templatePkg.dependencies[pkg]}\`);
-              }
-            }
-          }
-          if (originalPkg?.devDependencies && templatePkg.devDependencies) {
-            for (const pkg of Object.keys(templatePkg.devDependencies)) {
-              if (originalPkg.devDependencies[pkg] && originalPkg.devDependencies[pkg] !== templatePkg.devDependencies[pkg]) {
-                updates.push(\`  - \${pkg} (dev): \${originalPkg.devDependencies[pkg]} → \${templatePkg.devDependencies[pkg]}\`);
-              }
-            }
-          }
-
-          // Find app-only dependencies (not in template)
-          const appOnlyDeps = [];
-          if (originalPkg?.dependencies) {
-            for (const pkg of Object.keys(originalPkg.dependencies)) {
-              if (!templatePkg.dependencies || !templatePkg.dependencies[pkg]) {
-                appOnlyDeps.push(\`  - \${pkg}: \${originalPkg.dependencies[pkg]}\`);
-              }
-            }
-          }
-          const appOnlyDevDeps = [];
-          if (originalPkg?.devDependencies) {
-            for (const pkg of Object.keys(originalPkg.devDependencies)) {
-              if (!templatePkg.devDependencies || !templatePkg.devDependencies[pkg]) {
-                appOnlyDevDeps.push(\`  - \${pkg}: \${originalPkg.devDependencies[pkg]}\`);
-              }
-            }
-          }
-
-          // Final merge: start with template structure (has all latest updates), override with preserved fields and merged collections
+          // Final merge
           const merged = {
-            ...templatePkg,  // Start with template (has all latest structure and updates)
-            ...preservedFields,  // Override with app-specific fields (name, version, etc.)
+            ...templatePkg,
+            ...preservedFields,
             dependencies: Object.keys(mergedDependencies).length > 0 ? mergedDependencies : undefined,
             devDependencies: Object.keys(mergedDevDependencies).length > 0 ? mergedDevDependencies : undefined,
             scripts: Object.keys(mergedScripts).length > 0 ? mergedScripts : undefined
@@ -1057,22 +446,7 @@ runs:
 
           console.log('✓ package.json smart merged');
           console.log('  Preserved app-specific fields: ' + Object.keys(preservedFields).join(', '));
-          console.log('  Dependencies: ' + Object.keys(mergedDependencies).length + ' total');
-          console.log('  DevDependencies: ' + Object.keys(mergedDevDependencies).length + ' total');
-          console.log('  Scripts: ' + Object.keys(mergedScripts).length + ' total');
-          if (updates.length > 0) {
-            console.log('  📦 Updated versions from template:');
-            updates.forEach(u => console.log(u));
-          }
-          if (appOnlyDeps.length > 0 || appOnlyDevDeps.length > 0) {
-            console.log('  ➕ Preserved app-only dependencies:');
-            appOnlyDeps.forEach(d => console.log(d));
-            appOnlyDevDeps.forEach(d => console.log(d));
-          }
-        " || {
-          echo "Warning: Smart merge failed for package.json"
-          exit 0
-        }
+        "
 
     - name: Smart merge wrangler.jsonc
       shell: bash
@@ -1084,71 +458,37 @@ runs:
 
         echo "Smart merging wrangler.jsonc..."
 
-        # CRITICAL: Restore original app wrangler.jsonc from git FIRST
-        # The Git merge with -X theirs may have overwritten it with template placeholders
-        # We need to restore the app version before doing the smart merge
-        if git show HEAD:wrangler.jsonc > "wrangler.jsonc" 2>/dev/null; then
-          echo "✓ Restored original wrangler.jsonc from git (removed any template placeholders)"
-        else
-          echo "Warning: Could not read original wrangler.jsonc from git"
-          if [ ! -f "wrangler.jsonc" ]; then
-            echo "No wrangler.jsonc in target repo, skipping merge"
-            exit 0
-          fi
-        fi
-
-        # Get original app wrangler.jsonc from git for the merge logic
-        # This preserves app-specific database IDs and names
-        ORIGINAL_WRANGLER="/tmp/original-wrangler.jsonc"
-        if ! git show HEAD:wrangler.jsonc > "${ORIGINAL_WRANGLER}" 2>/dev/null; then
-          echo "Error: Could not read original wrangler.jsonc from git for merge"
-          echo "This should not happen - wrangler.jsonc should be excluded from Git merge"
-          exit 1
-        else
-          echo "✓ Read original wrangler.jsonc from git (for preserving app-specific IDs)"
-        fi
-
-        if [ ! -f "${TEMPLATE_DIR}/wrangler.jsonc" ]; then
-          echo "No wrangler.jsonc in template, skipping merge"
+        # Skip if no wrangler.jsonc exists
+        if [ ! -f "wrangler.jsonc" ] || [ ! -f "${TEMPLATE_DIR}/wrangler.jsonc" ]; then
+          echo "No wrangler.jsonc to merge, skipping"
           exit 0
         fi
 
-        # Use Node.js to perform smart merge of wrangler config with binding-name matching
+        # Restore original app wrangler.jsonc from git HEAD
+        if git show HEAD:wrangler.jsonc > "wrangler.jsonc" 2>/dev/null; then
+          echo "✓ Restored original wrangler.jsonc from git"
+        else
+          echo "Warning: Could not restore original wrangler.jsonc"
+          exit 0
+        fi
+
+        # Use Node.js to perform smart merge
         node -e "
           const fs = require('fs');
 
           // Helper to strip JSONC comments
           function parseJSONC(content) {
             let cleaned = content
-              .replace(/\/\*[\s\S]*?\*\//g, '') // Remove /* */ comments
-              .replace(/\/\/.*/g, '')            // Remove // comments
-              .replace(/,(\s*[}\]])/g, '\$1');   // Remove trailing commas
+              .replace(/\/\*[\s\S]*?\*\//g, '')
+              .replace(/\/\/.*/g, '')
+              .replace(/,(\s*[}\]])/g, '\$1');
             return JSON.parse(cleaned);
           }
 
-          // Read original app config from git (before merge) to preserve app-specific IDs
-          // ALWAYS use the git version - never fallback to current file which might have template placeholders
-          let appConfig = null;
-          if ('${ORIGINAL_WRANGLER}' && fs.existsSync('${ORIGINAL_WRANGLER}')) {
-            appConfig = parseJSONC(fs.readFileSync('${ORIGINAL_WRANGLER}', 'utf8'));
-            console.log('Using original app config from git HEAD');
-          } else {
-            // Try to read from git one more time as fallback
-            const { execSync } = require('child_process');
-            try {
-              const gitContent = execSync('git show HEAD:wrangler.jsonc', { encoding: 'utf8' });
-              appConfig = parseJSONC(gitContent);
-              console.log('Read app config from git HEAD (fallback)');
-            } catch (e) {
-              console.error('ERROR: Could not read original wrangler.jsonc from git. Cannot preserve app-specific IDs.');
-              console.error('This should not happen - wrangler.jsonc should be excluded from Git merge.');
-              process.exit(1);
-            }
-          }
-
+          const appConfig = parseJSONC(fs.readFileSync('wrangler.jsonc', 'utf8'));
           const templateConfig = parseJSONC(fs.readFileSync('${TEMPLATE_DIR}/wrangler.jsonc', 'utf8'));
 
-          // Helper to merge bindings by name, preserving app-specific IDs
+          // Helper to merge bindings by name
           function mergeBindings(appBindings, templateBindings, idField) {
             if (!templateBindings) return appBindings;
             if (!appBindings) return templateBindings;
@@ -1158,33 +498,30 @@ runs:
             const templateMap = new Map((templateBindings || []).map(b => [b.binding, b]));
             const processed = new Set();
 
-            // Process template bindings (updates + new ones)
+            // Process template bindings
             for (const [binding, templateBinding] of templateMap) {
               const appBinding = appMap.get(binding);
               if (appBinding) {
-                // Merge: preserve app IDs, use template structure
+                // Preserve app IDs
                 const mergedBinding = { ...templateBinding };
                 if (idField && appBinding[idField]) {
                   mergedBinding[idField] = appBinding[idField];
                 }
-                // Preserve database_name for D1
                 if (appBinding.database_name) {
                   mergedBinding.database_name = appBinding.database_name;
                 }
-                // Preserve bucket_name for R2
                 if (appBinding.bucket_name) {
                   mergedBinding.bucket_name = appBinding.bucket_name;
                 }
                 merged.push(mergedBinding);
                 processed.add(binding);
               } else {
-                // New binding from template
                 merged.push(templateBinding);
                 processed.add(binding);
               }
             }
 
-            // Add app-specific bindings not in template
+            // Add app-only bindings
             for (const [binding, appBinding] of appMap) {
               if (!processed.has(binding)) {
                 merged.push(appBinding);
@@ -1194,111 +531,65 @@ runs:
             return merged.length > 0 ? merged : undefined;
           }
 
-          // Helper to merge environment-specific configs
-          function mergeEnvironment(appEnv, templateEnv) {
-            if (!appEnv && !templateEnv) return undefined;
-            if (!appEnv) return templateEnv;
-            if (!templateEnv) return appEnv;
-
-            const merged = { ...templateEnv };
-
-            // Preserve app-specific name
-            if (appEnv.name) {
-              merged.name = appEnv.name;
-            }
-
-            // Preserve app-specific routes
-            if (appEnv.routes) {
-              merged.routes = appEnv.routes;
-            }
-
-            // Merge bindings by name
-            merged.d1_databases = mergeBindings(appEnv.d1_databases, templateEnv.d1_databases, 'database_id');
-            merged.kv_namespaces = mergeBindings(appEnv.kv_namespaces, templateEnv.kv_namespaces, 'id');
-            merged.r2_buckets = mergeBindings(appEnv.r2_buckets, templateEnv.r2_buckets, 'bucket_name');
-            merged.durable_objects = mergeBindings(appEnv.durable_objects, templateEnv.durable_objects, 'script_name');
-            merged.services = mergeBindings(appEnv.services, templateEnv.services, 'service');
-
-            // Clean up undefined fields
-            Object.keys(merged).forEach(key => merged[key] === undefined && delete merged[key]);
-
-            return merged;
-          }
-
           // Start with template config structure
           const merged = { ...templateConfig };
 
-          // Preserve app-specific root name
+          // Preserve app-specific name
           if (appConfig.name) {
             merged.name = appConfig.name;
           }
 
-          // Merge root-level bindings
+          // Merge bindings
           merged.d1_databases = mergeBindings(appConfig.d1_databases, templateConfig.d1_databases, 'database_id');
           merged.kv_namespaces = mergeBindings(appConfig.kv_namespaces, templateConfig.kv_namespaces, 'id');
           merged.r2_buckets = mergeBindings(appConfig.r2_buckets, templateConfig.r2_buckets, 'bucket_name');
-          merged.durable_objects = mergeBindings(appConfig.durable_objects, templateConfig.durable_objects, 'script_name');
-          merged.services = mergeBindings(appConfig.services, templateConfig.services, 'service');
 
-          // Preserve app-specific routes at root level
+          // Preserve app routes
           if (appConfig.routes) {
             merged.routes = appConfig.routes;
-          }
-
-          // Merge environment-specific configs
-          if (merged.env || appConfig.env) {
-            merged.env = merged.env || {};
-            const allEnvNames = new Set([
-              ...Object.keys(merged.env || {}),
-              ...Object.keys(appConfig.env || {})
-            ]);
-
-            for (const envName of allEnvNames) {
-              merged.env[envName] = mergeEnvironment(
-                appConfig.env?.[envName],
-                templateConfig.env?.[envName]
-              );
-            }
           }
 
           // Clean up undefined fields
           Object.keys(merged).forEach(key => merged[key] === undefined && delete merged[key]);
 
-          // Write back as JSON
+          // Write back
           fs.writeFileSync('wrangler.jsonc', JSON.stringify(merged, null, 2) + '\n');
 
-          // Log merge summary
-          console.log('✓ wrangler.jsonc smart merged with binding-name matching');
-          console.log('  Preserved: worker names, database IDs, KV IDs, routes');
-          console.log('  Updated: compatibility settings, vars, and other configs');
-
-          const d1Count = (merged.d1_databases?.length || 0);
-          const kvCount = (merged.kv_namespaces?.length || 0);
-          const r2Count = (merged.r2_buckets?.length || 0);
-          if (d1Count + kvCount + r2Count > 0) {
-            console.log('  Bindings: ' + d1Count + ' D1, ' + kvCount + ' KV, ' + r2Count + ' R2');
-          }
+          console.log('✓ wrangler.jsonc smart merged');
         " || {
           echo "Warning: Smart merge failed for wrangler.jsonc"
-          exit 0
         }
 
-    - name: Format wrangler.jsonc
-      if: always()
+    - name: Update template metadata
       shell: bash
       working-directory: target-repo
+      env:
+        SOURCE_REPO: ${{ inputs.source_repo }}
+        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
+        GH_TOKEN: ${{ inputs.github_token }}
       run: |
         set -euo pipefail
 
-        if [ -f "wrangler.jsonc" ]; then
-          echo "Formatting wrangler.jsonc with Prettier..."
-          # Try pnpm exec first (if dependencies are installed), fallback to npx
-          (pnpm exec prettier --write wrangler.jsonc 2>/dev/null || npx prettier --write wrangler.jsonc) || {
-            echo "Warning: Prettier formatting failed for wrangler.jsonc"
-            exit 0
-          }
-          echo "✓ wrangler.jsonc formatted"
-        fi
+        echo "Updating template metadata..."
+
+        # Get the commit SHA from the template repository
+        TEMPLATE_COMMIT_SHA=$(gh api "/repos/${SOURCE_REPO}/commits/${RELEASE_TAG}" --jq '.sha' 2>/dev/null || echo "unknown")
+
+        # Create or update metadata file using jq
+        jq -n \
+          --arg repo "${SOURCE_REPO}" \
+          --arg version "${RELEASE_TAG}" \
+          --arg sha "${TEMPLATE_COMMIT_SHA}" \
+          --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          '{
+            templateRepo: $repo,
+            templateVersion: $version,
+            templateCommitSHA: $sha,
+            lastUpdatedAt: $timestamp
+          }' > .template-metadata.json
+
+        echo "✓ Updated .template-metadata.json"
+        cat .template-metadata.json
 
     - name: Check for changes
       id: check-changes
@@ -1307,8 +598,11 @@ runs:
       run: |
         set -euo pipefail
 
+        # Stage all changes
+        git add -A
+
         # Check if there are any changes
-        if git diff --quiet && git diff --cached --quiet; then
+        if git diff --cached --quiet; then
           echo "has_changes=false" >> $GITHUB_OUTPUT
           echo "No changes detected, template is already up to date"
         else
@@ -1326,12 +620,9 @@ runs:
       run: |
         set -euo pipefail
 
-        # Check for merge conflicts
+        # Check for unresolved merge conflicts
         CONFLICT_FILES=$(git ls-files --unmerged 2>/dev/null | cut -f2 | sort -u || echo "")
 
-        git add -A
-
-        # Create commit message
         if [ -n "${CONFLICT_FILES}" ]; then
           # Create commit message with conflict list
           COMMIT_MSG_FILE=$(mktemp)
@@ -1342,18 +633,11 @@ runs:
           echo "" >> "${COMMIT_MSG_FILE}"
           echo "Please resolve conflicts manually in PR review." >> "${COMMIT_MSG_FILE}"
 
-          git commit -F "${COMMIT_MSG_FILE}" || {
-            rm -f "${COMMIT_MSG_FILE}"
-            echo "Warning: Commit failed (might be empty or no changes)"
-            exit 0
-          }
+          git commit -F "${COMMIT_MSG_FILE}" || true
           rm -f "${COMMIT_MSG_FILE}"
           echo "⚠️  Committed with merge conflicts - review required"
         else
-          git commit -m "fix: update template to ${RELEASE_TAG}" || {
-            echo "Warning: Commit failed (might be empty or no changes)"
-            exit 0
-          }
+          git commit -m "fix: update template to ${RELEASE_TAG}" || true
         fi
 
     - name: Push branch
@@ -1397,7 +681,7 @@ runs:
         if [ -n "${PR_BODY_INPUT}" ]; then
           PR_BODY="${PR_BODY_INPUT}"
         else
-          PR_BODY="This PR updates the provisioned app to template version \`${RELEASE_TAG}\`."$'\n\n'"## Changes"$'\n'"- Updated template files from \`${RELEASE_TAG}\`"$'\n'"- Preserved local customizations (node_modules, .env files, etc.)"$'\n\n'"## Review Checklist"$'\n'"- [ ] Review changes for conflicts"$'\n'"- [ ] Test the application"$'\n'"- [ ] Verify dependencies are up to date"$'\n'"- [ ] Check for any breaking changes"
+          PR_BODY="This PR updates the provisioned app to template version \`${RELEASE_TAG}\`."$'\n\n'"## Changes"$'\n'"- Updated template files from \`${RELEASE_TAG}\`"$'\n'"- Preserved local customizations and app-specific files"$'\n'"- Smart merged package.json and wrangler.jsonc"$'\n\n'"## Review Checklist"$'\n'"- [ ] Review changes for conflicts"$'\n'"- [ ] Test the application locally"$'\n'"- [ ] Verify dependencies are correct"$'\n'"- [ ] Check for any breaking changes"
         fi
 
         # Check if PR already exists
@@ -1415,7 +699,7 @@ runs:
           echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
           echo "pr_url=${PR_URL}" >> $GITHUB_OUTPUT
         else
-          # Create new PR (returns PR URL)
+          # Create new PR
           PR_URL=$(gh pr create \
             --repo "${TARGET_REPO}" \
             --title "${PR_TITLE}" \
@@ -1428,7 +712,6 @@ runs:
 
           echo "Created pull request: ${PR_URL}"
 
-          # Extract PR number from URL or use gh pr view to get it
           PR_NUMBER=$(gh pr view "${PR_URL}" --repo "${TARGET_REPO}" --json number --jq '.number')
 
           echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT

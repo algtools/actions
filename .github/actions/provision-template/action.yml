@@ -831,8 +831,30 @@ runs:
           exit 1
         fi
 
-        # Stage all remaining files (workflows, src, scripts)
-        echo "Staging remaining template files (workflows, src, scripts)..."
+        # Create template metadata file for tracking updates
+        echo "Creating template metadata file..."
+
+        # Get the commit SHA from the template repository for the release tag
+        TEMPLATE_COMMIT_SHA=$(gh api "/repos/${SOURCE_REPO}/commits/${RELEASE_TAG}" --jq '.sha' 2>/dev/null || echo "unknown")
+
+        # Create metadata JSON file using jq
+        jq -n \
+          --arg repo "${SOURCE_REPO}" \
+          --arg version "${RELEASE_TAG}" \
+          --arg sha "${TEMPLATE_COMMIT_SHA}" \
+          --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          '{
+            templateRepo: $repo,
+            templateVersion: $version,
+            templateCommitSHA: $sha,
+            provisionedAt: $timestamp
+          }' > .template-metadata.json
+
+        echo "✓ Created .template-metadata.json with template tracking information"
+        cat .template-metadata.json
+
+        # Stage all remaining files (workflows, src, scripts, metadata)
+        echo "Staging remaining template files (workflows, src, scripts, metadata)..."
         git add .
 
         # Verify files were staged
