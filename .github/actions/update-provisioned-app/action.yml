@@ -930,19 +930,28 @@ runs:
 
         echo "Smart merging wrangler.jsonc..."
 
-        # Get original app wrangler.jsonc from git (before git merge)
+        # CRITICAL: Restore original app wrangler.jsonc from git FIRST
+        # The Git merge with -X theirs may have overwritten it with template placeholders
+        # We need to restore the app version before doing the smart merge
+        if git show HEAD:wrangler.jsonc > "wrangler.jsonc" 2>/dev/null; then
+          echo "✓ Restored original wrangler.jsonc from git (removed any template placeholders)"
+        else
+          echo "Warning: Could not read original wrangler.jsonc from git"
+          if [ ! -f "wrangler.jsonc" ]; then
+            echo "No wrangler.jsonc in target repo, skipping merge"
+            exit 0
+          fi
+        fi
+
+        # Get original app wrangler.jsonc from git for the merge logic
         # This preserves app-specific database IDs and names
         ORIGINAL_WRANGLER="/tmp/original-wrangler.jsonc"
         if ! git show HEAD:wrangler.jsonc > "${ORIGINAL_WRANGLER}" 2>/dev/null; then
-          echo "Warning: Could not read original wrangler.jsonc from git"
-          ORIGINAL_WRANGLER=""
+          echo "Error: Could not read original wrangler.jsonc from git for merge"
+          echo "This should not happen - wrangler.jsonc should be excluded from Git merge"
+          exit 1
         else
           echo "✓ Read original wrangler.jsonc from git (for preserving app-specific IDs)"
-        fi
-
-        if [ ! -f "wrangler.jsonc" ]; then
-          echo "No wrangler.jsonc in target repo, skipping merge"
-          exit 0
         fi
 
         if [ ! -f "${TEMPLATE_DIR}/wrangler.jsonc" ]; then
@@ -964,12 +973,23 @@ runs:
           }
 
           // Read original app config from git (before merge) to preserve app-specific IDs
+          // ALWAYS use the git version - never fallback to current file which might have template placeholders
           let appConfig = null;
           if ('${ORIGINAL_WRANGLER}' && fs.existsSync('${ORIGINAL_WRANGLER}')) {
             appConfig = parseJSONC(fs.readFileSync('${ORIGINAL_WRANGLER}', 'utf8'));
+            console.log('Using original app config from git HEAD');
           } else {
-            // Fallback: read current file if git version not available
-            appConfig = parseJSONC(fs.readFileSync('wrangler.jsonc', 'utf8'));
+            // Try to read from git one more time as fallback
+            const { execSync } = require('child_process');
+            try {
+              const gitContent = execSync('git show HEAD:wrangler.jsonc', { encoding: 'utf8' });
+              appConfig = parseJSONC(gitContent);
+              console.log('Read app config from git HEAD (fallback)');
+            } catch (e) {
+              console.error('ERROR: Could not read original wrangler.jsonc from git. Cannot preserve app-specific IDs.');
+              console.error('This should not happen - wrangler.jsonc should be excluded from Git merge.');
+              process.exit(1);
+            }
           }
 
           const templateConfig = parseJSONC(fs.readFileSync('${TEMPLATE_DIR}/wrangler.jsonc', 'utf8'));
