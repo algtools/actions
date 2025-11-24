@@ -359,36 +359,36 @@ jobs:
       sentry_release: true
       sentry_org: 'my-org'
       sentry_project: 'my-project'
-      # Use toJSON() to properly construct JSON and avoid actionlint errors
-      secrets_json: ${{ toJSON({
-        "OPENAI_API_KEY": secrets.OPENAI_API_KEY,
-        "DATABASE_URL": secrets.DATABASE_URL
-      }) }}
+      # vars_json can use vars context (but NOT secrets context)
       vars_json: ${{ toJSON({
         "ENVIRONMENT": "production",
         "API_URL": vars.API_URL
       }) }}
     secrets:
-      # Only cloudflare_api_token and cloudflare_account_id are required here
-      # Individual secrets used in secrets_json are accessed directly via secrets.SECRET_NAME
-      # and do NOT need to be added to this secrets: section
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       sentry_auth_token: ${{ secrets.SENTRY_AUTH_TOKEN }}
 ```
 
-**Important Notes on Secrets/Vars:**
+**Important: GitHub Actions Context Restrictions**
 
-- **You do NOT need to add individual secrets to the `secrets:` section** when using `secrets_json`. The secrets are accessed directly in your workflow using `secrets.SECRET_NAME` and passed as JSON.
-- **Only `cloudflare_api_token` and `cloudflare_account_id` are required** in the `secrets:` section (these are used by the deployment action itself).
-- **Use `toJSON()` function** to construct the JSON properly and avoid actionlint errors. This is the recommended approach.
-- **Alternative multiline format** (if you prefer, but may trigger actionlint warnings):
-  ```yaml
-  secrets_json: |
-    {
-      "SECRET_NAME": "${{ secrets.SECRET_NAME }}"
-    }
-  ```
+⚠️ **WARNING:** When calling reusable workflows, the `secrets` context **CANNOT** be used in the `with:` block. It can only be used in the `secrets:` block.
+
+**This means:**
+
+- ❌ **NEVER** use `secrets_json: ${{ toJSON({ "KEY": secrets.MY_SECRET }) }}` in reusable workflow calls
+- ❌ **NEVER** use `secrets_json: '{ "KEY": "${{ secrets.MY_SECRET }}" }'` in reusable workflow calls
+- ✅ **ONLY** pass secrets through the dedicated `secrets:` block
+
+**For secrets management:**
+
+- Pass secrets explicitly through the `secrets:` block (recommended)
+- Set secrets directly in Cloudflare dashboard for your workers
+- Use `wrangler.toml` environment configurations with `vars` (not for sensitive data)
+- Use `vars_json` with `vars` context for non-sensitive configuration (✅ this works)
+
+**Why this limitation exists:**
+GitHub Actions restricts which contexts are available in different parts of workflows for security. When calling a reusable workflow at the `jobs` level, only these contexts are available in `with:`: `github`, `inputs`, `matrix`, `needs`, `strategy`, `vars`. The `secrets` context is intentionally excluded for security reasons.
 
 **Required Inputs:**
 
@@ -411,8 +411,8 @@ jobs:
 - `sentry_release` (optional): Enable Sentry release tracking (default: false)
 - `sentry_org` (optional): Sentry organization slug (required if sentry_release is true)
 - `sentry_project` (optional): Sentry project slug (required if sentry_release is true)
-- `secrets_json` (optional): JSON object mapping Cloudflare secret names to GitHub secret values (default: "{}")
-- `vars_json` (optional): JSON object mapping Cloudflare var names to GitHub var/secret values (default: "{}")
+- `secrets_json` (optional): JSON object mapping Cloudflare secret names to values (default: "{}"). ⚠️ **Advanced/Internal use only** - Cannot use `secrets` context here when calling reusable workflows. Generally leave as default.
+- `vars_json` (optional): JSON object mapping Cloudflare var names to values (default: "{}"). Can use `vars` context but not `secrets` context.
 - `sync_secrets_before_deploy` (optional): If true, syncs secrets from GitHub to Cloudflare Workers after deployment (default: true)
 - `sync_vars_before_deploy` (optional): If true, syncs vars from GitHub to Cloudflare Workers before deployment (default: true)
 
@@ -422,7 +422,7 @@ jobs:
 - `cloudflare_account_id`: Cloudflare account ID
 - `sentry_auth_token`: Sentry auth token (required if sentry_release is true)
 
-**Note:** When using `secrets_json`, you do NOT need to add the individual secrets (like `OPENAI_API_KEY`, `DATABASE_URL`, etc.) to the `secrets:` section. Only `cloudflare_api_token` and `cloudflare_account_id` are required. The secrets used in `secrets_json` are accessed directly via `secrets.SECRET_NAME` in the `toJSON()` expression.
+**Note on secrets_json/vars_json:** These parameters are for advanced use cases and internal workflow operations. Due to GitHub Actions context restrictions, you cannot use the `secrets` context when calling reusable workflows. For typical deployments, manage secrets directly in your Cloudflare dashboard or use wrangler.toml environment configurations.
 
 **Outputs:**
 
@@ -1445,6 +1445,66 @@ This repository uses the following CI workflows:
 - All workflows use minimal required permissions
 - Dependencies are pinned to specific versions (SHA or tag)
 - Regular security audits of actions and dependencies
+
+## Troubleshooting
+
+### Actionlint Error: "context 'secrets' is not allowed here"
+
+**Error Example:**
+
+```
+.github/workflows/deploy-prod.yml:98:50: context "secrets" is not allowed here. available contexts are "github", "inputs", "matrix", "needs", "strategy", "vars"
+```
+
+**Root Cause:**
+You're trying to use `secrets` context in the `with:` block when calling a reusable workflow. GitHub Actions restricts which contexts are available at different workflow levels for security reasons.
+
+**Where this restriction applies:**
+
+- ❌ Calling reusable workflows at the `jobs:` level - Cannot use `secrets` in `with:` block
+- ✅ Calling actions within job `steps:` - Can use `secrets` in `with` parameters
+
+**Common Mistake:**
+
+```yaml
+jobs:
+  deploy:
+    uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
+    with:
+      secrets_json: ${{ toJSON({ "KEY": secrets.MY_SECRET }) }}  # ❌ ERROR
+```
+
+**Solution:**
+Pass secrets through the dedicated `secrets:` block instead:
+
+```yaml
+jobs:
+  deploy:
+    uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
+    with:
+      environment: 'production'
+      # ... other inputs (no secrets here)
+    secrets:
+      cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+**Available Contexts by Workflow Level:**
+
+| Context    | Reusable Workflow `with:` | Action Inputs |
+| ---------- | ------------------------- | ------------- |
+| `github`   | ✅ Yes                    | ✅ Yes        |
+| `vars`     | ✅ Yes                    | ✅ Yes        |
+| `secrets`  | ❌ No                     | ✅ Yes        |
+| `inputs`   | ✅ Yes                    | ✅ Yes        |
+| `needs`    | ✅ Yes                    | ✅ Yes        |
+| `matrix`   | ✅ Yes                    | ✅ Yes        |
+| `strategy` | ✅ Yes                    | ✅ Yes        |
+
+**References:**
+
+- [GitHub Docs: Context availability](https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability)
+- [Reusing workflows](https://docs.github.com/en/actions/using-workflows/reusing-workflows)
 
 ## Contributing
 

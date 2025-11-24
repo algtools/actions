@@ -40,6 +40,8 @@ The action follows this order:
 
 ### Complete Build and Deploy Workflow
 
+**Important:** This action is called from within a job's `steps`, so it **CAN** use the `secrets` context in its inputs. This is different from calling reusable workflows at the `jobs` level, which cannot use `secrets` in the `with:` block. See [Actionlint Errors](#actionlint-errors-with-secrets_jsonvars_json) for details.
+
 ```yaml
 name: Build and Deploy Worker
 
@@ -788,24 +790,44 @@ worker_name: 'my-worker' # Must match
 
 **Issue:** Actionlint reports errors like "context 'secrets' is not allowed here" when using `secrets_json` or `vars_json`
 
-**Solution:**
+**Root Cause:** This error occurs when calling **reusable workflows** (not when calling this action directly). GitHub Actions does not allow the `secrets` context in the `with:` block of reusable workflow calls - it can only be used in the `secrets:` block.
 
-Use the `toJSON()` function instead of multiline JSON strings:
+**Solution Depends on Context:**
+
+**If calling this ACTION from within a job step** (✅ Works):
 
 ```yaml
-# ❌ This will trigger actionlint errors:
-secrets_json: |
-  {
-    "SECRET": "${{ secrets.SECRET }}"
-  }
-
-# ✅ Use this instead:
-secrets_json: ${{ toJSON({
-  "SECRET": secrets.SECRET
-}) }}
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: algtools/actions/.github/actions/deploy-cloudflare-from-artifact@main
+        with:
+          # ✅ This WORKS - actions can use secrets context in inputs
+          secrets_json: ${{ toJSON({
+            "SECRET": secrets.SECRET
+          }) }}
 ```
 
-**Why?** Actionlint flags `${{ secrets... }}` expressions in multiline strings when used as inputs to reusable workflows. The `toJSON()` function properly constructs the JSON and avoids these errors.
+**If calling a REUSABLE WORKFLOW that uses this action** (❌ Doesn't work):
+
+```yaml
+jobs:
+  deploy:
+    # ❌ This FAILS - reusable workflows cannot use secrets in with: block
+    uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
+    with:
+      secrets_json: ${{ toJSON({ "SECRET": secrets.SECRET }) }}  # ❌ ERROR
+    secrets:
+      cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+```
+
+**Why?** GitHub Actions has different context availability rules:
+
+- **Actions** (called in `steps`): ✅ Can use `secrets` context in inputs
+- **Reusable workflows** (called in `jobs`): ❌ Cannot use `secrets` context in `with:` block
+
+For reusable workflows, you must pass secrets through the `secrets:` block, not through `secrets_json`.
 
 ### Secrets Not Syncing
 

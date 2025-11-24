@@ -43,11 +43,11 @@ inputs:
     required: false
     default: "false"
   secrets_json:
-    description: 'JSON object mapping Cloudflare secret names to GitHub secret values. Example: {"SECRET_NAME": "${{ secrets.GITHUB_SECRET_NAME }}"}'
+    description: 'JSON object mapping Cloudflare secret names to GitHub secret values. Example: {"SECRET_NAME": "value_from_secret"}'
     required: false
     default: "{}"
   vars_json:
-    description: 'JSON object mapping Cloudflare var names to GitHub var/secret values. Example: {"VAR_NAME": "${{ vars.GITHUB_VAR_NAME }}"}'
+    description: 'JSON object mapping Cloudflare var names to GitHub var/secret values. Example: {"VAR_NAME": "value_from_var"}'
     required: false
     default: "{}"
   sync_secrets_before_deploy:
