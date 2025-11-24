@@ -42,6 +42,22 @@ inputs:
     description: "If true, performs a dry run without actually deploying (for testing)"
     required: false
     default: "false"
+  secrets_json:
+    description: 'JSON object mapping Cloudflare secret names to GitHub secret values. Example: {"SECRET_NAME": "${{ secrets.GITHUB_SECRET_NAME }}"}'
+    required: false
+    default: "{}"
+  vars_json:
+    description: 'JSON object mapping Cloudflare var names to GitHub var/secret values. Example: {"VAR_NAME": "${{ vars.GITHUB_VAR_NAME }}"}'
+    required: false
+    default: "{}"
+  sync_secrets_before_deploy:
+    description: "If true, syncs secrets from GitHub to Cloudflare Workers after deployment (worker must exist first)"
+    required: false
+    default: "true"
+  sync_vars_before_deploy:
+    description: "If true, syncs vars from GitHub to Cloudflare Workers before deployment"
+    required: false
+    default: "true"
 
 outputs:
   worker_url:
@@ -369,7 +385,216 @@ runs:
 
         echo "::endgroup::"
 
-    - name: Deploy to Cloudflare Workers
+    - name: Sync vars to wrangler config
+      shell: bash
+      working-directory: ${{ inputs.download_path }}
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare_api_token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare_account_id }}
+      run: |
+        echo "::group::Syncing secrets to Cloudflare Workers"
+
+        if [ "${{ inputs.sync_secrets_before_deploy }}" != "true" ]; then
+          echo "Secret syncing is disabled, skipping..."
+          echo "::endgroup::"
+          exit 0
+        fi
+
+        SECRETS_JSON="${{ inputs.secrets_json }}"
+        WORKER_NAME="${{ inputs.worker_name }}"
+        ENVIRONMENT="${{ inputs.deploy_environment }}"
+
+        # Check if secrets_json is empty or just "{}"
+        if [ -z "$SECRETS_JSON" ] || [ "$SECRETS_JSON" = "{}" ]; then
+          echo "No secrets to sync (secrets_json is empty)"
+          echo "::endgroup::"
+          exit 0
+        fi
+
+        # Build wrangler command prefix
+        WRANGLER_CMD="wrangler secret put"
+        if [ -n "$ENVIRONMENT" ]; then
+          WRANGLER_CMD="$WRANGLER_CMD --env \"$ENVIRONMENT\""
+        fi
+        WRANGLER_CMD="$WRANGLER_CMD --name \"$WORKER_NAME\""
+
+        echo "Syncing secrets for worker: $WORKER_NAME"
+        if [ -n "$ENVIRONMENT" ]; then
+          echo "Environment: $ENVIRONMENT"
+        fi
+        echo ""
+
+        # Parse JSON and sync each secret using Node.js
+        node -e "
+          const { spawnSync } = require('child_process');
+          const fs = require('fs');
+          const os = require('os');
+          const path = require('path');
+          const secretsJson = process.env.SECRETS_JSON;
+          const workerName = process.env.WORKER_NAME;
+          const environment = process.env.ENVIRONMENT;
+
+          try {
+            const secrets = JSON.parse(secretsJson);
+            const secretNames = Object.keys(secrets);
+
+            if (secretNames.length === 0) {
+              console.log('No secrets found in JSON');
+              process.exit(0);
+            }
+
+            console.log(\`Found \${secretNames.length} secret(s) to sync:\`);
+            secretNames.forEach(name => {
+              console.log(\`  - \${name}\`);
+            });
+            console.log('');
+
+            // Sync each secret
+            for (const name of secretNames) {
+              const value = secrets[name];
+              if (!value || (typeof value === 'string' && value.trim() === '')) {
+                console.log(\`⚠️  Secret \${name} is empty, skipping\`);
+                continue;
+              }
+
+              try {
+                console.log(\`Syncing secret: \${name}...\`);
+
+                // Build wrangler command args
+                const args = ['secret', 'put', name, '--name', workerName];
+                if (environment) {
+                  args.push('--env', environment);
+                }
+
+                // Execute wrangler secret put with the secret value via stdin
+                const result = spawnSync('wrangler', args, {
+                  input: String(value),
+                  stdio: ['pipe', 'inherit', 'inherit'],
+                  encoding: 'utf8'
+                });
+
+                if (result.status !== 0) {
+                  console.error(\`::error::Failed to sync secret \${name}\`);
+                  process.exit(1);
+                }
+
+                console.log(\`✓ Secret \${name} synced successfully\`);
+              } catch (error) {
+                console.error(\`::error::Failed to sync secret \${name}: \${error.message}\`);
+                process.exit(1);
+              }
+            }
+          } catch (error) {
+            console.error('Failed to parse secrets_json:', error.message);
+            if (secretsJson && secretsJson.length > 0) {
+              console.error('JSON preview:', secretsJson.substring(0, 100) + '...');
+            }
+            process.exit(1);
+          }
+        "
+
+        echo ""
+        echo "✓ All secrets synced successfully"
+        echo "::endgroup::"
+
+    - name: Sync vars to wrangler config
+      shell: bash
+      working-directory: ${{ inputs.download_path }}
+      run: |
+        echo "::group::Syncing vars to wrangler config"
+
+        if [ "${{ inputs.sync_vars_before_deploy }}" != "true" ]; then
+          echo "Var syncing is disabled, skipping..."
+          echo "::endgroup::"
+          exit 0
+        fi
+
+        VARS_JSON="${{ inputs.vars_json }}"
+        CONFIG_PATH="${{ inputs.wrangler_config }}"
+        ENVIRONMENT="${{ inputs.deploy_environment }}"
+
+        # Check if vars_json is empty or just "{}"
+        if [ -z "$VARS_JSON" ] || [ "$VARS_JSON" = "{}" ]; then
+          echo "No vars to sync (vars_json is empty)"
+          echo "::endgroup::"
+          exit 0
+        fi
+
+        echo "Syncing vars to wrangler config: $CONFIG_PATH"
+        if [ -n "$ENVIRONMENT" ]; then
+          echo "Environment: $ENVIRONMENT"
+        fi
+        echo ""
+
+        # Update wrangler config with vars
+        node -e "
+          const fs = require('fs');
+          const varsJson = process.env.VARS_JSON;
+          const configPath = process.env.CONFIG_PATH;
+          const environment = process.env.ENVIRONMENT;
+
+          try {
+            const vars = JSON.parse(varsJson);
+            const varNames = Object.keys(vars);
+
+            if (varNames.length === 0) {
+              console.log('No vars found in JSON');
+              process.exit(0);
+            }
+
+            console.log(\`Found \${varNames.length} var(s) to sync:\`);
+            varNames.forEach(name => {
+              console.log(\`  - \${name}\`);
+            });
+            console.log('');
+
+            // Read the config file
+            let content = fs.readFileSync(configPath, 'utf8');
+            const config = JSON.parse(content);
+
+            // Determine where to add vars (environment-specific or top-level)
+            let targetConfig = config;
+            if (environment && config.env && config.env[environment]) {
+              targetConfig = config.env[environment];
+              console.log(\`Adding vars to \${environment} environment\`);
+            } else {
+              console.log('Adding vars to top-level config');
+            }
+
+            // Initialize vars object if it doesn't exist
+            if (!targetConfig.vars) {
+              targetConfig.vars = {};
+            }
+
+            // Update vars
+            let updatedCount = 0;
+            varNames.forEach(name => {
+              const value = vars[name];
+              if (value === null || value === undefined || value === '') {
+                console.log(\`⚠️  Var \${name} is empty, skipping\`);
+                return;
+              }
+              targetConfig.vars[name] = value;
+              updatedCount++;
+            });
+
+            // Write back the config
+            fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+            console.log(\`✓ Updated \${updatedCount} var(s) in wrangler config\`);
+          } catch (error) {
+            console.error('Failed to sync vars:', error.message);
+            if (error.message.includes('JSON')) {
+              console.error('JSON content:', varsJson);
+            }
+            process.exit(1);
+          }
+        " || exit 1
+
+        echo ""
+        echo "✓ All vars synced successfully to wrangler config"
+        echo "::endgroup::"
+
+    - name: Deploy to Cloudflare Workers (creates worker if needed)
       id: deploy
       shell: bash
       working-directory: ${{ inputs.download_path }}
@@ -463,6 +688,116 @@ runs:
         echo "status=success" >> $GITHUB_OUTPUT
         echo "version=${{ github.sha }}" >> $GITHUB_OUTPUT
 
+        echo "::endgroup::"
+
+    - name: Sync secrets to Cloudflare Workers
+      shell: bash
+      working-directory: ${{ inputs.download_path }}
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare_api_token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare_account_id }}
+      run: |
+        echo "::group::Syncing secrets to Cloudflare Workers"
+
+        if [ "${{ inputs.sync_secrets_before_deploy }}" != "true" ]; then
+          echo "Secret syncing is disabled, skipping..."
+          echo "::endgroup::"
+          exit 0
+        fi
+
+        SECRETS_JSON="${{ inputs.secrets_json }}"
+        WORKER_NAME="${{ inputs.worker_name }}"
+        ENVIRONMENT="${{ inputs.deploy_environment }}"
+
+        # Check if secrets_json is empty or just "{}"
+        if [ -z "$SECRETS_JSON" ] || [ "$SECRETS_JSON" = "{}" ]; then
+          echo "No secrets to sync (secrets_json is empty)"
+          echo "::endgroup::"
+          exit 0
+        fi
+
+        echo "Syncing secrets for worker: $WORKER_NAME"
+        if [ -n "$ENVIRONMENT" ]; then
+          echo "Environment: $ENVIRONMENT"
+        fi
+        echo ""
+        echo "Note: Worker must exist before secrets can be set."
+        echo "      Secrets are synced after deployment to ensure the worker exists."
+        echo ""
+
+        # Parse JSON and sync each secret using Node.js
+        node -e "
+          const { spawnSync } = require('child_process');
+          const fs = require('fs');
+          const os = require('os');
+          const path = require('path');
+          const secretsJson = process.env.SECRETS_JSON;
+          const workerName = process.env.WORKER_NAME;
+          const environment = process.env.ENVIRONMENT;
+
+          try {
+            const secrets = JSON.parse(secretsJson);
+            const secretNames = Object.keys(secrets);
+
+            if (secretNames.length === 0) {
+              console.log('No secrets found in JSON');
+              process.exit(0);
+            }
+
+            console.log(\`Found \${secretNames.length} secret(s) to sync:\`);
+            secretNames.forEach(name => {
+              console.log(\`  - \${name}\`);
+            });
+            console.log('');
+
+            // Sync each secret
+            for (const name of secretNames) {
+              const value = secrets[name];
+              if (!value || (typeof value === 'string' && value.trim() === '')) {
+                console.log(\`⚠️  Secret \${name} is empty, skipping\`);
+                continue;
+              }
+
+              try {
+                console.log(\`Syncing secret: \${name}...\`);
+
+                // Build wrangler command args
+                const args = ['secret', 'put', name, '--name', workerName];
+                if (environment) {
+                  args.push('--env', environment);
+                }
+
+                // Execute wrangler secret put with the secret value via stdin
+                const result = spawnSync('wrangler', args, {
+                  input: String(value),
+                  stdio: ['pipe', 'inherit', 'inherit'],
+                  encoding: 'utf8'
+                });
+
+                if (result.status !== 0) {
+                  console.error(\`::error::Failed to sync secret \${name}\`);
+                  console.error('Make sure the worker exists. If this is the first deployment,');
+                  console.error('the worker should have been created in the previous step.');
+                  process.exit(1);
+                }
+
+                console.log(\`✓ Secret \${name} synced successfully\`);
+              } catch (error) {
+                console.error(\`::error::Failed to sync secret \${name}: \${error.message}\`);
+                process.exit(1);
+              }
+            }
+          } catch (error) {
+            console.error('Failed to parse secrets_json:', error.message);
+            if (secretsJson && secretsJson.length > 0) {
+              console.error('JSON preview:', secretsJson.substring(0, 100) + '...');
+            }
+            process.exit(1);
+          }
+        "
+
+        echo ""
+        echo "✓ All secrets synced successfully"
         echo "::endgroup::"
 
     - name: Deployment summary
