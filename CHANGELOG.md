@@ -1,3 +1,10 @@
+## [1.34.2](https://github.com/algtools/actions/compare/v1.34.1...v1.34.2) (2025-11-24)
+
+
+### Bug Fixes
+
+* clarify secrets context usage in GitHub Actions workflows ([d23a343](https://github.com/algtools/actions/commit/d23a343ee09e1c8bc6583ccdf3cb55c8c22d0bab))
+
 ## [1.34.1](https://github.com/algtools/actions/compare/v1.34.0...v1.34.1) (2025-11-24)
 
 
