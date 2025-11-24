@@ -310,6 +310,91 @@ jobs:
 
 ---
 
+### [prepare-secrets-reusable.yml](/.github/workflows/prepare-secrets-reusable.yml)
+
+**NEW!** A reusable workflow for preparing secrets for deployment. This solves the GitHub Actions limitation where `secrets` context cannot be used in the `with:` block when calling reusable workflows.
+
+**The Problem:**
+
+When calling reusable workflows, GitHub Actions restricts which contexts are available:
+
+```yaml
+# ❌ This does NOT work:
+deploy:
+  uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
+  with:
+    secrets_json: ${{ toJSON({ "KEY": secrets.MY_SECRET }) }}  # ERROR!
+```
+
+**The Solution:**
+
+Use this workflow to prepare secrets in a regular job context (where `secrets` IS available), then pass them via the `needs` context (which IS allowed):
+
+```yaml
+jobs:
+  prepare-secrets:
+    uses: algtools/actions/.github/workflows/prepare-secrets-reusable.yml@main
+    secrets:
+      auth_jwt_secret: ${{ secrets.AUTH_JWT_SECRET }}
+      database_url: ${{ secrets.DATABASE_URL }}
+      s3_access_key_id: ${{ secrets.S3_ACCESS_KEY_ID }}
+
+  deploy:
+    needs: prepare-secrets
+    uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
+    with:
+      secrets_json: ${{ needs.prepare-secrets.outputs.secrets_json }}
+    secrets:
+      cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+**Supported Secret Inputs:**
+
+- `auth_jwt_secret` - JWT secret for authentication
+- `api_key` - API key for external services
+- `database_url` - Database connection URL
+- `s3_access_key_id` - AWS S3 access key ID
+- `s3_secret_access_key` - AWS S3 secret access key
+- `s3_bucket_name` - AWS S3 bucket name
+- `openai_api_key` - OpenAI API key
+- `sendgrid_api_key` - SendGrid API key
+- `stripe_secret_key` - Stripe secret key
+- `cloudflare_account_id` - Cloudflare account ID (if needed as worker secret)
+- `custom_secrets_json` - Additional secrets as JSON string
+
+**Using Custom Secrets:**
+
+For secrets not in the predefined list:
+
+```yaml
+prepare-secrets:
+  uses: algtools/actions/.github/workflows/prepare-secrets-reusable.yml@main
+  secrets:
+    auth_jwt_secret: ${{ secrets.AUTH_JWT_SECRET }}
+    custom_secrets_json: |
+      {
+        "TWILIO_AUTH_TOKEN": "${{ secrets.TWILIO_AUTH_TOKEN }}",
+        "CUSTOM_API_KEY": "${{ secrets.CUSTOM_API_KEY }}"
+      }
+```
+
+**Output:**
+
+- `secrets_json` - JSON object containing all provided secrets (formatted for Cloudflare Workers deployment)
+
+**Benefits:**
+
+- ✅ **DRY** - No need to repeat secret preparation code in every workflow
+- ✅ **Maintainable** - Update secret handling logic in one place
+- ✅ **Type-safe** - Predefined inputs for common secrets
+- ✅ **Flexible** - Custom secrets support for unique cases
+- ✅ **Secure** - Secret values are automatically masked in logs
+
+**See Also:** [PREPARE_SECRETS_USAGE.md](.github/workflows/PREPARE_SECRETS_USAGE.md) for detailed documentation and examples.
+
+---
+
 ### [env-deploy-reusable.yml](/.github/workflows/env-deploy-reusable.yml)
 
 A comprehensive deployment workflow for deploying Cloudflare Workers to dev/qa/production environments. Handles wildcard SSL certificates, artifact-based deployments, optional Sentry release tracking, and automatic GitHub release creation.
@@ -422,7 +507,14 @@ GitHub Actions restricts which contexts are available in different parts of work
 - `cloudflare_account_id`: Cloudflare account ID
 - `sentry_auth_token`: Sentry auth token (required if sentry_release is true)
 
-**Note on secrets_json/vars_json:** These parameters are for advanced use cases and internal workflow operations. Due to GitHub Actions context restrictions, you cannot use the `secrets` context when calling reusable workflows. For typical deployments, manage secrets directly in your Cloudflare dashboard or use wrangler.toml environment configurations.
+**Note on secrets_json/vars_json:** These parameters accept JSON-formatted secrets/vars for deployment. Due to GitHub Actions context restrictions, you cannot use the `secrets` context directly when calling reusable workflows.
+
+**Recommended approach:** Use the [prepare-secrets-reusable](#prepare-secrets-reusableyml) workflow to prepare secrets in a separate job, then pass them via the `needs` context.
+
+**Alternative approaches:**
+
+- Manage secrets directly in Cloudflare dashboard
+- Use wrangler.toml environment configurations (for non-sensitive values)
 
 **Outputs:**
 
@@ -1474,8 +1566,31 @@ jobs:
       secrets_json: ${{ toJSON({ "KEY": secrets.MY_SECRET }) }}  # ❌ ERROR
 ```
 
-**Solution:**
-Pass secrets through the dedicated `secrets:` block instead:
+**Solution (Recommended):**
+Use the `prepare-secrets-reusable` workflow to prepare secrets in a separate job:
+
+```yaml
+jobs:
+  prepare-secrets:
+    uses: algtools/actions/.github/workflows/prepare-secrets-reusable.yml@main
+    secrets:
+      auth_jwt_secret: ${{ secrets.AUTH_JWT_SECRET }}
+      database_url: ${{ secrets.DATABASE_URL }}
+
+  deploy:
+    needs: prepare-secrets
+    uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
+    with:
+      environment: 'production'
+      # ✅ Use needs context (allowed) to pass secrets
+      secrets_json: ${{ needs.prepare-secrets.outputs.secrets_json }}
+    secrets:
+      cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+**Alternative Solution:**
+Pass secrets through the dedicated `secrets:` block (for simpler cases):
 
 ```yaml
 jobs:
@@ -1488,6 +1603,8 @@ jobs:
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 ```
+
+**See also:** [prepare-secrets-reusable.yml](#prepare-secrets-reusableyml) documentation for more details.
 
 **Available Contexts by Workflow Level:**
 
