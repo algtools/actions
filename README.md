@@ -359,21 +359,36 @@ jobs:
       sentry_release: true
       sentry_org: 'my-org'
       sentry_project: 'my-project'
-      secrets_json: |
-        {
-          "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}",
-          "DATABASE_URL": "${{ secrets.DATABASE_URL }}"
-        }
-      vars_json: |
-        {
-          "ENVIRONMENT": "production",
-          "API_URL": "${{ vars.API_URL }}"
-        }
+      # Use toJSON() to properly construct JSON and avoid actionlint errors
+      secrets_json: ${{ toJSON({
+        "OPENAI_API_KEY": secrets.OPENAI_API_KEY,
+        "DATABASE_URL": secrets.DATABASE_URL
+      }) }}
+      vars_json: ${{ toJSON({
+        "ENVIRONMENT": "production",
+        "API_URL": vars.API_URL
+      }) }}
     secrets:
+      # Only cloudflare_api_token and cloudflare_account_id are required here
+      # Individual secrets used in secrets_json are accessed directly via secrets.SECRET_NAME
+      # and do NOT need to be added to this secrets: section
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       sentry_auth_token: ${{ secrets.SENTRY_AUTH_TOKEN }}
 ```
+
+**Important Notes on Secrets/Vars:**
+
+- **You do NOT need to add individual secrets to the `secrets:` section** when using `secrets_json`. The secrets are accessed directly in your workflow using `secrets.SECRET_NAME` and passed as JSON.
+- **Only `cloudflare_api_token` and `cloudflare_account_id` are required** in the `secrets:` section (these are used by the deployment action itself).
+- **Use `toJSON()` function** to construct the JSON properly and avoid actionlint errors. This is the recommended approach.
+- **Alternative multiline format** (if you prefer, but may trigger actionlint warnings):
+  ```yaml
+  secrets_json: |
+    {
+      "SECRET_NAME": "${{ secrets.SECRET_NAME }}"
+    }
+  ```
 
 **Required Inputs:**
 
@@ -406,6 +421,8 @@ jobs:
 - `cloudflare_api_token`: Cloudflare API token with Workers deployment and SSL permissions
 - `cloudflare_account_id`: Cloudflare account ID
 - `sentry_auth_token`: Sentry auth token (required if sentry_release is true)
+
+**Note:** When using `secrets_json`, you do NOT need to add the individual secrets (like `OPENAI_API_KEY`, `DATABASE_URL`, etc.) to the `secrets:` section. Only `cloudflare_api_token` and `cloudflare_account_id` are required. The secrets used in `secrets_json` are accessed directly via `secrets.SECRET_NAME` in the `toJSON()` expression.
 
 **Outputs:**
 

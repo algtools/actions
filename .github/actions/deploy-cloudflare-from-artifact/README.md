@@ -91,16 +91,15 @@ jobs:
           wrangler_config: 'wrangler.toml'
           cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          secrets_json: |
-            {
-              "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}",
-              "DATABASE_URL": "${{ secrets.DATABASE_URL }}"
-            }
-          vars_json: |
-            {
-              "ENVIRONMENT": "${{ vars.ENVIRONMENT }}",
-              "API_URL": "${{ vars.API_URL }}"
-            }
+          # Use toJSON() to properly construct JSON and avoid actionlint errors
+          secrets_json: ${{ toJSON({
+            "OPENAI_API_KEY": secrets.OPENAI_API_KEY,
+            "DATABASE_URL": secrets.DATABASE_URL
+          }) }}
+          vars_json: ${{ toJSON({
+            "ENVIRONMENT": vars.ENVIRONMENT,
+            "API_URL": vars.API_URL
+          }) }}
 
       - name: Display deployment info
         run: |
@@ -173,19 +172,20 @@ jobs:
     wrangler_config: 'wrangler.toml'
     cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-    secrets_json: |
-      {
-        "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}",
-        "DATABASE_URL": "${{ secrets.DATABASE_URL }}",
-        "API_SECRET": "${{ secrets.API_SECRET }}"
-      }
-    vars_json: |
-      {
-        "ENVIRONMENT": "production",
-        "API_URL": "${{ vars.API_URL }}",
-        "FEATURE_FLAG": "${{ vars.FEATURE_FLAG }}"
-      }
+    # Use toJSON() to properly construct JSON and avoid actionlint errors
+    secrets_json: ${{ toJSON({
+      "OPENAI_API_KEY": secrets.OPENAI_API_KEY,
+      "DATABASE_URL": secrets.DATABASE_URL,
+      "API_SECRET": secrets.API_SECRET
+    }) }}
+    vars_json: ${{ toJSON({
+      "ENVIRONMENT": "production",
+      "API_URL": vars.API_URL,
+      "FEATURE_FLAG": vars.FEATURE_FLAG
+    }) }}
 ```
+
+**Important:** Use `toJSON()` function to construct the JSON properly. This avoids actionlint errors that occur when using `${{ secrets... }}` directly in multiline strings. The secrets are accessed directly via `secrets.SECRET_NAME` (without the `${{ }}` wrapper inside `toJSON()`).
 
 ### Deployment with Dry Run (Testing)
 
@@ -213,16 +213,15 @@ jobs:
     deploy_environment: 'production'
     cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-    secrets_json: |
-      {
-        "PROD_API_KEY": "${{ secrets.PROD_API_KEY }}",
-        "PROD_DATABASE_URL": "${{ secrets.PROD_DATABASE_URL }}"
-      }
-    vars_json: |
-      {
-        "ENVIRONMENT": "production",
-        "API_URL": "https://api.example.com"
-      }
+    # Use toJSON() to properly construct JSON
+    secrets_json: ${{ toJSON({
+      "PROD_API_KEY": secrets.PROD_API_KEY,
+      "PROD_DATABASE_URL": secrets.PROD_DATABASE_URL
+    }) }}
+    vars_json: ${{ toJSON({
+      "ENVIRONMENT": "production",
+      "API_URL": "https://api.example.com"
+    }) }}
 ```
 
 **Note:** When `deploy_environment` is set, secrets are synced to the environment-specific worker, and vars are added to the environment-specific section in the wrangler config.
@@ -360,6 +359,11 @@ When set to `true`, Wrangler will validate the deployment without actually publi
 
 A JSON object that maps Cloudflare Worker secret names to GitHub secret values. Secrets are synced to Cloudflare Workers using `wrangler secret put` **after deployment** (the worker must exist first).
 
+**Important:**
+
+- **You do NOT need to add individual secrets to a `secrets:` section** when using this action directly. The secrets are accessed directly via `secrets.SECRET_NAME` in the `toJSON()` expression.
+- **Use `toJSON()` function** to construct the JSON properly and avoid actionlint errors.
+
 **Format:**
 
 ```json
@@ -369,14 +373,23 @@ A JSON object that maps Cloudflare Worker secret names to GitHub secret values. 
 }
 ```
 
-**Example:**
+**Example (Recommended - using toJSON()):**
+
+```yaml
+secrets_json: ${{ toJSON({
+  "OPENAI_API_KEY": secrets.OPENAI_API_KEY,
+  "DATABASE_URL": secrets.DATABASE_URL,
+  "API_SECRET": secrets.API_SECRET
+}) }}
+```
+
+**Alternative format (may trigger actionlint warnings):**
 
 ```yaml
 secrets_json: |
   {
     "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}",
-    "DATABASE_URL": "${{ secrets.DATABASE_URL }}",
-    "API_SECRET": "${{ secrets.API_SECRET }}"
+    "DATABASE_URL": "${{ secrets.DATABASE_URL }}"
   }
 ```
 
@@ -393,6 +406,8 @@ secrets_json: |
 
 A JSON object that maps Cloudflare Worker variable names to GitHub variable or secret values. Vars are added to the wrangler config file before deployment.
 
+**Important:** Use `toJSON()` function to construct the JSON properly and avoid actionlint errors.
+
 **Format:**
 
 ```json
@@ -402,14 +417,23 @@ A JSON object that maps Cloudflare Worker variable names to GitHub variable or s
 }
 ```
 
-**Example:**
+**Example (Recommended - using toJSON()):**
+
+```yaml
+vars_json: ${{ toJSON({
+  "ENVIRONMENT": vars.ENVIRONMENT,
+  "API_URL": vars.API_URL,
+  "FEATURE_FLAG": vars.FEATURE_FLAG
+}) }}
+```
+
+**Alternative format (may trigger actionlint warnings):**
 
 ```yaml
 vars_json: |
   {
     "ENVIRONMENT": "${{ vars.ENVIRONMENT }}",
-    "API_URL": "${{ vars.API_URL }}",
-    "FEATURE_FLAG": "${{ vars.FEATURE_FLAG }}"
+    "API_URL": "${{ vars.API_URL }}"
   }
 ```
 
@@ -760,6 +784,29 @@ worker_name: 'my-worker' # Must match
 3. Check Cloudflare dashboard for worker status
 4. Review worker routes configuration
 
+### Actionlint Errors with secrets_json/vars_json
+
+**Issue:** Actionlint reports errors like "context 'secrets' is not allowed here" when using `secrets_json` or `vars_json`
+
+**Solution:**
+
+Use the `toJSON()` function instead of multiline JSON strings:
+
+```yaml
+# ❌ This will trigger actionlint errors:
+secrets_json: |
+  {
+    "SECRET": "${{ secrets.SECRET }}"
+  }
+
+# ✅ Use this instead:
+secrets_json: ${{ toJSON({
+  "SECRET": secrets.SECRET
+}) }}
+```
+
+**Why?** Actionlint flags `${{ secrets... }}` expressions in multiline strings when used as inputs to reusable workflows. The `toJSON()` function properly constructs the JSON and avoids these errors.
+
 ### Secrets Not Syncing
 
 **Issue:** Secrets are not available in the deployed worker
@@ -767,14 +814,22 @@ worker_name: 'my-worker' # Must match
 **Solution:**
 
 1. Verify the worker was deployed successfully (secrets can only be set on existing workers)
-2. Verify `secrets_json` format is valid JSON
+2. Verify `secrets_json` format is valid JSON (use `toJSON()` function)
 3. Check that GitHub secrets exist and are accessible
 4. Ensure `sync_secrets_before_deploy` is `true` (default)
 5. Verify secret names match what your worker expects
 6. Check Cloudflare dashboard to confirm secrets are set
 7. Note: Secrets are synced **after** deployment, so the worker must exist first
 
-**Example valid format:**
+**Example valid format (Recommended):**
+
+```yaml
+secrets_json: ${{ toJSON({
+  "SECRET_NAME": secrets.GITHUB_SECRET_NAME
+}) }}
+```
+
+**Alternative format (may trigger actionlint warnings):**
 
 ```yaml
 secrets_json: |
@@ -795,7 +850,15 @@ secrets_json: |
 4. Verify vars are added to the correct environment section in wrangler config
 5. Check the wrangler config file after deployment to confirm vars were added
 
-**Example valid format:**
+**Example valid format (Recommended):**
+
+```yaml
+vars_json: ${{ toJSON({
+  "VAR_NAME": vars.GITHUB_VAR_NAME
+}) }}
+```
+
+**Alternative format (may trigger actionlint warnings):**
 
 ```yaml
 vars_json: |
