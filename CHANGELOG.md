@@ -1,3 +1,10 @@
+# [1.35.0](https://github.com/algtools/actions/compare/v1.34.2...v1.35.0) (2025-11-24)
+
+
+### Features
+
+* introduce reusable workflow for preparing secrets in GitHub Actions ([bf39948](https://github.com/algtools/actions/commit/bf399484a35dae401b5b2abadb0e465a33cbb18d))
+
 ## [1.34.2](https://github.com/algtools/actions/compare/v1.34.1...v1.34.2) (2025-11-24)
 
 
