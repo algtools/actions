@@ -1,3 +1,10 @@
+# [1.34.0](https://github.com/algtools/actions/compare/v1.33.0...v1.34.0) (2025-11-24)
+
+
+### Features
+
+* add support for syncing secrets and vars in Cloudflare deployment action ([9c41ac8](https://github.com/algtools/actions/commit/9c41ac892bf68a7e5ed69495c07e2ee53582632c))
+
 # [1.33.0](https://github.com/algtools/actions/compare/v1.32.1...v1.33.0) (2025-11-22)
 
 
