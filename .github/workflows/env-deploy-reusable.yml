@@ -71,6 +71,26 @@ on:
         required: false
         type: string
         default: "Release {0}"
+      secrets_json:
+        description: 'JSON object mapping Cloudflare secret names to GitHub secret values. Example: {"SECRET_NAME": "value_from_github_secret"}'
+        required: false
+        type: string
+        default: "{}"
+      vars_json:
+        description: 'JSON object mapping Cloudflare var names to GitHub var/secret values. Example: {"VAR_NAME": "value_from_github_var"}'
+        required: false
+        type: string
+        default: "{}"
+      sync_secrets_before_deploy:
+        description: "If true, syncs secrets from GitHub to Cloudflare Workers after deployment (worker must exist first)"
+        required: false
+        type: boolean
+        default: true
+      sync_vars_before_deploy:
+        description: "If true, syncs vars from GitHub to Cloudflare Workers before deployment"
+        required: false
+        type: boolean
+        default: true
     secrets:
       cloudflare_api_token:
         description: "Cloudflare API token with Workers deployment permissions"
@@ -237,6 +257,10 @@ jobs:
           custom_domain: ${{ inputs.custom_domain }}
           zone_id: ${{ inputs.zone }}
           dry_run: "false"
+          secrets_json: ${{ inputs.secrets_json }}
+          vars_json: ${{ inputs.vars_json }}
+          sync_secrets_before_deploy: ${{ inputs.sync_secrets_before_deploy }}
+          sync_vars_before_deploy: ${{ inputs.sync_vars_before_deploy }}
 
       - name: Create Sentry release
         if: inputs.sentry_release == true

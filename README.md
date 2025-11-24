@@ -325,7 +325,7 @@ A comprehensive deployment workflow for deploying Cloudflare Workers to dev/qa/p
 - Comprehensive deployment summaries with all key information
 - Idempotent certificate operations
 
-**Example Usage (Production with GitHub Release):**
+**Example Usage (Production with GitHub Release and Secrets/Vars):**
 
 ```yaml
 name: Deploy to Production
@@ -352,12 +352,23 @@ jobs:
       zone: '${{ vars.CLOUDFLARE_ZONE_ID }}'
       custom_domain: 'example.com'
       slug: 'my-app'
+      app_name: 'api'
       artifact_name: 'production-build'
       create_github_release: true
       release_name_template: 'My App {0}'
       sentry_release: true
       sentry_org: 'my-org'
       sentry_project: 'my-project'
+      secrets_json: |
+        {
+          "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}",
+          "DATABASE_URL": "${{ secrets.DATABASE_URL }}"
+        }
+      vars_json: |
+        {
+          "ENVIRONMENT": "production",
+          "API_URL": "${{ vars.API_URL }}"
+        }
     secrets:
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -385,6 +396,10 @@ jobs:
 - `sentry_release` (optional): Enable Sentry release tracking (default: false)
 - `sentry_org` (optional): Sentry organization slug (required if sentry_release is true)
 - `sentry_project` (optional): Sentry project slug (required if sentry_release is true)
+- `secrets_json` (optional): JSON object mapping Cloudflare secret names to GitHub secret values (default: "{}")
+- `vars_json` (optional): JSON object mapping Cloudflare var names to GitHub var/secret values (default: "{}")
+- `sync_secrets_before_deploy` (optional): If true, syncs secrets from GitHub to Cloudflare Workers after deployment (default: true)
+- `sync_vars_before_deploy` (optional): If true, syncs vars from GitHub to Cloudflare Workers before deployment (default: true)
 
 **Required Secrets:**
 
