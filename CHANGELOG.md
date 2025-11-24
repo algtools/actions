@@ -1,3 +1,10 @@
+## [1.34.1](https://github.com/algtools/actions/compare/v1.34.0...v1.34.1) (2025-11-24)
+
+
+### Bug Fixes
+
+* enhance existing workflows with secrets and vars syncing ([1521ed6](https://github.com/algtools/actions/commit/1521ed60335a681dbbda24ff0139c7a321272161))
+
 # [1.34.0](https://github.com/algtools/actions/compare/v1.33.0...v1.34.0) (2025-11-24)
 
 
