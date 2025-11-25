@@ -466,10 +466,9 @@ runs:
                 console.log(\`Syncing secret: \${name}...\`);
 
                 // Build wrangler command args
+                // Note: Don't use --env for secrets - it appends -env to the worker name
+                // We want to set secrets on the actual deployed worker name
                 const args = ['secret', 'put', name, '--name', workerName];
-                if (environment) {
-                  args.push('--env', environment);
-                }
 
                 // Execute wrangler secret put with the secret value via stdin
                 const result = spawnSync('wrangler', args, {
@@ -777,10 +776,9 @@ runs:
                 console.log(\`Syncing secret: \${name}...\`);
 
                 // Build wrangler command args
+                // Note: Don't use --env for secrets - it appends -env to the worker name
+                // We want to set secrets on the actual deployed worker name
                 const args = ['secret', 'put', name, '--name', workerName];
-                if (environment) {
-                  args.push('--env', environment);
-                }
 
                 // Execute wrangler secret put with the secret value via stdin
                 const result = spawnSync('wrangler', args, {
