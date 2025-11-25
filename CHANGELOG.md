@@ -1,3 +1,10 @@
+## [1.36.4](https://github.com/algtools/actions/compare/v1.36.3...v1.36.4) (2025-11-25)
+
+
+### Bug Fixes
+
+* standardize description formatting in reusable workflows ([7524432](https://github.com/algtools/actions/commit/752443261e8842b3f0fcfa83411fd4f7a1a33795))
+
 ## [1.36.3](https://github.com/algtools/actions/compare/v1.36.2...v1.36.3) (2025-11-25)
 
 
