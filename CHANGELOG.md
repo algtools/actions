@@ -1,3 +1,10 @@
+## [1.36.5](https://github.com/algtools/actions/compare/v1.36.4...v1.36.5) (2025-11-25)
+
+
+### Bug Fixes
+
+* remove deprecated secrets handling and update documentation ([028e37d](https://github.com/algtools/actions/commit/028e37d1949118070525fdebe45bd264096cb050))
+
 ## [1.36.4](https://github.com/algtools/actions/compare/v1.36.3...v1.36.4) (2025-11-25)
 
 
