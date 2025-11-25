@@ -385,7 +385,7 @@ runs:
 
         echo "::endgroup::"
 
-    - name: Sync vars to wrangler config
+    - name: Sync secrets to Cloudflare Workers (before deploy)
       shell: bash
       working-directory: ${{ inputs.download_path }}
       env:
@@ -403,6 +403,11 @@ runs:
         SECRETS_JSON="${{ inputs.secrets_json }}"
         WORKER_NAME="${{ inputs.worker_name }}"
         ENVIRONMENT="${{ inputs.deploy_environment }}"
+
+        # Export variables so they're available in child processes (Node.js)
+        export SECRETS_JSON
+        export WORKER_NAME
+        export ENVIRONMENT
 
         # Check if secrets_json is empty or just "{}"
         if [ -z "$SECRETS_JSON" ] || [ "$SECRETS_JSON" = "{}" ]; then
@@ -512,6 +517,11 @@ runs:
         VARS_JSON="${{ inputs.vars_json }}"
         CONFIG_PATH="${{ inputs.wrangler_config }}"
         ENVIRONMENT="${{ inputs.deploy_environment }}"
+
+        # Export variables so they're available in child processes (Node.js)
+        export VARS_JSON
+        export CONFIG_PATH
+        export ENVIRONMENT
 
         # Check if vars_json is empty or just "{}"
         if [ -z "$VARS_JSON" ] || [ "$VARS_JSON" = "{}" ]; then
@@ -690,7 +700,7 @@ runs:
 
         echo "::endgroup::"
 
-    - name: Sync secrets to Cloudflare Workers
+    - name: Sync secrets to Cloudflare Workers (after deploy)
       shell: bash
       working-directory: ${{ inputs.download_path }}
       env:
@@ -708,6 +718,11 @@ runs:
         SECRETS_JSON="${{ inputs.secrets_json }}"
         WORKER_NAME="${{ inputs.worker_name }}"
         ENVIRONMENT="${{ inputs.deploy_environment }}"
+
+        # Export variables so they're available in child processes (Node.js)
+        export SECRETS_JSON
+        export WORKER_NAME
+        export ENVIRONMENT
 
         # Check if secrets_json is empty or just "{}"
         if [ -z "$SECRETS_JSON" ] || [ "$SECRETS_JSON" = "{}" ]; then
