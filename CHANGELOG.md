@@ -1,3 +1,10 @@
+## [1.36.3](https://github.com/algtools/actions/compare/v1.36.2...v1.36.3) (2025-11-25)
+
+
+### Bug Fixes
+
+* add worker_secrets_json and worker_vars_json inputs ([6ab01da](https://github.com/algtools/actions/commit/6ab01da3f61b5529f93a79c8b9e5c8640ac11c50))
+
 ## [1.36.2](https://github.com/algtools/actions/compare/v1.36.1...v1.36.2) (2025-11-25)
 
 
