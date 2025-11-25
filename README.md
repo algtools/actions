@@ -295,30 +295,9 @@ jobs:
 
 **Passing Custom Secrets:**
 
-To pass custom secrets to your Cloudflare Worker:
-
-```yaml
-jobs:
-  prepare-secrets:
-    runs-on: ubuntu-latest
-    outputs:
-      worker_secrets_json: ${{ steps.build-json.outputs.json }}
-    steps:
-      - name: Build secrets JSON
-        id: build-json
-        run: |
-          SECRETS_JSON=$(jq -nc \
-            --arg my_secret "${{ secrets.MY_SECRET || '' }}" \
-            '{MY_SECRET: $my_secret}')
-          echo "json=$SECRETS_JSON" >> "$GITHUB_OUTPUT"
-
-  build:
-    needs: prepare-secrets
-    uses: algtools/actions/.github/workflows/pr-build-reusable.yml@main
-    with:
-      # ... build configuration
-      worker_secrets_json: '${{ needs.prepare-secrets.outputs.worker_secrets_json }}'
-```
+> ⚠️ **Important Limitation:** This reusable workflow does not support passing custom secrets to Cloudflare Workers due to GitHub Actions security restrictions.
+>
+> **If you need custom secrets:** Use the `deploy-cloudflare-from-artifact` action directly. See troubleshooting section below for details.
 
 **Build Outputs:**
 
@@ -449,31 +428,9 @@ GitHub Actions restricts which contexts are available in different parts of work
 
 **Passing Custom Secrets:**
 
-To pass custom secrets to your Cloudflare Worker:
-
-```yaml
-jobs:
-  prepare-secrets:
-    runs-on: ubuntu-latest
-    outputs:
-      worker_secrets_json: ${{ steps.build-json.outputs.json }}
-    steps:
-      - name: Build secrets JSON
-        id: build-json
-        run: |
-          SECRETS_JSON=$(jq -nc \
-            --arg my_secret "${{ secrets.MY_SECRET || '' }}" \
-            '{MY_SECRET: $my_secret}')
-          echo "json=$SECRETS_JSON" >> "$GITHUB_OUTPUT"
-
-  deploy:
-    needs: prepare-secrets
-    uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
-    with:
-      environment: 'production'
-      # ... other configuration
-      worker_secrets_json: '${{ needs.prepare-secrets.outputs.worker_secrets_json }}'
-```
+> ⚠️ **Important Limitation:** This reusable workflow does not support passing custom secrets to Cloudflare Workers due to GitHub Actions security restrictions.
+>
+> **If you need custom secrets:** Use the `deploy-cloudflare-from-artifact` action directly. See troubleshooting section below for details.
 
 **Outputs:**
 
@@ -990,30 +947,9 @@ jobs:
 
 **Passing Custom Secrets:**
 
-To pass custom secrets to your Cloudflare Worker:
-
-```yaml
-jobs:
-  prepare-secrets:
-    runs-on: ubuntu-latest
-    outputs:
-      worker_secrets_json: ${{ steps.build-json.outputs.json }}
-    steps:
-      - name: Build secrets JSON
-        id: build-json
-        run: |
-          SECRETS_JSON=$(jq -nc \
-            --arg my_secret "${{ secrets.MY_SECRET || '' }}" \
-            '{MY_SECRET: $my_secret}')
-          echo "json=$SECRETS_JSON" >> "$GITHUB_OUTPUT"
-
-  deploy:
-    needs: prepare-secrets
-    uses: algtools/actions/.github/workflows/preview-deploy-reusable.yml@main
-    with:
-      # ... preview configuration
-      worker_secrets_json: '${{ needs.prepare-secrets.outputs.worker_secrets_json }}'
-```
+> ⚠️ **Important Limitation:** This reusable workflow does not support passing custom secrets to Cloudflare Workers due to GitHub Actions security restrictions.
+>
+> **If you need custom secrets:** Use the `deploy-cloudflare-from-artifact` action directly. See troubleshooting section below for details.
 
 **Build Outputs:**
 
@@ -1553,17 +1489,21 @@ jobs:
 ```
 
 **Solution:**
-Use a `prepare-secrets` job with `jq` to construct valid JSON, then pass it through inputs:
+Use the `deploy-cloudflare-from-artifact` action directly within the same job:
 
 ```yaml
 jobs:
-  prepare-secrets:
+  deploy:
     runs-on: ubuntu-latest
-    outputs:
-      worker_secrets_json: ${{ steps.build-json.outputs.json }}
+    environment: production
     steps:
-      - name: Build secrets JSON
-        id: build-json
+      - uses: actions/download-artifact@v4
+        with:
+          name: 'my-build'
+          path: ./dist
+
+      - name: Prepare secrets JSON
+        id: secrets
         run: |
           # Use jq to construct valid JSON
           SECRETS_JSON=$(jq -nc \
@@ -1572,33 +1512,27 @@ jobs:
             '{AUTH_JWT_SECRET: $auth_secret, DATABASE_URL: $db_url}')
           echo "json=$SECRETS_JSON" >> "$GITHUB_OUTPUT"
 
-  deploy:
-    needs: prepare-secrets
-    uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
-    with:
-      environment: 'production'
-      # ... other configuration
-      # ✅ CRITICAL: Quote the output to preserve JSON!
-      worker_secrets_json: '${{ needs.prepare-secrets.outputs.worker_secrets_json }}'
-    secrets:
-      cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - uses: algtools/actions/.github/actions/deploy-cloudflare-from-artifact@main
+        with:
+          artifact_name: 'my-build'
+          worker_name: 'my-worker'
+          wrangler_config: 'wrangler.jsonc'
+          cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # ✅ Works because prepare-secrets step is in the same job!
+          secrets_json: '${{ steps.secrets.outputs.json }}'
 ```
 
 **Why this works:**
 
-- `jq -nc` guarantees valid, compact JSON with proper quoting
-- Quoting the output (`'${{ ... }}'`) prevents GitHub Actions from evaluating it as an expression
-- The action uses single quotes in bash to preserve the JSON exactly
+- Step outputs **within the same job** can contain secrets
+- `jq -nc` guarantees valid, compact JSON
+- The action uses single quotes in bash to preserve the JSON
 - See [deploy-cloudflare-from-artifact README](/.github/actions/deploy-cloudflare-from-artifact/README.md) for details
 
-**Key Requirements:**
+**Why reusable workflows don't work:**
 
-1. ✅ Use `jq -nc` (not GitHub Actions expressions)
-2. ✅ Quote the job output: `'${{ needs.prepare-secrets.outputs.worker_secrets_json }}'`
-3. ✅ Use `|| ''` fallback for missing secrets
-4. ✅ The reusable workflow quotes it when passing to action
-5. ✅ The action uses single quotes in bash
+GitHub Actions blocks job outputs that contain secrets. Since reusable workflows require passing data **between jobs**, secrets cannot be passed through them. This is a security feature that cannot be bypassed.
 
 **Available Contexts by Workflow Level:**
 
