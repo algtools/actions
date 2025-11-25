@@ -1,3 +1,10 @@
+# [1.36.0](https://github.com/algtools/actions/compare/v1.35.0...v1.36.0) (2025-11-25)
+
+
+### Features
+
+* enhance Cloudflare deployment workflows with new secrets handling ([604ce8e](https://github.com/algtools/actions/commit/604ce8e14fb9183a2aa14e59600dbe3f1f84bc50))
+
 # [1.35.0](https://github.com/algtools/actions/compare/v1.34.2...v1.35.0) (2025-11-24)
 
 
