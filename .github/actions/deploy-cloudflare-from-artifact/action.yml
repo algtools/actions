@@ -400,9 +400,9 @@ runs:
           exit 0
         fi
 
-        SECRETS_JSON="${{ inputs.secrets_json }}"
-        WORKER_NAME="${{ inputs.worker_name }}"
-        ENVIRONMENT="${{ inputs.deploy_environment }}"
+        SECRETS_JSON='${{ inputs.secrets_json }}'
+        WORKER_NAME='${{ inputs.worker_name }}'
+        ENVIRONMENT='${{ inputs.deploy_environment }}'
 
         # Export variables so they're available in child processes (Node.js)
         export SECRETS_JSON
@@ -514,9 +514,9 @@ runs:
           exit 0
         fi
 
-        VARS_JSON="${{ inputs.vars_json }}"
-        CONFIG_PATH="${{ inputs.wrangler_config }}"
-        ENVIRONMENT="${{ inputs.deploy_environment }}"
+        VARS_JSON='${{ inputs.vars_json }}'
+        CONFIG_PATH='${{ inputs.wrangler_config }}'
+        ENVIRONMENT='${{ inputs.deploy_environment }}'
 
         # Export variables so they're available in child processes (Node.js)
         export VARS_JSON
@@ -715,9 +715,9 @@ runs:
           exit 0
         fi
 
-        SECRETS_JSON="${{ inputs.secrets_json }}"
-        WORKER_NAME="${{ inputs.worker_name }}"
-        ENVIRONMENT="${{ inputs.deploy_environment }}"
+        SECRETS_JSON='${{ inputs.secrets_json }}'
+        WORKER_NAME='${{ inputs.worker_name }}'
+        ENVIRONMENT='${{ inputs.deploy_environment }}'
 
         # Export variables so they're available in child processes (Node.js)
         export SECRETS_JSON
