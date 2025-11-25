@@ -1,3 +1,10 @@
+## [1.36.8](https://github.com/algtools/actions/compare/v1.36.7...v1.36.8) (2025-11-25)
+
+
+### Bug Fixes
+
+* update wrangler command args for secret syncing to avoid using --env ([1b2fada](https://github.com/algtools/actions/commit/1b2fada4b8d6c89aee6062d3cb16c219ab69758f))
+
 ## [1.36.7](https://github.com/algtools/actions/compare/v1.36.6...v1.36.7) (2025-11-25)
 
 
