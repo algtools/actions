@@ -293,6 +293,23 @@ jobs:
 - `cloudflare_api_token`: Cloudflare API token with Workers and SSL permissions
 - `cloudflare_account_id`: Cloudflare account ID
 
+**Optional Secrets (if deploy_to_dev is true):**
+
+- `worker_secrets_json`: JSON string mapping Cloudflare secret names to values. Construct using `toJSON()` in your calling workflow.
+- `worker_vars_json`: JSON string mapping Cloudflare var names to values. Construct using `toJSON()` in your calling workflow.
+
+**Passing Worker Secrets:**
+
+To pass custom secrets to your Cloudflare Worker when deploying to dev:
+
+```yaml
+secrets:
+  cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  worker_secrets_json: ${{ toJSON(fromJSON(format('{{"MY_SECRET":"{0}"}}', secrets.MY_SECRET))) }}
+  worker_vars_json: ${{ toJSON(fromJSON(format('{{"MY_VAR":"{0}"}}', vars.MY_VAR))) }}
+```
+
 **Build Outputs:**
 
 - `artifact_id`: GitHub artifact ID
@@ -307,91 +324,6 @@ jobs:
 - `deployment_status`: Deployment status
 - `certificate_id`: SSL certificate ID
 - `certificate_status`: SSL certificate status
-
----
-
-### [prepare-secrets-reusable.yml](/.github/workflows/prepare-secrets-reusable.yml)
-
-**NEW!** A reusable workflow for preparing secrets for deployment. This solves the GitHub Actions limitation where `secrets` context cannot be used in the `with:` block when calling reusable workflows.
-
-**The Problem:**
-
-When calling reusable workflows, GitHub Actions restricts which contexts are available:
-
-```yaml
-# ❌ This does NOT work:
-deploy:
-  uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
-  with:
-    secrets_json: ${{ toJSON({ "KEY": secrets.MY_SECRET }) }}  # ERROR!
-```
-
-**The Solution:**
-
-Use this workflow to prepare secrets in a regular job context (where `secrets` IS available), then pass them via the `needs` context (which IS allowed):
-
-```yaml
-jobs:
-  prepare-secrets:
-    uses: algtools/actions/.github/workflows/prepare-secrets-reusable.yml@main
-    secrets:
-      auth_jwt_secret: ${{ secrets.AUTH_JWT_SECRET }}
-      database_url: ${{ secrets.DATABASE_URL }}
-      s3_access_key_id: ${{ secrets.S3_ACCESS_KEY_ID }}
-
-  deploy:
-    needs: prepare-secrets
-    uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
-    with:
-      secrets_json: ${{ needs.prepare-secrets.outputs.secrets_json }}
-    secrets:
-      cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-```
-
-**Supported Secret Inputs:**
-
-- `auth_jwt_secret` - JWT secret for authentication
-- `api_key` - API key for external services
-- `database_url` - Database connection URL
-- `s3_access_key_id` - AWS S3 access key ID
-- `s3_secret_access_key` - AWS S3 secret access key
-- `s3_bucket_name` - AWS S3 bucket name
-- `openai_api_key` - OpenAI API key
-- `sendgrid_api_key` - SendGrid API key
-- `stripe_secret_key` - Stripe secret key
-- `cloudflare_account_id` - Cloudflare account ID (if needed as worker secret)
-- `custom_secrets_json` - Additional secrets as JSON string
-
-**Using Custom Secrets:**
-
-For secrets not in the predefined list:
-
-```yaml
-prepare-secrets:
-  uses: algtools/actions/.github/workflows/prepare-secrets-reusable.yml@main
-  secrets:
-    auth_jwt_secret: ${{ secrets.AUTH_JWT_SECRET }}
-    custom_secrets_json: |
-      {
-        "TWILIO_AUTH_TOKEN": "${{ secrets.TWILIO_AUTH_TOKEN }}",
-        "CUSTOM_API_KEY": "${{ secrets.CUSTOM_API_KEY }}"
-      }
-```
-
-**Output:**
-
-- `secrets_json` - JSON object containing all provided secrets (formatted for Cloudflare Workers deployment)
-
-**Benefits:**
-
-- ✅ **DRY** - No need to repeat secret preparation code in every workflow
-- ✅ **Maintainable** - Update secret handling logic in one place
-- ✅ **Type-safe** - Predefined inputs for common secrets
-- ✅ **Flexible** - Custom secrets support for unique cases
-- ✅ **Secure** - Secret values are automatically masked in logs
-
-**See Also:** [PREPARE_SECRETS_USAGE.md](.github/workflows/PREPARE_SECRETS_USAGE.md) for detailed documentation and examples.
 
 ---
 
@@ -496,8 +428,6 @@ GitHub Actions restricts which contexts are available in different parts of work
 - `sentry_release` (optional): Enable Sentry release tracking (default: false)
 - `sentry_org` (optional): Sentry organization slug (required if sentry_release is true)
 - `sentry_project` (optional): Sentry project slug (required if sentry_release is true)
-- `secrets_json` (optional): JSON object mapping Cloudflare secret names to values (default: "{}"). ⚠️ **Advanced/Internal use only** - Cannot use `secrets` context here when calling reusable workflows. Generally leave as default.
-- `vars_json` (optional): JSON object mapping Cloudflare var names to values (default: "{}"). Can use `vars` context but not `secrets` context.
 - `sync_secrets_before_deploy` (optional): If true, syncs secrets from GitHub to Cloudflare Workers after deployment (default: true)
 - `sync_vars_before_deploy` (optional): If true, syncs vars from GitHub to Cloudflare Workers before deployment (default: true)
 
@@ -507,14 +437,22 @@ GitHub Actions restricts which contexts are available in different parts of work
 - `cloudflare_account_id`: Cloudflare account ID
 - `sentry_auth_token`: Sentry auth token (required if sentry_release is true)
 
-**Note on secrets_json/vars_json:** These parameters accept JSON-formatted secrets/vars for deployment. Due to GitHub Actions context restrictions, you cannot use the `secrets` context directly when calling reusable workflows.
+**Optional Secrets:**
 
-**Recommended approach:** Use the [prepare-secrets-reusable](#prepare-secrets-reusableyml) workflow to prepare secrets in a separate job, then pass them via the `needs` context.
+- `worker_secrets_json`: JSON string mapping Cloudflare secret names to values. Construct using `toJSON()` in your calling workflow.
+- `worker_vars_json`: JSON string mapping Cloudflare var names to values. Construct using `toJSON()` in your calling workflow.
 
-**Alternative approaches:**
+**Passing Worker Secrets:**
 
-- Manage secrets directly in Cloudflare dashboard
-- Use wrangler.toml environment configurations (for non-sensitive values)
+To pass custom secrets to your Cloudflare Worker, construct a JSON string in your calling workflow and pass it via the `secrets:` block:
+
+```yaml
+secrets:
+  cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  worker_secrets_json: ${{ toJSON(fromJSON(format('{{"MY_SECRET":"{0}","ANOTHER_SECRET":"{1}"}}', secrets.MY_SECRET, secrets.ANOTHER_SECRET))) }}
+  worker_vars_json: ${{ toJSON(fromJSON(format('{{"MY_VAR":"{0}"}}', vars.MY_VAR))) }}
+```
 
 **Outputs:**
 
@@ -1028,6 +966,23 @@ jobs:
 
 - `cloudflare_api_token`: Cloudflare API token with Workers and SSL permissions
 - `cloudflare_account_id`: Cloudflare account ID
+
+**Optional Secrets:**
+
+- `worker_secrets_json`: JSON string mapping Cloudflare secret names to values. Construct using `toJSON()` in your calling workflow.
+- `worker_vars_json`: JSON string mapping Cloudflare var names to values. Construct using `toJSON()` in your calling workflow.
+
+**Passing Worker Secrets:**
+
+To pass custom secrets to your Cloudflare Worker in preview environments:
+
+```yaml
+secrets:
+  cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  worker_secrets_json: ${{ toJSON(fromJSON(format('{{"AUTH_JWT_SECRET":"{0}","DATABASE_URL":"{1}"}}', secrets.AUTH_JWT_SECRET, secrets.DATABASE_URL))) }}
+  worker_vars_json: ${{ toJSON(fromJSON(format('{{"ENVIRONMENT":"preview"}}', ''))) }}
+```
 
 **Build Outputs:**
 
@@ -1566,31 +1521,8 @@ jobs:
       secrets_json: ${{ toJSON({ "KEY": secrets.MY_SECRET }) }}  # ❌ ERROR
 ```
 
-**Solution (Recommended):**
-Use the `prepare-secrets-reusable` workflow to prepare secrets in a separate job:
-
-```yaml
-jobs:
-  prepare-secrets:
-    uses: algtools/actions/.github/workflows/prepare-secrets-reusable.yml@main
-    secrets:
-      auth_jwt_secret: ${{ secrets.AUTH_JWT_SECRET }}
-      database_url: ${{ secrets.DATABASE_URL }}
-
-  deploy:
-    needs: prepare-secrets
-    uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
-    with:
-      environment: 'production'
-      # ✅ Use needs context (allowed) to pass secrets
-      secrets_json: ${{ needs.prepare-secrets.outputs.secrets_json }}
-    secrets:
-      cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-```
-
-**Alternative Solution:**
-Pass secrets through the dedicated `secrets:` block (for simpler cases):
+**Solution:**
+Pass secrets through the dedicated `secrets:` block using the new `worker_secrets_json` and `worker_vars_json` secret parameters:
 
 ```yaml
 jobs:
@@ -1602,9 +1534,18 @@ jobs:
     secrets:
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Pass worker secrets as JSON string
+      worker_secrets_json: ${{ toJSON(fromJSON(format('{{"AUTH_JWT_SECRET":"{0}","DATABASE_URL":"{1}"}}', secrets.AUTH_JWT_SECRET, secrets.DATABASE_URL))) }}
+      # Pass worker vars as JSON string
+      worker_vars_json: ${{ toJSON(fromJSON(format('{{"ENVIRONMENT":"{0}"}}', vars.ENVIRONMENT))) }}
 ```
 
-**See also:** [prepare-secrets-reusable.yml](#prepare-secrets-reusableyml) documentation for more details.
+This works because:
+
+- The `toJSON()/format()` expression is evaluated in the **calling workflow's context** where secrets are accessible
+- The resulting JSON string is passed as a **secret value** to the reusable workflow
+- The reusable workflow treats it as an opaque string and passes it to the action
+- The action parses the JSON and sets the secrets/vars in Cloudflare
 
 **Available Contexts by Workflow Level:**
 

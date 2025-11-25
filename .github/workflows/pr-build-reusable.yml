@@ -65,16 +65,6 @@ on:
         required: false
         type: string
         default: "latest"
-      secrets_json:
-        description: 'JSON object mapping Cloudflare secret names to GitHub secret values. Example: {"SECRET_NAME": "value_from_github_secret"}'
-        required: false
-        type: string
-        default: "{}"
-      vars_json:
-        description: 'JSON object mapping Cloudflare var names to GitHub var/secret values. Example: {"VAR_NAME": "value_from_github_var"}'
-        required: false
-        type: string
-        default: "{}"
       sync_secrets_before_deploy:
         description: "If true, syncs secrets from GitHub to Cloudflare Workers after deployment (worker must exist first)"
         required: false
@@ -91,6 +81,12 @@ on:
         required: false
       cloudflare_account_id:
         description: "Cloudflare account ID (required if deploy_to_dev is true)"
+        required: false
+      worker_secrets_json:
+        description: "JSON string mapping Cloudflare secret names to values. Construct using toJSON() in calling workflow."
+        required: false
+      worker_vars_json:
+        description: "JSON string mapping Cloudflare var names to values. Construct using toJSON() in calling workflow."
         required: false
     outputs:
       artifact_id:
@@ -264,8 +260,8 @@ jobs:
           wrangler_version: ${{ inputs.wrangler_version }}
           deploy_environment: "dev"
           dry_run: "false"
-          secrets_json: ${{ inputs.secrets_json }}
-          vars_json: ${{ inputs.vars_json }}
+          secrets_json: ${{ secrets.worker_secrets_json || '{}' }}
+          vars_json: ${{ secrets.worker_vars_json || '{}' }}
           sync_secrets_before_deploy: ${{ inputs.sync_secrets_before_deploy }}
           sync_vars_before_deploy: ${{ inputs.sync_vars_before_deploy }}
 

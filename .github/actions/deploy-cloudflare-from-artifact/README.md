@@ -809,7 +809,7 @@ jobs:
           }) }}
 ```
 
-**If calling a REUSABLE WORKFLOW that uses this action** (❌ Doesn't work):
+**If calling a REUSABLE WORKFLOW that uses this action** (❌ Doesn't work the old way):
 
 ```yaml
 jobs:
@@ -822,12 +822,44 @@ jobs:
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 ```
 
+**Solution for Reusable Workflows** (✅ Works):
+
+Our reusable workflows (env-deploy-reusable, preview-deploy-reusable, pr-build-reusable) now accept secrets via the `secrets:` block using `worker_secrets_json` and `worker_vars_json`:
+
+```yaml
+jobs:
+  deploy:
+    uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
+    with:
+      environment: 'production'
+      worker_name: 'my-worker'
+      wrangler_config: 'wrangler.toml'
+      zone: '${{ vars.CLOUDFLARE_ZONE_ID }}'
+      custom_domain: 'example.com'
+      slug: 'my-app'
+      app_name: 'api'
+      artifact_name: 'production-build'
+      # ... other inputs
+    secrets:
+      cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # ✅ Pass worker secrets via secrets: block using toJSON()
+      worker_secrets_json: ${{ toJSON(fromJSON(format('{{"AUTH_JWT_SECRET":"{0}","DATABASE_URL":"{1}"}}', secrets.AUTH_JWT_SECRET, secrets.DATABASE_URL))) }}
+      # ✅ Pass worker vars via secrets: block using toJSON()
+      worker_vars_json: ${{ toJSON(fromJSON(format('{{"ENVIRONMENT":"production","API_URL":"{0}"}}', vars.API_URL))) }}
+```
+
 **Why?** GitHub Actions has different context availability rules:
 
 - **Actions** (called in `steps`): ✅ Can use `secrets` context in inputs
-- **Reusable workflows** (called in `jobs`): ❌ Cannot use `secrets` context in `with:` block
+- **Reusable workflows** (called in `jobs`): ❌ Cannot use `secrets` context in `with:` block, ✅ but CAN use it in `secrets:` block
 
-For reusable workflows, you must pass secrets through the `secrets:` block, not through `secrets_json`.
+**How it works:**
+
+1. The `toJSON(fromJSON(format()))` expression is evaluated in your calling workflow's context (where `secrets` and `vars` are accessible)
+2. The resulting JSON string is passed as a **secret value** to the reusable workflow
+3. The reusable workflow receives it as an opaque string and passes it to this action
+4. This action parses the JSON and syncs the secrets/vars to Cloudflare
 
 ### Secrets Not Syncing
 
