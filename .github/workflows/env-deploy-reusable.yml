@@ -81,6 +81,16 @@ on:
         required: false
         type: boolean
         default: true
+      worker_secrets_json:
+        description: "JSON string of secrets to sync to worker. Construct using jq in calling workflow."
+        required: false
+        type: string
+        default: "{}"
+      worker_vars_json:
+        description: "JSON string of vars to sync to worker. Construct using jq in calling workflow."
+        required: false
+        type: string
+        default: "{}"
     secrets:
       cloudflare_api_token:
         description: "Cloudflare API token with Workers deployment permissions"
@@ -247,8 +257,8 @@ jobs:
           custom_domain: ${{ inputs.custom_domain }}
           zone_id: ${{ inputs.zone }}
           dry_run: "false"
-          secrets_json: "{}"
-          vars_json: "{}"
+          secrets_json: "${{ inputs.worker_secrets_json }}"
+          vars_json: "${{ inputs.worker_vars_json }}"
           sync_secrets_before_deploy: ${{ inputs.sync_secrets_before_deploy }}
           sync_vars_before_deploy: ${{ inputs.sync_vars_before_deploy }}
 
