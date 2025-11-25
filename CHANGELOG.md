@@ -1,3 +1,10 @@
+## [1.36.1](https://github.com/algtools/actions/compare/v1.36.0...v1.36.1) (2025-11-25)
+
+
+### Bug Fixes
+
+* improve secrets handling in deployment workflows ([b5b8728](https://github.com/algtools/actions/commit/b5b87286c5032ec5abf936e802c2719bb28b657c))
+
 # [1.36.0](https://github.com/algtools/actions/compare/v1.35.0...v1.36.0) (2025-11-25)
 
 
