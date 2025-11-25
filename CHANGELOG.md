@@ -1,3 +1,10 @@
+## [1.36.6](https://github.com/algtools/actions/compare/v1.36.5...v1.36.6) (2025-11-25)
+
+
+### Bug Fixes
+
+* update action steps for syncing secrets ([94eaafd](https://github.com/algtools/actions/commit/94eaafd3f1ebbcc657eaab2b8f5cd6e71a0d7e4f))
+
 ## [1.36.5](https://github.com/algtools/actions/compare/v1.36.4...v1.36.5) (2025-11-25)
 
 
