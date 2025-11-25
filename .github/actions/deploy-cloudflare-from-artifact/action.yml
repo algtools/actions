@@ -131,58 +131,6 @@ runs:
 
         echo "::endgroup::"
 
-    - name: Debug secrets JSON (action)
-      shell: bash
-      run: |
-        echo "::group::🔍 Debug: secrets_json in action"
-        SECRETS_JSON="${{ inputs.secrets_json }}"
-        VARS_JSON="${{ inputs.vars_json }}"
-
-        echo "📦 secrets_json received in action:"
-        if [ -z "$SECRETS_JSON" ]; then
-          echo "  ❌ EMPTY or UNDEFINED"
-        else
-          echo "  ✅ Present (length: ${#SECRETS_JSON} chars)"
-          # Show redacted preview
-          if [ "$SECRETS_JSON" = "{}" ]; then
-            echo "  📄 Content: {} (empty object)"
-          else
-            echo "  📄 Content: [REDACTED - contains secrets]"
-            echo "  🔑 First 20 chars: ${SECRETS_JSON:0:20}***"
-            # Try to parse to check validity
-            if echo "$SECRETS_JSON" | jq empty 2>/dev/null; then
-              echo "  ✅ Valid JSON format"
-              echo "  🔑 Number of keys: $(echo "$SECRETS_JSON" | jq 'keys | length')"
-            else
-              echo "  ❌ INVALID JSON format"
-            fi
-          fi
-        fi
-
-        echo ""
-        echo "📦 vars_json received in action:"
-        if [ -z "$VARS_JSON" ]; then
-          echo "  ❌ EMPTY or UNDEFINED"
-        else
-          echo "  ✅ Present (length: ${#VARS_JSON} chars)"
-          if [ "$VARS_JSON" = "{}" ]; then
-            echo "  📄 Content: {} (empty object)"
-          else
-            echo "  📄 Content: ${VARS_JSON:0:50}***"
-            if echo "$VARS_JSON" | jq empty 2>/dev/null; then
-              echo "  ✅ Valid JSON format"
-            else
-              echo "  ❌ INVALID JSON format"
-            fi
-          fi
-        fi
-
-        echo ""
-        echo "⚙️  Sync settings:"
-        echo "  sync_secrets_before_deploy: ${{ inputs.sync_secrets_before_deploy }}"
-        echo "  sync_vars_before_deploy: ${{ inputs.sync_vars_before_deploy }}"
-        echo "::endgroup::"
-
     - name: Download artifact
       uses: actions/download-artifact@v4
       with:

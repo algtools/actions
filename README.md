@@ -293,22 +293,11 @@ jobs:
 - `cloudflare_api_token`: Cloudflare API token with Workers and SSL permissions
 - `cloudflare_account_id`: Cloudflare account ID
 
-**Optional Secrets (if deploy_to_dev is true):**
+**Passing Custom Secrets:**
 
-- `worker_secrets_json`: JSON string mapping Cloudflare secret names to values. Construct using `toJSON()` in your calling workflow.
-- `worker_vars_json`: JSON string mapping Cloudflare var names to values. Construct using `toJSON()` in your calling workflow.
-
-**Passing Worker Secrets:**
-
-To pass custom secrets to your Cloudflare Worker when deploying to dev:
-
-```yaml
-secrets:
-  cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-  cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-  worker_secrets_json: ${{ format('{"MY_SECRET":"{0}"}', secrets.MY_SECRET || '') }}
-  worker_vars_json: ${{ format('{"MY_VAR":"{0}"}', vars.MY_VAR || '') }}
-```
+> ⚠️ **Note:** This workflow does not support passing custom secrets to Cloudflare Workers.
+> If you need to set custom secrets, use the `deploy-cloudflare-from-artifact` action directly instead.
+> See [deploy-cloudflare-from-artifact README](/.github/actions/deploy-cloudflare-from-artifact/README.md) for details.
 
 **Build Outputs:**
 
@@ -437,22 +426,11 @@ GitHub Actions restricts which contexts are available in different parts of work
 - `cloudflare_account_id`: Cloudflare account ID
 - `sentry_auth_token`: Sentry auth token (required if sentry_release is true)
 
-**Optional Secrets:**
+**Passing Custom Secrets:**
 
-- `worker_secrets_json`: JSON string mapping Cloudflare secret names to values. Construct using `toJSON()` in your calling workflow.
-- `worker_vars_json`: JSON string mapping Cloudflare var names to values. Construct using `toJSON()` in your calling workflow.
-
-**Passing Worker Secrets:**
-
-To pass custom secrets to your Cloudflare Worker, construct a JSON string in your calling workflow and pass it via the `secrets:` block:
-
-```yaml
-secrets:
-  cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-  cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-  worker_secrets_json: ${{ format('{"MY_SECRET":"{0}","ANOTHER_SECRET":"{1}"}', secrets.MY_SECRET || '', secrets.ANOTHER_SECRET || '') }}
-  worker_vars_json: ${{ format('{"MY_VAR":"{0}"}', vars.MY_VAR || '') }}
-```
+> ⚠️ **Note:** This workflow does not support passing custom secrets to Cloudflare Workers.
+> If you need to set custom secrets, use the `deploy-cloudflare-from-artifact` action directly instead.
+> See [deploy-cloudflare-from-artifact README](/.github/actions/deploy-cloudflare-from-artifact/README.md) for details.
 
 **Outputs:**
 
@@ -967,22 +945,11 @@ jobs:
 - `cloudflare_api_token`: Cloudflare API token with Workers and SSL permissions
 - `cloudflare_account_id`: Cloudflare account ID
 
-**Optional Secrets:**
+**Passing Custom Secrets:**
 
-- `worker_secrets_json`: JSON string mapping Cloudflare secret names to values. Construct using `toJSON()` in your calling workflow.
-- `worker_vars_json`: JSON string mapping Cloudflare var names to values. Construct using `toJSON()` in your calling workflow.
-
-**Passing Worker Secrets:**
-
-To pass custom secrets to your Cloudflare Worker in preview environments:
-
-```yaml
-secrets:
-  cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-  cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-  worker_secrets_json: ${{ format('{"AUTH_JWT_SECRET":"{0}","DATABASE_URL":"{1}"}', secrets.AUTH_JWT_SECRET || '', secrets.DATABASE_URL || '') }}
-  worker_vars_json: ${{ format('{"ENVIRONMENT":"preview"}', '') }}
-```
+> ⚠️ **Note:** This workflow does not support passing custom secrets to Cloudflare Workers.
+> If you need to set custom secrets, use the `deploy-cloudflare-from-artifact` action directly instead.
+> See [deploy-cloudflare-from-artifact README](/.github/actions/deploy-cloudflare-from-artifact/README.md) for details.
 
 **Build Outputs:**
 
@@ -1522,30 +1489,48 @@ jobs:
 ```
 
 **Solution:**
-Pass secrets through the dedicated `secrets:` block using the new `worker_secrets_json` and `worker_vars_json` secret parameters:
+Use the `deploy-cloudflare-from-artifact` action directly instead of the reusable workflow:
 
 ```yaml
 jobs:
   deploy:
-    uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
-    with:
-      environment: 'production'
-      # ... other inputs (no secrets here)
-    secrets:
-      cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      # Pass worker secrets as JSON string
-      worker_secrets_json: ${{ format('{"AUTH_JWT_SECRET":"{0}","DATABASE_URL":"{1}"}', secrets.AUTH_JWT_SECRET || '', secrets.DATABASE_URL || '') }}
-      # Pass worker vars as JSON string
-      worker_vars_json: ${{ format('{"ENVIRONMENT":"{0}"}', vars.ENVIRONMENT || '') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: 'my-build'
+          path: ./dist
+
+      - uses: algtools/actions/.github/actions/deploy-cloudflare-from-artifact@main
+        with:
+          artifact_name: 'my-build'
+          worker_name: 'my-worker'
+          wrangler_config: 'wrangler.jsonc'
+          cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # ✅ Secrets work in action calls! Use format() with fallbacks for safety
+          secrets_json: ${{ secrets.AUTH_JWT_SECRET && format('{"AUTH_JWT_SECRET":"{0}"}', secrets.AUTH_JWT_SECRET) || '{}' }}
 ```
 
-This works because:
+**Why this works:**
 
-- The `toJSON()/format()` expression is evaluated in the **calling workflow's context** where secrets are accessible
-- The resulting JSON string is passed as a **secret value** to the reusable workflow
-- The reusable workflow treats it as an opaque string and passes it to the action
-- The action parses the JSON and sets the secrets/vars in Cloudflare
+- When calling an **action** (not a reusable workflow), secrets ARE available in the `with:` block
+- Use `format()` with conditional checks to handle missing secrets gracefully
+- See [deploy-cloudflare-from-artifact README](/.github/actions/deploy-cloudflare-from-artifact/README.md) for details
+
+**⚠️ Common Pitfall:**
+
+```yaml
+# ❌ Don't do this - breaks if secret doesn't exist:
+secrets_json: '{"AUTH_JWT_SECRET":"${{ secrets.AUTH_JWT_SECRET }}"}'
+# If AUTH_JWT_SECRET doesn't exist, results in: {"AUTH_JWT_SECRET":"undefined"}
+# This is invalid JSON and will cause deployment to fail!
+
+# ✅ Do this instead - handles missing secrets:
+secrets_json: ${{ secrets.AUTH_JWT_SECRET && format('{"AUTH_JWT_SECRET":"{0}"}', secrets.AUTH_JWT_SECRET) || '{}' }}
+# If secret exists: {"AUTH_JWT_SECRET":"actual_value"}
+# If secret doesn't exist: {}
+```
 
 **Available Contexts by Workflow Level:**
 

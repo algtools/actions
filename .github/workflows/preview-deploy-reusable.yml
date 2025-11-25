@@ -156,16 +156,6 @@ on:
         required: false
         type: boolean
         default: true
-      worker_secrets_json:
-        description: "JSON string mapping Cloudflare secret names to values. Pass from job outputs."
-        required: false
-        type: string
-        default: "{}"
-      worker_vars_json:
-        description: "JSON string mapping Cloudflare var names to values. Pass from job outputs."
-        required: false
-        type: string
-        default: "{}"
 
       # Miscellaneous
       retention_days:
@@ -529,46 +519,6 @@ jobs:
 
           echo "::endgroup::"
 
-      - name: Decode and debug secrets JSON (preview-deploy-reusable)
-        id: decode-secrets
-        run: |
-          echo "::group::🔍 Debug: worker_secrets_json in reusable workflow"
-          SECRETS_JSON_B64="${{ inputs.worker_secrets_json }}"
-          VARS_JSON="${{ inputs.worker_vars_json }}"
-
-          echo "📦 worker_secrets_json received (base64):"
-          if [ -z "$SECRETS_JSON_B64" ] || [ "$SECRETS_JSON_B64" = "{}" ]; then
-            echo "  ❌ EMPTY or UNDEFINED"
-            SECRETS_JSON="{}"
-          else
-            echo "  ✅ Present (base64 length: ${#SECRETS_JSON_B64} chars)"
-            # Decode from base64
-            SECRETS_JSON=$(echo "$SECRETS_JSON_B64" | base64 -d)
-            echo "  ✅ Decoded (length: ${#SECRETS_JSON} chars)"
-            echo "  🔑 First 20 chars: ${SECRETS_JSON:0:20}***"
-          fi
-
-          # Export for use in deploy step
-          echo "secrets_json=$SECRETS_JSON" >> "$GITHUB_OUTPUT"
-
-          echo ""
-          echo "📦 worker_vars_json received in reusable workflow:"
-          if [ -z "$VARS_JSON" ]; then
-            echo "  ❌ EMPTY or UNDEFINED"
-            VARS_JSON="{}"
-          else
-            echo "  ✅ Present (length: ${#VARS_JSON} chars)"
-            if [ "$VARS_JSON" = "{}" ]; then
-              echo "  📄 Content: {} (empty object)"
-            else
-              echo "  📄 Content: ${VARS_JSON:0:50}***"
-            fi
-          fi
-
-          # Export for use in deploy step
-          echo "vars_json=$VARS_JSON" >> "$GITHUB_OUTPUT"
-          echo "::endgroup::"
-
       - name: Deploy to Cloudflare Workers
         id: deploy-worker
         uses: algtools/actions/.github/actions/deploy-cloudflare-from-artifact@main
@@ -583,8 +533,8 @@ jobs:
           custom_domain: ${{ steps.preview-domain.outputs.domain }}
           zone_id: ${{ inputs.zone }}
           dry_run: "false"
-          secrets_json: ${{ steps.decode-secrets.outputs.secrets_json }}
-          vars_json: ${{ steps.decode-secrets.outputs.vars_json }}
+          secrets_json: "{}"
+          vars_json: "{}"
           sync_secrets_before_deploy: ${{ inputs.sync_secrets_before_deploy }}
           sync_vars_before_deploy: ${{ inputs.sync_vars_before_deploy }}
 
