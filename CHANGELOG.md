@@ -1,3 +1,10 @@
+## [1.36.7](https://github.com/algtools/actions/compare/v1.36.6...v1.36.7) (2025-11-25)
+
+
+### Bug Fixes
+
+* update variable assignment syntax in deploy action ([bf46a8d](https://github.com/algtools/actions/commit/bf46a8d7eb1c1b8cf5b45882027139e538a97a6c))
+
 ## [1.36.6](https://github.com/algtools/actions/compare/v1.36.5...v1.36.6) (2025-11-25)
 
 
