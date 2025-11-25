@@ -1,3 +1,10 @@
+## [1.36.2](https://github.com/algtools/actions/compare/v1.36.1...v1.36.2) (2025-11-25)
+
+
+### Bug Fixes
+
+* update secrets handling ([3d0df5c](https://github.com/algtools/actions/commit/3d0df5cd7d63a4994885972f71aacb8623f80bff))
+
 ## [1.36.1](https://github.com/algtools/actions/compare/v1.36.0...v1.36.1) (2025-11-25)
 
 
