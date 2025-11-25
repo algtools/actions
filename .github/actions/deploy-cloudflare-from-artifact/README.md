@@ -843,10 +843,10 @@ jobs:
     secrets:
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      # ✅ Pass worker secrets via secrets: block using toJSON()
-      worker_secrets_json: ${{ toJSON(fromJSON(format('{{"AUTH_JWT_SECRET":"{0}","DATABASE_URL":"{1}"}}', secrets.AUTH_JWT_SECRET, secrets.DATABASE_URL))) }}
-      # ✅ Pass worker vars via secrets: block using toJSON()
-      worker_vars_json: ${{ toJSON(fromJSON(format('{{"ENVIRONMENT":"production","API_URL":"{0}"}}', vars.API_URL))) }}
+      # ✅ Pass worker secrets via secrets: block using format()
+      worker_secrets_json: ${{ format('{{"AUTH_JWT_SECRET":"{0}","DATABASE_URL":"{1}"}}', secrets.AUTH_JWT_SECRET || '', secrets.DATABASE_URL || '') }}
+      # ✅ Pass worker vars via secrets: block using format()
+      worker_vars_json: ${{ format('{{"ENVIRONMENT":"production","API_URL":"{0}"}}', vars.API_URL || '') }}
 ```
 
 **Why?** GitHub Actions has different context availability rules:
@@ -856,10 +856,12 @@ jobs:
 
 **How it works:**
 
-1. The `toJSON(fromJSON(format()))` expression is evaluated in your calling workflow's context (where `secrets` and `vars` are accessible)
+1. The `format()` expression is evaluated in your calling workflow's context (where `secrets` and `vars` are accessible) to construct a valid JSON string
 2. The resulting JSON string is passed as a **secret value** to the reusable workflow
 3. The reusable workflow receives it as an opaque string and passes it to this action
 4. This action parses the JSON and syncs the secrets/vars to Cloudflare
+
+**Note:** Use `|| ''` to provide empty string fallbacks for potentially missing secrets/vars (e.g., `secrets.MY_SECRET || ''`)
 
 ### Secrets Not Syncing
 
@@ -875,21 +877,28 @@ jobs:
 6. Check Cloudflare dashboard to confirm secrets are set
 7. Note: Secrets are synced **after** deployment, so the worker must exist first
 
-**Example valid format (Recommended):**
+**Example valid formats:**
+
+**Direct action usage (using toJSON):**
 
 ```yaml
 secrets_json: ${{ toJSON({
-  "SECRET_NAME": secrets.GITHUB_SECRET_NAME
+  "SECRET_NAME": secrets.GITHUB_SECRET_NAME,
+  "API_KEY": secrets.API_KEY
 }) }}
 ```
 
-**Alternative format (may trigger actionlint warnings):**
+**Reusable workflow usage (using format):**
 
 ```yaml
-secrets_json: |
-  {
-    "SECRET_NAME": "${{ secrets.GITHUB_SECRET_NAME }}"
-  }
+# In the calling workflow's secrets: block
+worker_secrets_json: ${{ format('{{"SECRET_NAME":"{0}","API_KEY":"{1}"}}', secrets.SECRET_NAME || '', secrets.API_KEY || '') }}
+```
+
+**Conditional inclusion:**
+
+```yaml
+worker_secrets_json: ${{ secrets.MY_SECRET != '' && format('{{"MY_SECRET":"{0}"}}', secrets.MY_SECRET) || '{}' }}
 ```
 
 ### Vars Not Syncing
@@ -904,12 +913,22 @@ secrets_json: |
 4. Verify vars are added to the correct environment section in wrangler config
 5. Check the wrangler config file after deployment to confirm vars were added
 
-**Example valid format (Recommended):**
+**Example valid formats:**
+
+**Direct action usage (using toJSON):**
 
 ```yaml
 vars_json: ${{ toJSON({
-  "VAR_NAME": vars.GITHUB_VAR_NAME
+  "VAR_NAME": vars.GITHUB_VAR_NAME,
+  "ENVIRONMENT": vars.ENVIRONMENT
 }) }}
+```
+
+**Reusable workflow usage (using format):**
+
+```yaml
+# In the calling workflow's secrets: block
+worker_vars_json: ${{ format('{{"VAR_NAME":"{0}","ENVIRONMENT":"{1}"}}', vars.VAR_NAME || '', vars.ENVIRONMENT || '') }}
 ```
 
 **Alternative format (may trigger actionlint warnings):**

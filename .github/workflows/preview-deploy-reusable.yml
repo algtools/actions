@@ -525,6 +525,40 @@ jobs:
 
           echo "::endgroup::"
 
+      - name: Debug secrets JSON (preview-deploy-reusable)
+        run: |
+          echo "::group::🔍 Debug: worker_secrets_json in reusable workflow"
+          SECRETS_JSON="${{ secrets.worker_secrets_json }}"
+          VARS_JSON="${{ secrets.worker_vars_json }}"
+
+          echo "📦 worker_secrets_json received in reusable workflow:"
+          if [ -z "$SECRETS_JSON" ]; then
+            echo "  ❌ EMPTY or UNDEFINED"
+          else
+            echo "  ✅ Present (length: ${#SECRETS_JSON} chars)"
+            # Show redacted preview
+            if [ "$SECRETS_JSON" = "{}" ]; then
+              echo "  📄 Content: {} (empty object)"
+            else
+              echo "  📄 Content: [REDACTED - contains secrets]"
+              echo "  🔑 First 20 chars: ${SECRETS_JSON:0:20}***"
+            fi
+          fi
+
+          echo ""
+          echo "📦 worker_vars_json received in reusable workflow:"
+          if [ -z "$VARS_JSON" ]; then
+            echo "  ❌ EMPTY or UNDEFINED"
+          else
+            echo "  ✅ Present (length: ${#VARS_JSON} chars)"
+            if [ "$VARS_JSON" = "{}" ]; then
+              echo "  📄 Content: {} (empty object)"
+            else
+              echo "  📄 Content: ${VARS_JSON:0:50}***"
+            fi
+          fi
+          echo "::endgroup::"
+
       - name: Deploy to Cloudflare Workers
         id: deploy-worker
         uses: algtools/actions/.github/actions/deploy-cloudflare-from-artifact@main
