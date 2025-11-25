@@ -295,9 +295,30 @@ jobs:
 
 **Passing Custom Secrets:**
 
-> ⚠️ **Note:** This workflow does not support passing custom secrets to Cloudflare Workers.
-> If you need to set custom secrets, use the `deploy-cloudflare-from-artifact` action directly instead.
-> See [deploy-cloudflare-from-artifact README](/.github/actions/deploy-cloudflare-from-artifact/README.md) for details.
+To pass custom secrets to your Cloudflare Worker:
+
+```yaml
+jobs:
+  prepare-secrets:
+    runs-on: ubuntu-latest
+    outputs:
+      worker_secrets_json: ${{ steps.build-json.outputs.json }}
+    steps:
+      - name: Build secrets JSON
+        id: build-json
+        run: |
+          SECRETS_JSON=$(jq -nc \
+            --arg my_secret "${{ secrets.MY_SECRET || '' }}" \
+            '{MY_SECRET: $my_secret}')
+          echo "json=$SECRETS_JSON" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare-secrets
+    uses: algtools/actions/.github/workflows/pr-build-reusable.yml@main
+    with:
+      # ... build configuration
+      worker_secrets_json: '${{ needs.prepare-secrets.outputs.worker_secrets_json }}'
+```
 
 **Build Outputs:**
 
@@ -428,9 +449,31 @@ GitHub Actions restricts which contexts are available in different parts of work
 
 **Passing Custom Secrets:**
 
-> ⚠️ **Note:** This workflow does not support passing custom secrets to Cloudflare Workers.
-> If you need to set custom secrets, use the `deploy-cloudflare-from-artifact` action directly instead.
-> See [deploy-cloudflare-from-artifact README](/.github/actions/deploy-cloudflare-from-artifact/README.md) for details.
+To pass custom secrets to your Cloudflare Worker:
+
+```yaml
+jobs:
+  prepare-secrets:
+    runs-on: ubuntu-latest
+    outputs:
+      worker_secrets_json: ${{ steps.build-json.outputs.json }}
+    steps:
+      - name: Build secrets JSON
+        id: build-json
+        run: |
+          SECRETS_JSON=$(jq -nc \
+            --arg my_secret "${{ secrets.MY_SECRET || '' }}" \
+            '{MY_SECRET: $my_secret}')
+          echo "json=$SECRETS_JSON" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: prepare-secrets
+    uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
+    with:
+      environment: 'production'
+      # ... other configuration
+      worker_secrets_json: '${{ needs.prepare-secrets.outputs.worker_secrets_json }}'
+```
 
 **Outputs:**
 
@@ -947,9 +990,30 @@ jobs:
 
 **Passing Custom Secrets:**
 
-> ⚠️ **Note:** This workflow does not support passing custom secrets to Cloudflare Workers.
-> If you need to set custom secrets, use the `deploy-cloudflare-from-artifact` action directly instead.
-> See [deploy-cloudflare-from-artifact README](/.github/actions/deploy-cloudflare-from-artifact/README.md) for details.
+To pass custom secrets to your Cloudflare Worker:
+
+```yaml
+jobs:
+  prepare-secrets:
+    runs-on: ubuntu-latest
+    outputs:
+      worker_secrets_json: ${{ steps.build-json.outputs.json }}
+    steps:
+      - name: Build secrets JSON
+        id: build-json
+        run: |
+          SECRETS_JSON=$(jq -nc \
+            --arg my_secret "${{ secrets.MY_SECRET || '' }}" \
+            '{MY_SECRET: $my_secret}')
+          echo "json=$SECRETS_JSON" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: prepare-secrets
+    uses: algtools/actions/.github/workflows/preview-deploy-reusable.yml@main
+    with:
+      # ... preview configuration
+      worker_secrets_json: '${{ needs.prepare-secrets.outputs.worker_secrets_json }}'
+```
 
 **Build Outputs:**
 
@@ -1489,48 +1553,52 @@ jobs:
 ```
 
 **Solution:**
-Use the `deploy-cloudflare-from-artifact` action directly instead of the reusable workflow:
+Use a `prepare-secrets` job with `jq` to construct valid JSON, then pass it through inputs:
 
 ```yaml
 jobs:
-  deploy:
+  prepare-secrets:
     runs-on: ubuntu-latest
+    outputs:
+      worker_secrets_json: ${{ steps.build-json.outputs.json }}
     steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: 'my-build'
-          path: ./dist
+      - name: Build secrets JSON
+        id: build-json
+        run: |
+          # Use jq to construct valid JSON
+          SECRETS_JSON=$(jq -nc \
+            --arg auth_secret "${{ secrets.AUTH_JWT_SECRET || '' }}" \
+            --arg db_url "${{ secrets.DATABASE_URL || '' }}" \
+            '{AUTH_JWT_SECRET: $auth_secret, DATABASE_URL: $db_url}')
+          echo "json=$SECRETS_JSON" >> "$GITHUB_OUTPUT"
 
-      - uses: algtools/actions/.github/actions/deploy-cloudflare-from-artifact@main
-        with:
-          artifact_name: 'my-build'
-          worker_name: 'my-worker'
-          wrangler_config: 'wrangler.jsonc'
-          cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # ✅ Secrets work in action calls! Use format() with fallbacks for safety
-          secrets_json: ${{ secrets.AUTH_JWT_SECRET && format('{"AUTH_JWT_SECRET":"{0}"}', secrets.AUTH_JWT_SECRET) || '{}' }}
+  deploy:
+    needs: prepare-secrets
+    uses: algtools/actions/.github/workflows/env-deploy-reusable.yml@main
+    with:
+      environment: 'production'
+      # ... other configuration
+      # ✅ CRITICAL: Quote the output to preserve JSON!
+      worker_secrets_json: '${{ needs.prepare-secrets.outputs.worker_secrets_json }}'
+    secrets:
+      cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 ```
 
 **Why this works:**
 
-- When calling an **action** (not a reusable workflow), secrets ARE available in the `with:` block
-- Use `format()` with conditional checks to handle missing secrets gracefully
+- `jq -nc` guarantees valid, compact JSON with proper quoting
+- Quoting the output (`'${{ ... }}'`) prevents GitHub Actions from evaluating it as an expression
+- The action uses single quotes in bash to preserve the JSON exactly
 - See [deploy-cloudflare-from-artifact README](/.github/actions/deploy-cloudflare-from-artifact/README.md) for details
 
-**⚠️ Common Pitfall:**
+**Key Requirements:**
 
-```yaml
-# ❌ Don't do this - breaks if secret doesn't exist:
-secrets_json: '{"AUTH_JWT_SECRET":"${{ secrets.AUTH_JWT_SECRET }}"}'
-# If AUTH_JWT_SECRET doesn't exist, results in: {"AUTH_JWT_SECRET":"undefined"}
-# This is invalid JSON and will cause deployment to fail!
-
-# ✅ Do this instead - handles missing secrets:
-secrets_json: ${{ secrets.AUTH_JWT_SECRET && format('{"AUTH_JWT_SECRET":"{0}"}', secrets.AUTH_JWT_SECRET) || '{}' }}
-# If secret exists: {"AUTH_JWT_SECRET":"actual_value"}
-# If secret doesn't exist: {}
-```
+1. ✅ Use `jq -nc` (not GitHub Actions expressions)
+2. ✅ Quote the job output: `'${{ needs.prepare-secrets.outputs.worker_secrets_json }}'`
+3. ✅ Use `|| ''` fallback for missing secrets
+4. ✅ The reusable workflow quotes it when passing to action
+5. ✅ The action uses single quotes in bash
 
 **Available Contexts by Workflow Level:**
 
