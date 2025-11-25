@@ -844,9 +844,9 @@ jobs:
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       # ✅ Pass worker secrets via secrets: block using format()
-      worker_secrets_json: ${{ format('{{"AUTH_JWT_SECRET":"{0}","DATABASE_URL":"{1}"}}', secrets.AUTH_JWT_SECRET || '', secrets.DATABASE_URL || '') }}
+      worker_secrets_json: ${{ format('{"AUTH_JWT_SECRET":"{0}","DATABASE_URL":"{1}"}', secrets.AUTH_JWT_SECRET || '', secrets.DATABASE_URL || '') }}
       # ✅ Pass worker vars via secrets: block using format()
-      worker_vars_json: ${{ format('{{"ENVIRONMENT":"production","API_URL":"{0}"}}', vars.API_URL || '') }}
+      worker_vars_json: ${{ format('{"ENVIRONMENT":"production","API_URL":"{0}"}', vars.API_URL || '') }}
 ```
 
 **Why?** GitHub Actions has different context availability rules:
@@ -892,13 +892,13 @@ secrets_json: ${{ toJSON({
 
 ```yaml
 # In the calling workflow's secrets: block
-worker_secrets_json: ${{ format('{{"SECRET_NAME":"{0}","API_KEY":"{1}"}}', secrets.SECRET_NAME || '', secrets.API_KEY || '') }}
+worker_secrets_json: ${{ format('{"SECRET_NAME":"{0}","API_KEY":"{1}"}', secrets.SECRET_NAME || '', secrets.API_KEY || '') }}
 ```
 
 **Conditional inclusion:**
 
 ```yaml
-worker_secrets_json: ${{ secrets.MY_SECRET != '' && format('{{"MY_SECRET":"{0}"}}', secrets.MY_SECRET) || '{}' }}
+worker_secrets_json: ${{ secrets.MY_SECRET != '' && format('{"MY_SECRET":"{0}"}', secrets.MY_SECRET) || '{}' }}
 ```
 
 ### Vars Not Syncing
@@ -928,7 +928,7 @@ vars_json: ${{ toJSON({
 
 ```yaml
 # In the calling workflow's secrets: block
-worker_vars_json: ${{ format('{{"VAR_NAME":"{0}","ENVIRONMENT":"{1}"}}', vars.VAR_NAME || '', vars.ENVIRONMENT || '') }}
+worker_vars_json: ${{ format('{"VAR_NAME":"{0}","ENVIRONMENT":"{1}"}', vars.VAR_NAME || '', vars.ENVIRONMENT || '') }}
 ```
 
 **Alternative format (may trigger actionlint warnings):**

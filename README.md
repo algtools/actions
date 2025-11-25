@@ -306,8 +306,8 @@ To pass custom secrets to your Cloudflare Worker when deploying to dev:
 secrets:
   cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-  worker_secrets_json: ${{ format('{{"MY_SECRET":"{0}"}}', secrets.MY_SECRET || '') }}
-  worker_vars_json: ${{ format('{{"MY_VAR":"{0}"}}', vars.MY_VAR || '') }}
+  worker_secrets_json: ${{ format('{"MY_SECRET":"{0}"}', secrets.MY_SECRET || '') }}
+  worker_vars_json: ${{ format('{"MY_VAR":"{0}"}', vars.MY_VAR || '') }}
 ```
 
 **Build Outputs:**
@@ -450,8 +450,8 @@ To pass custom secrets to your Cloudflare Worker, construct a JSON string in you
 secrets:
   cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-  worker_secrets_json: ${{ format('{{"MY_SECRET":"{0}","ANOTHER_SECRET":"{1}"}}', secrets.MY_SECRET || '', secrets.ANOTHER_SECRET || '') }}
-  worker_vars_json: ${{ format('{{"MY_VAR":"{0}"}}', vars.MY_VAR || '') }}
+  worker_secrets_json: ${{ format('{"MY_SECRET":"{0}","ANOTHER_SECRET":"{1}"}', secrets.MY_SECRET || '', secrets.ANOTHER_SECRET || '') }}
+  worker_vars_json: ${{ format('{"MY_VAR":"{0}"}', vars.MY_VAR || '') }}
 ```
 
 **Outputs:**
@@ -980,8 +980,8 @@ To pass custom secrets to your Cloudflare Worker in preview environments:
 secrets:
   cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-  worker_secrets_json: ${{ format('{{"AUTH_JWT_SECRET":"{0}","DATABASE_URL":"{1}"}}', secrets.AUTH_JWT_SECRET || '', secrets.DATABASE_URL || '') }}
-  worker_vars_json: ${{ format('{{"ENVIRONMENT":"preview"}}', '') }}
+  worker_secrets_json: ${{ format('{"AUTH_JWT_SECRET":"{0}","DATABASE_URL":"{1}"}', secrets.AUTH_JWT_SECRET || '', secrets.DATABASE_URL || '') }}
+  worker_vars_json: ${{ format('{"ENVIRONMENT":"preview"}', '') }}
 ```
 
 **Build Outputs:**
@@ -1535,9 +1535,9 @@ jobs:
       cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       # Pass worker secrets as JSON string
-      worker_secrets_json: ${{ format('{{"AUTH_JWT_SECRET":"{0}","DATABASE_URL":"{1}"}}', secrets.AUTH_JWT_SECRET || '', secrets.DATABASE_URL || '') }}
+      worker_secrets_json: ${{ format('{"AUTH_JWT_SECRET":"{0}","DATABASE_URL":"{1}"}', secrets.AUTH_JWT_SECRET || '', secrets.DATABASE_URL || '') }}
       # Pass worker vars as JSON string
-      worker_vars_json: ${{ format('{{"ENVIRONMENT":"{0}"}}', vars.ENVIRONMENT || '') }}
+      worker_vars_json: ${{ format('{"ENVIRONMENT":"{0}"}', vars.ENVIRONMENT || '') }}
 ```
 
 This works because:
