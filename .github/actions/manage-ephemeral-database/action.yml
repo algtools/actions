@@ -5,8 +5,11 @@ author: "Algenium Systems"
 inputs:
   # Repository configuration
   repository_name:
-    description: "Repository name (used for database naming)"
+    description: "Repository name (used for logging, fallback for database naming if database_name_base not provided)"
     required: true
+  database_name_base:
+    description: "Base name for database (e.g., 'janovix-aml-pr'). If not provided, uses repository_name. Database will be named '{database_name_base}-{pr_number}'"
+    required: false
   pr_number:
     description: "Pull request number"
     required: true
@@ -283,8 +286,15 @@ runs:
         REPO_NAME="${{ inputs.repository_name }}"
         PR_NUMBER="${{ inputs.pr_number }}"
 
+        # Determine database name base
+        if [ -n "${{ inputs.database_name_base }}" ]; then
+          DB_NAME_BASE="${{ inputs.database_name_base }}"
+        else
+          DB_NAME_BASE="${REPO_NAME}"
+        fi
+
         # Determine database name
-        DB_NAME="${REPO_NAME}-${PR_NUMBER}"
+        DB_NAME="${DB_NAME_BASE}-${PR_NUMBER}"
 
         # Decide whether to create database
         if [ "$HAS_NEW_MIGRATIONS" = "true" ] || [ "$FORCE_CREATE" = "true" ]; then
