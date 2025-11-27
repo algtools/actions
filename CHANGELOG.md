@@ -1,3 +1,10 @@
+## [1.37.1](https://github.com/algtools/actions/compare/v1.37.0...v1.37.1) (2025-11-27)
+
+
+### Bug Fixes
+
+* enhance database naming flexibility in manage-ephemeral-database action ([62ea75b](https://github.com/algtools/actions/commit/62ea75b8bf0637b1416a2f40230ca4891c3f92a0))
+
 # [1.37.0](https://github.com/algtools/actions/compare/v1.36.8...v1.37.0) (2025-11-25)
 
 
