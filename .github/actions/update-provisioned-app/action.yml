@@ -1,36 +1,45 @@
 name: "Update Provisioned App"
-description: "Updates an already provisioned app with the latest or specific template version by creating a PR"
+description: "Updates an app using incremental diffs with smart merge rules for special files"
+author: "Algtools"
+
+branding:
+  icon: "refresh-cw"
+  color: "blue"
 
 inputs:
   source_repo:
-    description: "Source template repository (e.g., 'owner/repo')"
+    description: "Source template repository (e.g., algtools/core-template)"
     required: true
   target_repo:
-    description: "Target repository to update (e.g., 'owner/app-name')"
+    description: "Target repository to update (e.g., owner/my-app)"
     required: true
   version:
-    description: "Template release tag (use 'latest' for newest release)"
+    description: 'Target template version (e.g., v1.8.2 or "latest")'
     required: false
     default: "latest"
   base_branch:
-    description: "Base branch to create PR against (default: main)"
+    description: "Base branch to create PR against"
     required: false
     default: "main"
   branch_name:
-    description: "Name for the update branch (default: algtools/{template_name}-{version}, e.g., algtools/web-template-1-16-4)"
+    description: "Name for the update branch (default: algtools/{template_name}-{version})"
     required: false
     default: ""
   pr_title:
-    description: "Title for the pull request (default: fix: update template to {version})"
+    description: "Title for the pull request (auto-generated if not provided)"
     required: false
     default: ""
   pr_body:
-    description: "Body for the pull request (default: auto-generated)"
+    description: "Body for the pull request (auto-generated if not provided)"
     required: false
     default: ""
   github_token:
     description: "GitHub token with repo permissions"
     required: true
+  dry_run:
+    description: "Perform a dry run without creating PR"
+    required: false
+    default: "false"
 
 outputs:
   pr_url:
@@ -41,10 +50,16 @@ outputs:
     value: ${{ steps.create-pr.outputs.pr_number }}
   release_tag:
     description: "Template version used for the update"
-    value: ${{ steps.release-info.outputs.release_tag }}
+    value: ${{ steps.resolve-version.outputs.version }}
   branch_name:
     description: "Name of the branch created"
-    value: ${{ steps.create-branch.outputs.branch_name }}
+    value: ${{ steps.setup.outputs.branch_name }}
+  versions_applied:
+    description: "Number of versions successfully applied"
+    value: ${{ steps.apply-changes.outputs.versions_applied }}
+  files_changed:
+    description: "Total number of files changed"
+    value: ${{ steps.apply-changes.outputs.files_changed }}
 
 runs:
   using: "composite"
@@ -53,691 +68,309 @@ runs:
       shell: bash
       run: |
         ACTION_NAME="Update Provisioned App"
-        # Change to repo root (3 levels up from action directory)
         cd "${GITHUB_ACTION_PATH}/../../.."
-        VERSION="v$(jq -r '.version' package.json)"
-
+        VERSION="v$(jq -r '.version' package.json 2>/dev/null || echo 'dev')"
         echo "🔧 algtools/actions: ${ACTION_NAME} | Version: ${VERSION}"
         echo "## 🔧 ${ACTION_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
 
-    - name: Mask sensitive tokens
+    - name: Setup dependencies
       shell: bash
       run: |
-        echo "::add-mask::${{ inputs.github_token }}"
+        echo "::group::Installing dependencies"
+        # Install jq if not available
+        if ! command -v jq &> /dev/null; then
+          echo "Installing jq..."
+          if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            sudo apt-get update && sudo apt-get install -y jq
+          elif [[ "$OSTYPE" == "darwin"* ]]; then
+            brew install jq
+          fi
+        fi
 
-    - name: Resolve release information
-      id: release-info
+        # Install Node.js dependencies for rule engine
+        cd "${GITHUB_ACTION_PATH}/rules"
+        if [ ! -d "node_modules" ]; then
+          npm install --silent js-yaml minimatch 2>&1 | grep -v "^npm WARN" || true
+        fi
+
+        echo "✓ Dependencies installed"
+        echo "::endgroup::"
+
+    - name: Checkout target repository
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ inputs.target_repo }}
+        token: ${{ inputs.github_token }}
+        fetch-depth: 0
+        path: target-repo
+
+    - name: Detect current version
+      id: detect-version
+      shell: bash
+      working-directory: target-repo
+      run: |
+        echo "::group::Detecting current template version"
+        bash "${GITHUB_ACTION_PATH}/scripts/detect-version.sh"
+        echo "::endgroup::"
+
+    - name: Resolve target version
+      id: resolve-version
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github_token }}
-        VERSION_INPUT: ${{ inputs.version }}
         SOURCE_REPO: ${{ inputs.source_repo }}
+        VERSION_INPUT: ${{ inputs.version }}
       run: |
-        set -euo pipefail
+        echo "::group::Resolving target version"
 
         VERSION="${VERSION_INPUT:-latest}"
 
-        # Get repository owner and name
-        IFS='/' read -r OWNER REPO <<< "${SOURCE_REPO}"
-
-        echo "Repository: ${SOURCE_REPO}"
-        echo "Version: ${VERSION}"
-
-        # Test API access first
-        echo "Testing API access to repository..."
-        if ! gh api "/repos/${SOURCE_REPO}" --jq '.name' >/dev/null 2>&1; then
-          echo "::error::Cannot access repository ${SOURCE_REPO}"
-          exit 1
-        fi
-
-        # Fetch releases
-        echo "Fetching releases from ${SOURCE_REPO}..."
-        RELEASES_LIST=$(gh api "/repos/${SOURCE_REPO}/releases" --jq '.[].tag_name' 2>&1 || echo "")
-        if [ -z "${RELEASES_LIST}" ]; then
-          echo "::error::No releases found in ${SOURCE_REPO}"
-          exit 1
-        fi
-
-        echo "Available releases:"
-        echo "${RELEASES_LIST}"
-
-        if [ "${VERSION}" = "latest" ]; then
+        if [ "$VERSION" = "latest" ]; then
           echo "Fetching latest release..."
           RELEASE_DATA=$(gh api "/repos/${SOURCE_REPO}/releases/latest" 2>&1) || {
             echo "::error::Failed to fetch latest release"
             exit 1
           }
-        else
-          echo "Fetching release with tag: ${VERSION}"
-          RELEASE_DATA=$(gh api "/repos/${SOURCE_REPO}/releases/tags/${VERSION}" 2>&1) || {
-            echo "::error::Release tag ${VERSION} not found"
-            exit 1
-          }
+          VERSION=$(echo "$RELEASE_DATA" | jq -r '.tag_name')
         fi
 
-        RELEASE_TAG=$(echo "${RELEASE_DATA}" | jq -r '.tag_name')
-        echo "Found release: ${RELEASE_TAG}"
-        echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "✓ Target version: $VERSION"
+        echo "::endgroup::"
 
-        # Look for template asset
-        ASSET_NAME=$(echo "${RELEASE_DATA}" | jq -r '.assets[] | select(.name | endswith(".tar.gz") or endswith(".tgz")) | .name' | head -n 1)
+    - name: Check if update needed
+      id: check-update
+      shell: bash
+      run: |
+        current="${{ steps.detect-version.outputs.current_version }}"
+        target="${{ steps.resolve-version.outputs.version }}"
 
-        if [ -n "${ASSET_NAME}" ]; then
-          echo "Found template asset: ${ASSET_NAME}"
-          echo "asset_name=${ASSET_NAME}" >> $GITHUB_OUTPUT
+        if [ "$current" = "$target" ]; then
+          echo "::notice::Already on target version $target. No update needed."
+          echo "update_needed=false" >> $GITHUB_OUTPUT
         else
-          echo "::error::No template package found in release ${RELEASE_TAG}"
-          exit 1
+          echo "::notice::Update needed: $current → $target"
+          echo "update_needed=true" >> $GITHUB_OUTPUT
         fi
 
-    - name: Download template archive
+    - name: Query intermediate versions
+      id: query-versions
+      if: steps.check-update.outputs.update_needed == 'true'
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github_token }}
         SOURCE_REPO: ${{ inputs.source_repo }}
-        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
-        ASSET_NAME: ${{ steps.release-info.outputs.asset_name }}
+        CURRENT_VERSION: ${{ steps.detect-version.outputs.current_version }}
+        TARGET_VERSION: ${{ steps.resolve-version.outputs.version }}
       run: |
-        set -euo pipefail
-        mkdir -p dist
+        echo "::group::Querying intermediate versions"
+        bash "${GITHUB_ACTION_PATH}/scripts/query-versions.sh" > versions.json
 
-        echo "Downloading template package: ${ASSET_NAME}"
-        gh release download "${RELEASE_TAG}" \
-          --repo "${SOURCE_REPO}" \
-          --pattern "${ASSET_NAME}" \
-          --dir dist \
-          --clobber
+        versions_count=$(jq 'length' versions.json)
+        echo "versions_count=$versions_count" >> $GITHUB_OUTPUT
+        echo "✓ Found $versions_count intermediate version(s)"
+        echo "::endgroup::"
 
-        echo "✓ Downloaded ${ASSET_NAME}"
-
-    - name: Extract template archive
-      shell: bash
-      run: |
-        set -euo pipefail
-        mkdir -p extracted
-
-        TARBALL=$(find dist -maxdepth 1 -type f -name '*.tar.gz' -o -name '*.tgz' | head -n 1)
-        if [ -z "${TARBALL}" ]; then
-          echo 'Unable to locate downloaded tarball.' >&2
-          exit 1
-        fi
-
-        tar -xzf "${TARBALL}" -C extracted
-
-        # Find the template directory
-        if [ -d extracted/package ]; then
-          mv extracted/package template
-        else
-          FIRST_DIR=$(find extracted -mindepth 1 -maxdepth 1 -type d | head -n 1)
-          if [ -z "${FIRST_DIR}" ]; then
-            echo 'Extracted archive did not contain a directory.' >&2
-            exit 1
-          fi
-          mv "${FIRST_DIR}" template
-        fi
-
-        echo "✓ Template extracted (workflows already transformed to app structure)"
-
-    - name: Clone target repository
+    - name: Collect version diffs
+      id: collect-diffs
+      if: steps.check-update.outputs.update_needed == 'true'
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github_token }}
-        TARGET_REPO: ${{ inputs.target_repo }}
-        BASE_BRANCH: ${{ inputs.base_branch }}
-      run: |
-        set -euo pipefail
-
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-        # Clone the target repository
-        echo "Cloning target repository: ${TARGET_REPO}"
-        git clone "https://x-access-token:${GH_TOKEN}@github.com/${TARGET_REPO}.git" target-repo
-        cd target-repo
-
-        # Fetch all branches
-        git fetch origin
-
-        # Try to checkout base branch
-        if git show-ref --verify --quiet "refs/remotes/origin/${BASE_BRANCH}"; then
-          echo "Checking out base branch: ${BASE_BRANCH}"
-          git checkout "${BASE_BRANCH}" || git checkout -B "${BASE_BRANCH}" "origin/${BASE_BRANCH}"
-        elif git show-ref --verify --quiet "refs/remotes/origin/main"; then
-          echo "Base branch ${BASE_BRANCH} not found, using main instead"
-          git checkout main || git checkout -B main "origin/main"
-        else
-          echo "Warning: Neither ${BASE_BRANCH} nor main branch found"
-          git checkout -b "${BASE_BRANCH}"
-        fi
-
-    - name: Determine branch name
-      id: create-branch
-      shell: bash
-      working-directory: target-repo
-      env:
-        BRANCH_NAME_INPUT: ${{ inputs.branch_name }}
-        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
         SOURCE_REPO: ${{ inputs.source_repo }}
       run: |
-        set -euo pipefail
+        echo "::group::Collecting version diffs"
+        mkdir -p diffs
 
-        if [ -n "${BRANCH_NAME_INPUT}" ]; then
-          BRANCH_NAME="${BRANCH_NAME_INPUT}"
+        bash "${GITHUB_ACTION_PATH}/scripts/collect-diffs.sh" \
+          versions.json \
+          diffs > diffs-metadata.json
+
+        echo "✓ Diffs collected"
+        echo "::endgroup::"
+
+    - name: Setup branch
+      id: setup
+      if: steps.check-update.outputs.update_needed == 'true'
+      shell: bash
+      working-directory: target-repo
+      run: |
+        echo "::group::Setting up branch"
+
+        template_name="${{ steps.detect-version.outputs.template_name }}"
+        target_version="${{ steps.resolve-version.outputs.version }}"
+
+        # Generate branch name
+        if [ -n "${{ inputs.branch_name }}" ]; then
+          branch_name="${{ inputs.branch_name }}"
         else
-          # Extract source org and repo name
-          SOURCE_ORG=$(echo "${SOURCE_REPO}" | cut -d'/' -f1)
-          REPO_NAME=$(echo "${SOURCE_REPO}" | cut -d'/' -f2)
-
-          # Format: {org}/{template_name}-{version}
-          VERSION_SLUG=$(echo "${RELEASE_TAG}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
-          BRANCH_NAME="${SOURCE_ORG}/${REPO_NAME}-${VERSION_SLUG}"
+          version_slug=$(echo "$target_version" | sed 's/v//g' | sed 's/\./-/g')
+          branch_name="algtools/${template_name}-${version_slug}"
         fi
 
-        echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+        echo "branch_name=$branch_name" >> $GITHUB_OUTPUT
 
-    - name: Create update branch
+        # Configure git
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        # Create or checkout branch
+        git checkout -b "$branch_name" 2>/dev/null || git checkout "$branch_name"
+
+        echo "✓ Working on branch: $branch_name"
+        echo "::endgroup::"
+
+    - name: Apply changes with rules
+      id: apply-changes
+      if: steps.check-update.outputs.update_needed == 'true'
       shell: bash
       working-directory: target-repo
       env:
-        BRANCH_NAME: ${{ steps.create-branch.outputs.branch_name }}
+        RULES_ENGINE_PATH: ${{ github.action_path }}/rules
+        DRY_RUN: ${{ inputs.dry_run }}
       run: |
-        set -euo pipefail
+        echo "::group::Applying changes with rule processing"
 
-        # Check if branch already exists
-        if git show-ref --verify --quiet refs/heads/"${BRANCH_NAME}"; then
-          echo "Branch ${BRANCH_NAME} already exists, checking it out"
-          git checkout "${BRANCH_NAME}"
-          git pull origin "${BRANCH_NAME}" || true
-        else
-          echo "Creating new branch: ${BRANCH_NAME}"
-          git checkout -b "${BRANCH_NAME}"
-        fi
+        bash "${GITHUB_ACTION_PATH}/scripts/apply-changes.sh" \
+          ../diffs \
+          ../diffs-metadata.json > application-report.json
 
-    - name: Apply template updates using Git merge
+        # Extract stats
+        versions_applied=$(jq -r '.applied' application-report.json)
+        files_changed=$(jq -r '.files_changed' application-report.json)
+
+        echo "versions_applied=$versions_applied" >> $GITHUB_OUTPUT
+        echo "files_changed=$files_changed" >> $GITHUB_OUTPUT
+
+        echo "✓ Applied $versions_applied version(s), changed $files_changed file(s)"
+        echo "::endgroup::"
+
+    - name: Generate PR description
+      id: generate-pr-desc
+      if: steps.check-update.outputs.update_needed == 'true'
       shell: bash
-      working-directory: target-repo
-      env:
-        TEMPLATE_DIR: ../template
-        SOURCE_REPO: ${{ inputs.source_repo }}
-        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
       run: |
-        set -euo pipefail
+        echo "::group::Generating PR description"
 
-        echo "Applying template changes using Git merge..."
+        bash "${GITHUB_ACTION_PATH}/scripts/generate-pr-description.sh" \
+          "${{ steps.detect-version.outputs.current_version }}" \
+          "${{ steps.resolve-version.outputs.version }}" \
+          diffs-metadata.json \
+          application-report.json \
+          "${{ steps.detect-version.outputs.template_name }}" > pr-description.md
 
-        # Prepare template for Git merge by creating a temporary Git repository
-        TEMPLATE_GIT_DIR="/tmp/template-git-$$"
-        mkdir -p "${TEMPLATE_GIT_DIR}"
+        echo "✓ PR description generated"
+        echo "::endgroup::"
 
-        # Copy template files to temporary directory
-        echo "Copying template files..."
-        rsync -a --exclude='.git' "${TEMPLATE_DIR}/" "${TEMPLATE_GIT_DIR}/" || {
-          cp -r "${TEMPLATE_DIR}"/* "${TEMPLATE_GIT_DIR}/"
-        }
-
-        # Initialize git repo in temporary directory
-        (
-          cd "${TEMPLATE_GIT_DIR}"
-          git init
-          git config user.name "template-update[bot]"
-          git config user.email "template-update[bot]@users.noreply.github.com"
-
-          # Add all template files
-          git add -A
-
-          # Create commit
-          git commit -m "Template state for ${RELEASE_TAG}" || {
-            echo "Warning: Failed to create template commit"
-            exit 1
-          }
-
-          echo "Template commit created"
-        )
-
-        # Add template git directory as a temporary remote
-        echo "Setting up template remote..."
-        git remote add template-remote "${TEMPLATE_GIT_DIR}" 2>/dev/null || {
-          git remote set-url template-remote "${TEMPLATE_GIT_DIR}"
-        }
-
-        # Fetch template
-        TEMPLATE_BRANCH=$(cd "${TEMPLATE_GIT_DIR}" && git branch --show-current 2>/dev/null || echo "master")
-        git fetch template-remote "${TEMPLATE_BRANCH}"
-
-        echo "Merging template changes (this may create conflicts)..."
-
-        # Perform merge with --allow-unrelated-histories
-        # Use -X ours as the default strategy to prefer app code when there are conflicts
-        # This is opposite to -X theirs - we want to keep app changes by default
-        set +e
-        git merge "template-remote/${TEMPLATE_BRANCH}" --no-commit --no-ff --allow-unrelated-histories -X ours 2>&1
-        MERGE_EXIT_CODE=$?
-        set -e
-
-        if [ $MERGE_EXIT_CODE -eq 1 ]; then
-          echo "⚠️  Merge conflicts detected - will be visible in PR for manual resolution"
-          # Stage all files including conflicts
-          git add -A || true
-        elif [ $MERGE_EXIT_CODE -eq 0 ]; then
-          echo "✓ Merge completed without conflicts"
-        else
-          echo "Error during merge (exit code: ${MERGE_EXIT_CODE})"
-        fi
-
-        # Remove temporary remote
-        git remote remove template-remote 2>/dev/null || true
-        rm -rf "${TEMPLATE_GIT_DIR}"
-
-        echo "✓ Template changes merged"
-
-    - name: Restore app-specific files
+    - name: Push changes
+      if: steps.check-update.outputs.update_needed == 'true' && inputs.dry_run == 'false'
       shell: bash
       working-directory: target-repo
       run: |
-        set -euo pipefail
+        echo "::group::Pushing changes"
 
-        echo "Restoring app-specific files that should never be updated..."
-
-        # Files that should NEVER be updated from template
-        EXCLUDED_FILES=(
-          ".github/template-updates.yml"
-          "CHANGELOG.md"
-          "pnpm-lock.yaml"
-          "package-lock.json"
-          "yarn.lock"
-        )
-
-        # Restore each excluded file from git HEAD
-        for file in "${EXCLUDED_FILES[@]}"; do
-          if git show HEAD:"${file}" > "/tmp/restore-$$-$(basename ${file})" 2>/dev/null; then
-            mkdir -p "$(dirname "${file}")"
-            cp "/tmp/restore-$$-$(basename ${file})" "${file}"
-            rm -f "/tmp/restore-$$-$(basename ${file})"
-            echo "✓ Restored ${file} from HEAD"
-          fi
-        done
-
-        echo "✓ App-specific files restored"
-
-    - name: Smart merge package.json
-      shell: bash
-      working-directory: target-repo
-      env:
-        TEMPLATE_DIR: ../template
-      run: |
-        set -euo pipefail
-
-        echo "Smart merging package.json..."
-
-        # Get original app package.json from git HEAD
-        ORIGINAL_PKG="/tmp/original-package.json"
-        if ! git show HEAD:package.json > "${ORIGINAL_PKG}" 2>/dev/null; then
-          echo "Warning: Could not read original package.json from git"
-          exit 0
-        fi
-
-        if [ ! -f "package.json" ] || [ ! -f "${TEMPLATE_DIR}/package.json" ]; then
-          echo "No package.json to merge, skipping"
-          exit 0
-        fi
-
-        # Use Node.js to perform smart merge
-        node -e "
-          const fs = require('fs');
-
-          const templatePkg = JSON.parse(fs.readFileSync('${TEMPLATE_DIR}/package.json', 'utf8'));
-          const originalPkg = JSON.parse(fs.readFileSync('${ORIGINAL_PKG}', 'utf8'));
-
-          // App-specific fields that should NEVER be updated from template
-          const appSpecificFields = ['name', 'version', '__template', 'private', 'description', 'author', 'license', 'repository', 'homepage', 'bugs'];
-
-          // Preserve app-specific fields
-          const preservedFields = {};
-          for (const field of appSpecificFields) {
-            if (originalPkg[field] !== undefined) {
-              preservedFields[field] = originalPkg[field];
-            }
-          }
-
-          // Merge dependencies: template versions + app-only deps
-          const mergedDependencies = { ...(templatePkg.dependencies || {}) };
-          if (originalPkg.dependencies) {
-            for (const [pkg, version] of Object.entries(originalPkg.dependencies)) {
-              if (!templatePkg.dependencies || !templatePkg.dependencies[pkg]) {
-                mergedDependencies[pkg] = version;
-              }
-            }
-          }
-
-          // Merge devDependencies: template versions + app-only deps
-          const mergedDevDependencies = { ...(templatePkg.devDependencies || {}) };
-          if (originalPkg.devDependencies) {
-            for (const [pkg, version] of Object.entries(originalPkg.devDependencies)) {
-              if (!templatePkg.devDependencies || !templatePkg.devDependencies[pkg]) {
-                mergedDevDependencies[pkg] = version;
-              }
-            }
-          }
-
-          // Merge scripts: template scripts + app-only scripts
-          const mergedScripts = { ...(templatePkg.scripts || {}) };
-          if (originalPkg.scripts) {
-            for (const [script, command] of Object.entries(originalPkg.scripts)) {
-              if (!templatePkg.scripts || !templatePkg.scripts[script]) {
-                mergedScripts[script] = command;
-              }
-            }
-          }
-
-          // Final merge
-          const merged = {
-            ...templatePkg,
-            ...preservedFields,
-            dependencies: Object.keys(mergedDependencies).length > 0 ? mergedDependencies : undefined,
-            devDependencies: Object.keys(mergedDevDependencies).length > 0 ? mergedDevDependencies : undefined,
-            scripts: Object.keys(mergedScripts).length > 0 ? mergedScripts : undefined
-          };
-
-          // Remove undefined fields
-          Object.keys(merged).forEach(key => merged[key] === undefined && delete merged[key]);
-
-          // Write back
-          fs.writeFileSync('package.json', JSON.stringify(merged, null, 2) + '\n');
-
-          console.log('✓ package.json smart merged');
-          console.log('  Preserved app-specific fields: ' + Object.keys(preservedFields).join(', '));
-        "
-
-    - name: Smart merge wrangler.jsonc
-      shell: bash
-      working-directory: target-repo
-      env:
-        TEMPLATE_DIR: ../template
-      run: |
-        set -euo pipefail
-
-        echo "Smart merging wrangler.jsonc..."
-
-        # Skip if no wrangler.jsonc exists
-        if [ ! -f "wrangler.jsonc" ] || [ ! -f "${TEMPLATE_DIR}/wrangler.jsonc" ]; then
-          echo "No wrangler.jsonc to merge, skipping"
-          exit 0
-        fi
-
-        # Restore original app wrangler.jsonc from git HEAD
-        if git show HEAD:wrangler.jsonc > "wrangler.jsonc" 2>/dev/null; then
-          echo "✓ Restored original wrangler.jsonc from git"
-        else
-          echo "Warning: Could not restore original wrangler.jsonc"
-          exit 0
-        fi
-
-        # Use Node.js to perform smart merge
-        node -e "
-          const fs = require('fs');
-
-          // Helper to strip JSONC comments
-          function parseJSONC(content) {
-            let cleaned = content
-              .replace(/\/\*[\s\S]*?\*\//g, '')
-              .replace(/\/\/.*/g, '')
-              .replace(/,(\s*[}\]])/g, '\$1');
-            return JSON.parse(cleaned);
-          }
-
-          const appConfig = parseJSONC(fs.readFileSync('wrangler.jsonc', 'utf8'));
-          const templateConfig = parseJSONC(fs.readFileSync('${TEMPLATE_DIR}/wrangler.jsonc', 'utf8'));
-
-          // Helper to merge bindings by name
-          function mergeBindings(appBindings, templateBindings, idField) {
-            if (!templateBindings) return appBindings;
-            if (!appBindings) return templateBindings;
-
-            const merged = [];
-            const appMap = new Map((appBindings || []).map(b => [b.binding, b]));
-            const templateMap = new Map((templateBindings || []).map(b => [b.binding, b]));
-            const processed = new Set();
-
-            // Process template bindings
-            for (const [binding, templateBinding] of templateMap) {
-              const appBinding = appMap.get(binding);
-              if (appBinding) {
-                // Preserve app IDs
-                const mergedBinding = { ...templateBinding };
-                if (idField && appBinding[idField]) {
-                  mergedBinding[idField] = appBinding[idField];
-                }
-                if (appBinding.database_name) {
-                  mergedBinding.database_name = appBinding.database_name;
-                }
-                if (appBinding.bucket_name) {
-                  mergedBinding.bucket_name = appBinding.bucket_name;
-                }
-                merged.push(mergedBinding);
-                processed.add(binding);
-              } else {
-                merged.push(templateBinding);
-                processed.add(binding);
-              }
-            }
-
-            // Add app-only bindings
-            for (const [binding, appBinding] of appMap) {
-              if (!processed.has(binding)) {
-                merged.push(appBinding);
-              }
-            }
-
-            return merged.length > 0 ? merged : undefined;
-          }
-
-          // Start with template config structure
-          const merged = { ...templateConfig };
-
-          // Preserve app-specific name
-          if (appConfig.name) {
-            merged.name = appConfig.name;
-          }
-
-          // Merge bindings
-          merged.d1_databases = mergeBindings(appConfig.d1_databases, templateConfig.d1_databases, 'database_id');
-          merged.kv_namespaces = mergeBindings(appConfig.kv_namespaces, templateConfig.kv_namespaces, 'id');
-          merged.r2_buckets = mergeBindings(appConfig.r2_buckets, templateConfig.r2_buckets, 'bucket_name');
-
-          // Preserve app routes
-          if (appConfig.routes) {
-            merged.routes = appConfig.routes;
-          }
-
-          // Clean up undefined fields
-          Object.keys(merged).forEach(key => merged[key] === undefined && delete merged[key]);
-
-          // Write back
-          fs.writeFileSync('wrangler.jsonc', JSON.stringify(merged, null, 2) + '\n');
-
-          console.log('✓ wrangler.jsonc smart merged');
-        " || {
-          echo "Warning: Smart merge failed for wrangler.jsonc"
-        }
-
-    - name: Update template metadata
-      shell: bash
-      working-directory: target-repo
-      env:
-        SOURCE_REPO: ${{ inputs.source_repo }}
-        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
-        GH_TOKEN: ${{ inputs.github_token }}
-      run: |
-        set -euo pipefail
-
-        echo "Updating template metadata..."
-
-        # Get the commit SHA from the template repository
-        TEMPLATE_COMMIT_SHA=$(gh api "/repos/${SOURCE_REPO}/commits/${RELEASE_TAG}" --jq '.sha' 2>/dev/null || echo "unknown")
-
-        # Create or update metadata file using jq
-        jq -n \
-          --arg repo "${SOURCE_REPO}" \
-          --arg version "${RELEASE_TAG}" \
-          --arg sha "${TEMPLATE_COMMIT_SHA}" \
-          --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-          '{
-            templateRepo: $repo,
-            templateVersion: $version,
-            templateCommitSHA: $sha,
-            lastUpdatedAt: $timestamp
-          }' > .template-metadata.json
-
-        echo "✓ Updated .template-metadata.json"
-        cat .template-metadata.json
-
-    - name: Check for changes
-      id: check-changes
-      shell: bash
-      working-directory: target-repo
-      run: |
-        set -euo pipefail
-
-        # Stage all changes
         git add -A
 
-        # Check if there are any changes
-        if git diff --cached --quiet; then
-          echo "has_changes=false" >> $GITHUB_OUTPUT
-          echo "No changes detected, template is already up to date"
+        if git diff --staged --quiet; then
+          echo "::notice::No changes to commit"
         else
-          echo "has_changes=true" >> $GITHUB_OUTPUT
-          echo "Changes detected:"
-          git status --short
+          git commit -m "chore: update template from ${{ steps.detect-version.outputs.current_version }} to ${{ steps.resolve-version.outputs.version }}"
+          git push -u origin "${{ steps.setup.outputs.branch_name }}" --force
+          echo "✓ Changes pushed"
         fi
 
-    - name: Commit changes
-      if: steps.check-changes.outputs.has_changes == 'true'
-      shell: bash
-      working-directory: target-repo
-      env:
-        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
-      run: |
-        set -euo pipefail
+        echo "::endgroup::"
 
-        # Check for unresolved merge conflicts
-        CONFLICT_FILES=$(git ls-files --unmerged 2>/dev/null | cut -f2 | sort -u || echo "")
-
-        if [ -n "${CONFLICT_FILES}" ]; then
-          # Create commit message with conflict list
-          COMMIT_MSG_FILE=$(mktemp)
-          echo "fix: update template to ${RELEASE_TAG}" > "${COMMIT_MSG_FILE}"
-          echo "" >> "${COMMIT_MSG_FILE}"
-          echo "⚠️  Merge conflicts detected in:" >> "${COMMIT_MSG_FILE}"
-          echo "${CONFLICT_FILES}" | sed 's/^/  - /' >> "${COMMIT_MSG_FILE}"
-          echo "" >> "${COMMIT_MSG_FILE}"
-          echo "Please resolve conflicts manually in PR review." >> "${COMMIT_MSG_FILE}"
-
-          git commit -F "${COMMIT_MSG_FILE}" || true
-          rm -f "${COMMIT_MSG_FILE}"
-          echo "⚠️  Committed with merge conflicts - review required"
-        else
-          git commit -m "fix: update template to ${RELEASE_TAG}" || true
-        fi
-
-    - name: Push branch
-      if: steps.check-changes.outputs.has_changes == 'true'
-      shell: bash
-      working-directory: target-repo
-      env:
-        GH_TOKEN: ${{ inputs.github_token }}
-        BRANCH_NAME: ${{ steps.create-branch.outputs.branch_name }}
-      run: |
-        set -euo pipefail
-
-        git push -u origin "${BRANCH_NAME}" || {
-          echo "Error: Failed to push branch"
-          exit 1
-        }
-
-    - name: Create pull request
+    - name: Create Pull Request
       id: create-pr
-      if: steps.check-changes.outputs.has_changes == 'true'
+      if: steps.check-update.outputs.update_needed == 'true' && inputs.dry_run == 'false'
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github_token }}
         TARGET_REPO: ${{ inputs.target_repo }}
         BASE_BRANCH: ${{ inputs.base_branch }}
-        BRANCH_NAME: ${{ steps.create-branch.outputs.branch_name }}
-        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
+        BRANCH_NAME: ${{ steps.setup.outputs.branch_name }}
+        RELEASE_TAG: ${{ steps.resolve-version.outputs.version }}
         PR_TITLE_INPUT: ${{ inputs.pr_title }}
         PR_BODY_INPUT: ${{ inputs.pr_body }}
       run: |
-        set -euo pipefail
+        echo "::group::Creating pull request"
+
+        cd target-repo
 
         # Determine PR title
         if [ -n "${PR_TITLE_INPUT}" ]; then
           PR_TITLE="${PR_TITLE_INPUT}"
         else
-          PR_TITLE="fix: update template to ${RELEASE_TAG}"
+          PR_TITLE="chore: update template to ${RELEASE_TAG}"
         fi
 
         # Determine PR body
-        if [ -n "${PR_BODY_INPUT}" ]; then
+        if [ -f "../pr-description.md" ]; then
+          PR_BODY=$(cat ../pr-description.md)
+        elif [ -n "${PR_BODY_INPUT}" ]; then
           PR_BODY="${PR_BODY_INPUT}"
         else
-          PR_BODY="This PR updates the provisioned app to template version \`${RELEASE_TAG}\`."$'\n\n'"## Changes"$'\n'"- Updated template files from \`${RELEASE_TAG}\`"$'\n'"- Preserved local customizations and app-specific files"$'\n'"- Smart merged package.json and wrangler.jsonc"$'\n\n'"## Review Checklist"$'\n'"- [ ] Review changes for conflicts"$'\n'"- [ ] Test the application locally"$'\n'"- [ ] Verify dependencies are correct"$'\n'"- [ ] Check for any breaking changes"
+          PR_BODY="Updates template to version ${RELEASE_TAG}"
         fi
 
-        # Check if PR already exists
-        EXISTING_PR=$(gh pr list \
+        # Check if PR exists
+        existing_pr=$(gh pr list \
           --repo "${TARGET_REPO}" \
           --head "${BRANCH_NAME}" \
           --base "${BASE_BRANCH}" \
           --json number,url \
           --jq '.[0] // empty' 2>/dev/null || echo "")
 
-        if [ -n "${EXISTING_PR}" ]; then
-          PR_NUMBER=$(echo "${EXISTING_PR}" | jq -r '.number')
-          PR_URL=$(echo "${EXISTING_PR}" | jq -r '.url')
-          echo "Pull request already exists: ${PR_URL}"
-          echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
-          echo "pr_url=${PR_URL}" >> $GITHUB_OUTPUT
+        if [ -n "${existing_pr}" ]; then
+          pr_number=$(echo "${existing_pr}" | jq -r '.number')
+          pr_url=$(echo "${existing_pr}" | jq -r '.url')
+          echo "::notice::Updating existing PR #${pr_number}"
+          gh pr edit "${pr_number}" --title "${PR_TITLE}" --body "${PR_BODY}"
         else
-          # Create new PR
-          PR_URL=$(gh pr create \
+          echo "::notice::Creating new PR"
+          pr_url=$(gh pr create \
             --repo "${TARGET_REPO}" \
             --title "${PR_TITLE}" \
             --body "${PR_BODY}" \
             --base "${BASE_BRANCH}" \
-            --head "${BRANCH_NAME}") || {
-            echo "Error: Failed to create pull request"
-            exit 1
-          }
+            --head "${BRANCH_NAME}" \
+            --label "template-update" \
+            --label "dependencies")
 
-          echo "Created pull request: ${PR_URL}"
-
-          PR_NUMBER=$(gh pr view "${PR_URL}" --repo "${TARGET_REPO}" --json number --jq '.number')
-
-          echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
-          echo "pr_url=${PR_URL}" >> $GITHUB_OUTPUT
+          pr_number=$(gh pr view "${pr_url}" --repo "${TARGET_REPO}" --json number --jq '.number')
         fi
 
-    - name: Generate summary
+        echo "pr_number=${pr_number}" >> $GITHUB_OUTPUT
+        echo "pr_url=${pr_url}" >> $GITHUB_OUTPUT
+        echo "✓ Pull request: ${pr_url}"
+        echo "::endgroup::"
+
+    - name: Summary
+      if: always()
       shell: bash
-      env:
-        TARGET_REPO: ${{ inputs.target_repo }}
-        RELEASE_TAG: ${{ steps.release-info.outputs.release_tag }}
-        BRANCH_NAME: ${{ steps.create-branch.outputs.branch_name }}
-        HAS_CHANGES: ${{ steps.check-changes.outputs.has_changes }}
-        PR_URL: ${{ steps.create-pr.outputs.pr_url }}
-        PR_NUMBER: ${{ steps.create-pr.outputs.pr_number }}
       run: |
-        {
-          echo '## Update Summary'
-          echo
-          echo "- **Target Repository**: ${TARGET_REPO}"
-          echo "- **Template Version**: ${RELEASE_TAG}"
-          echo "- **Branch**: ${BRANCH_NAME}"
-          if [ "${HAS_CHANGES}" = "true" ]; then
-            echo "- **Pull Request**: [#${PR_NUMBER}](${PR_URL})"
-            echo "- **Status**: ✅ Changes detected and PR created"
-          else
-            echo "- **Status**: ℹ️ No changes detected, template is already up to date"
+        echo "## Template Update Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        if [ "${{ steps.check-update.outputs.update_needed }}" != "true" ]; then
+          echo "✅ Already on latest version - no update needed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### Update Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **From Version:** ${{ steps.detect-version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **To Version:** ${{ steps.resolve-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Template:** ${{ steps.detect-version.outputs.template_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Statistics" >> $GITHUB_STEP_SUMMARY
+          echo "- **Versions Applied:** ${{ steps.apply-changes.outputs.versions_applied }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Files Changed:** ${{ steps.apply-changes.outputs.files_changed }}" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "🔍 **Dry Run Mode** - No PR was created" >> $GITHUB_STEP_SUMMARY
+          elif [ -n "${{ steps.create-pr.outputs.pr_url }}" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Pull Request" >> $GITHUB_STEP_SUMMARY
+            echo "🔗 [${{ steps.create-pr.outputs.pr_url }}](${{ steps.create-pr.outputs.pr_url }})" >> $GITHUB_STEP_SUMMARY
           fi
-        } >> "${GITHUB_STEP_SUMMARY}"
+        fi

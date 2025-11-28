@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["version"],
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1,
+      "description": "Rule configuration version"
+    },
+    "exclude": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Files that should never be updated"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["pattern", "handler"],
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "Glob pattern to match files"
+          },
+          "handler": {
+            "type": "string",
+            "description": "Handler to use (builtin:name or custom:path)"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of what this rule does"
+          },
+          "config": {
+            "type": "object",
+            "description": "Configuration for the handler"
+          }
+        }
+      }
+    }
+  }
+}

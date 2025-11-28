@@ -1,292 +1,236 @@
 # Update Provisioned App Action
 
-A composite GitHub Action that updates an already provisioned app with the latest or specific template version by creating a pull request. This action automates the process of downloading a template release, applying changes to an existing repository, and creating a PR for review.
+A GitHub Action that updates provisioned template apps using incremental diffs with smart merge rules for special files.
+
+## Overview
+
+This action collects incremental changes between template versions and applies them with custom processing rules for files like `package.json` and `wrangler.jsonc`. It creates a comprehensive PR with version-by-version breakdown of changes.
 
 ## Features
 
-- 🔍 **Smart Release Resolution**: Supports "latest" or specific version tags
-- 📦 **Flexible Archive Formats**: Works with custom template assets or GitHub source tarballs
-- 🔒 **Secure Token Handling**: Properly masks sensitive tokens in logs
-- 🌿 **Branch Management**: Creates a new branch for the update (configurable name)
-- 🔀 **Pull Request Creation**: Automatically creates or updates a PR with the changes
-- 🛡️ **Smart Exclusions**: Preserves local customizations (node_modules, .env files, etc.)
-- ✅ **Change Detection**: Skips PR creation if no changes are detected
+- **Incremental Updates**: Applies changes version-by-version for better traceability
+- **Smart Merge Rules**: Custom processing for configuration files
+- **Conflict Handling**: Detects and reports merge conflicts
+- **Comprehensive PRs**: Detailed breakdown of what changed in each version
+- **Flexible Rules**: Easy to add custom rules via YAML configuration
 
 ## Usage
 
 ### Basic Example
 
 ```yaml
-- name: Update provisioned app
-  uses: algtools/actions/.github/actions/update-provisioned-app@main
-  with:
-    source_repo: 'owner/bff-template'
-    target_repo: 'owner/my-app'
-    github_token: ${{ secrets.GITHUB_TOKEN }}
-```
-
-### Complete Workflow Example
-
-```yaml
-name: Update Provisioned App
+name: Update Template
 
 on:
+  schedule:
+    - cron: '0 0 * * 1' # Weekly
   workflow_dispatch:
     inputs:
-      target_repo:
-        description: 'Repository to update (e.g., owner/app-name)'
-        required: true
-        type: string
       version:
-        description: 'Template version (latest or specific tag)'
-        required: false
-        type: string
+        description: 'Target version'
         default: 'latest'
-      base_branch:
-        description: 'Base branch for PR'
-        required: false
-        type: string
-        default: 'main'
-
-permissions:
-  contents: write
-  pull-requests: write
 
 jobs:
   update:
-    name: Update App
     runs-on: ubuntu-latest
     steps:
-      - name: Update provisioned app
-        id: update
-        uses: algtools/actions/.github/actions/update-provisioned-app@main
+      - uses: algtools/actions/.github/actions/update-provisioned-app@main
         with:
-          source_repo: ${{ github.repository }}
-          target_repo: ${{ inputs.target_repo }}
-          version: ${{ inputs.version }}
-          base_branch: ${{ inputs.base_branch }}
+          source_repo: 'algtools/core-template'
+          target_repo: ${{ github.repository }}
+          version: 'latest'
           github_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Display results
-        run: |
-          echo "PR URL: ${{ steps.update.outputs.pr_url }}"
-          echo "PR Number: ${{ steps.update.outputs.pr_number }}"
-          echo "Release Tag: ${{ steps.update.outputs.release_tag }}"
-```
-
-### Using the Reusable Workflow
-
-```yaml
-name: Update My App
-
-on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Template version'
-        required: false
-        type: string
-        default: 'latest'
-
-jobs:
-  update:
-    uses: algtools/actions/.github/workflows/update-provisioned-app-reusable.yml@main
-    with:
-      target_repo: 'owner/my-app'
-      version: ${{ inputs.version }}
-      base_branch: 'main'
-    secrets:
-      github_token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ## Inputs
 
-| Input          | Description                                                     | Required | Default                                 |
-| -------------- | --------------------------------------------------------------- | -------- | --------------------------------------- |
-| `source_repo`  | Source template repository (e.g., 'owner/repo')                 | Yes      | -                                       |
-| `target_repo`  | Target repository to update (e.g., 'owner/app-name')            | Yes      | -                                       |
-| `version`      | Template release tag (use 'latest' for newest release)          | No       | `"latest"`                              |
-| `base_branch`  | Base branch to create PR against                                | No       | `"main"`                                |
-| `branch_name`  | Name for the update branch (default: update-template-{version}) | No       | `""`                                    |
-| `pr_title`     | Title for the pull request                                      | No       | `"chore: update template to {version}"` |
-| `pr_body`      | Body for the pull request (default: auto-generated)             | No       | `""`                                    |
-| `github_token` | GitHub token with repo permissions                              | Yes      | -                                       |
+| Input          | Description                                                 | Required | Default        |
+| -------------- | ----------------------------------------------------------- | -------- | -------------- |
+| `source_repo`  | Source template repository (e.g., `algtools/core-template`) | Yes      | -              |
+| `target_repo`  | Target repository to update                                 | Yes      | -              |
+| `version`      | Target version (e.g., `v1.8.2` or `latest`)                 | No       | `latest`       |
+| `base_branch`  | Base branch for PR                                          | No       | `main`         |
+| `branch_name`  | Custom branch name                                          | No       | Auto-generated |
+| `pr_title`     | Custom PR title                                             | No       | Auto-generated |
+| `pr_body`      | Custom PR body                                              | No       | Auto-generated |
+| `github_token` | GitHub token with repo permissions                          | Yes      | -              |
+| `dry_run`      | Test mode without creating PR                               | No       | `false`        |
 
 ## Outputs
 
-| Output        | Description                          |
-| ------------- | ------------------------------------ |
-| `pr_url`      | URL of the created pull request      |
-| `pr_number`   | Number of the created pull request   |
-| `release_tag` | Template version used for the update |
-| `branch_name` | Name of the branch created           |
+| Output             | Description                     |
+| ------------------ | ------------------------------- |
+| `pr_url`           | URL of the created pull request |
+| `pr_number`        | Number of the pull request      |
+| `release_tag`      | Template version used           |
+| `branch_name`      | Name of the branch created      |
+| `versions_applied` | Number of versions applied      |
+| `files_changed`    | Total files changed             |
 
 ## How It Works
 
-1. **Resolve Release**: Fetches the specified release (or latest) from the source repository
-2. **Download Archive**: Downloads either custom template asset or GitHub source tarball
-3. **Extract Template**: Extracts the archive to a working directory
-4. **Clone Target**: Clones the target repository to update
-5. **Create Branch**: Creates a new branch for the update (or uses existing)
-6. **Apply Changes**: Copies template files while preserving local customizations
-7. **Check Changes**: Detects if there are any actual changes
-8. **Commit & Push**: Commits changes and pushes the branch (if changes exist)
-9. **Create PR**: Creates or updates a pull request (if changes exist)
-10. **Generate Summary**: Outputs a comprehensive summary of the update
+### 1. Version Detection
 
-## Excluded Files/Directories
+Reads `.template-metadata.json` or `.template.config.json` to determine current template version.
 
-The action automatically excludes the following from template updates to preserve local customizations:
+### 2. Query Versions
 
-- `.git` - Git repository data
-- `node_modules` - Dependencies
-- `.next`, `dist`, `build` - Build outputs
-- `.env*` - Environment files
-- `*.log` - Log files
-- `.DS_Store`, `.idea`, `.vscode` - IDE files
-- `coverage`, `.nyc_output` - Test coverage
-- `pnpm-lock.yaml`, `package-lock.json`, `yarn.lock` - Lock files
+Uses GitHub API to find all releases between current and target versions.
 
-## Branch Naming
+### 3. Collect Diffs
 
-By default, branches are named `update-template-{version}` where `{version}` is the release tag (normalized). For example:
+Clones template repository and generates git diffs for each version transition.
 
-- `update-template-v1-2-3` for version `v1.2.3`
-- `update-template-latest` for version `latest`
+### 4. Load Rules
 
-You can override this by providing a custom `branch_name` input.
+Reads `.template-app/merge-rules.yml` from the template to determine how to process files.
 
-## Pull Request Behavior
+### 5. Apply Changes
 
-- **New PR**: Creates a new PR if one doesn't exist for the branch
-- **Existing PR**: Updates the existing PR if one already exists
-- **No Changes**: Skips PR creation if no changes are detected
+- Applies each diff incrementally
+- Processes files through rule engine
+- Tracks conflicts and resolutions
 
-## Required Permissions
+### 6. Create PR
 
-The GitHub token needs the following permissions:
+Generates comprehensive PR with version-by-version breakdown and testing checklist.
 
-- `contents: write` - To push branches and commits
-- `pull-requests: write` - To create/update pull requests
+## Rule System
 
-## Example Use Cases
-
-### 1. Scheduled Updates
+Templates define merge rules in `.template-app/merge-rules.yml`:
 
 ```yaml
-name: Weekly Template Update
+version: 1
 
-on:
-  schedule:
-    - cron: '0 0 * * 1' # Every Monday
+# Files that should never be updated
+exclude:
+  - '.github/template-updates.yml'
+  - 'CHANGELOG.md'
+  - '*.lock'
 
-jobs:
-  update:
-    uses: algtools/actions/.github/workflows/update-provisioned-app-reusable.yml@main
-    with:
-      target_repo: 'owner/my-app'
-      version: 'latest'
-    secrets:
-      github_token: ${{ secrets.GITHUB_TOKEN }}
+# Custom processing
+rules:
+  - pattern: 'package.json'
+    handler: 'builtin:package-json'
+    description: 'Smart merge preserving app name/version'
+    config:
+      preserve: ['name', 'version', 'description']
+
+  - pattern: 'wrangler.jsonc'
+    handler: 'builtin:wrangler-jsonc'
+    description: 'Preserve binding IDs'
+    config:
+      preserve_binding_ids: true
 ```
 
-### 2. Manual Update to Specific Version
+### Built-in Handlers
 
-```yaml
-name: Update to Specific Version
+**`builtin:package-json`**
 
-on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to update to'
-        required: true
+- Preserves app name, version, description
+- Validates for placeholder syntax
+- Warns if placeholders detected
 
-jobs:
-  update:
-    uses: algtools/actions/.github/workflows/update-provisioned-app-reusable.yml@main
-    with:
-      target_repo: 'owner/my-app'
-      version: ${{ inputs.version }}
-      pr_title: 'chore: update template to ${{ inputs.version }}'
-    secrets:
-      github_token: ${{ secrets.GITHUB_TOKEN }}
-```
+**`builtin:wrangler-jsonc`**
 
-### 3. Update Multiple Apps
+- Preserves database IDs and binding IDs
+- Preserves app worker name
+- Validates configuration
+- Warns about placeholders
 
-```yaml
-name: Update All Apps
+**`builtin:preserve-files`**
 
-on:
-  workflow_dispatch:
+- Keeps file unchanged
+- Used for app-specific files
 
-jobs:
-  update-app-1:
-    uses: algtools/actions/.github/workflows/update-provisioned-app-reusable.yml@main
-    with:
-      target_repo: 'owner/app-1'
-      version: 'latest'
-    secrets:
-      github_token: ${{ secrets.GITHUB_TOKEN }}
+**`builtin:strip-placeholders`**
 
-  update-app-2:
-    uses: algtools/actions/.github/workflows/update-provisioned-app-reusable.yml@main
-    with:
-      target_repo: 'owner/app-2'
-      version: 'latest'
-    secrets:
-      github_token: ${{ secrets.GITHUB_TOKEN }}
+- Detects `{{PLACEHOLDER}}` syntax
+- Warns or errors based on configuration
+
+## Template Architecture
+
+### Files That Can Be Updated
+
+Files in the released template package CAN receive updates:
+
+- Source code
+- Workflows (from `.github/workflows/app/`)
+- Configuration files (with smart merge rules)
+- Documentation
+
+### Files That Never Update
+
+Files in `.template-app/include/` are NEVER in the release package:
+
+- Files with `{{PLACEHOLDERS}}`
+- Provision-only configurations
+- These are copied only during initial provisioning
+
+### Excluded Files
+
+Files in the exclude list are preserved:
+
+- `CHANGELOG.md` - App's own history
+- `.github/template-updates.yml` - App-specific config
+- Lock files
+- Environment files
+
+## Example PR Output
+
+When updating from v1.7.2 to v1.8.2:
+
+```markdown
+# 🔄 Template Update: `v1.7.2` → `v1.8.2`
+
+## 📊 Update Summary
+
+| Metric              | Value |
+| ------------------- | ----- |
+| 📦 Versions Applied | 5 / 5 |
+| 📝 Files Changed    | 23    |
+
+## 📋 Version-by-Version Changes
+
+### ✅ `v1.7.3` - Bug fixes
+
+- 3 files changed
+- Fixed authentication timeout
+- [View Release](...)
+
+### ✅ `v1.8.0` - New features
+
+- 12 files changed
+- Added new API endpoints
+- [View Release](...)
+
+...
 ```
 
 ## Troubleshooting
 
-### Release Not Found
+### No template metadata found
 
-```
-Error: Release tag "v1.0.0" not found
-```
+**Cause**: Repository is not a provisioned app.
+**Solution**: Ensure `.template-metadata.json` or `.template.config.json` exists.
 
-**Solution**: Verify the release exists in the source repository and the tag is correct.
+### Merge conflicts detected
 
-### Repository Not Found
+**Cause**: Local changes conflict with template updates.
+**Solution**: Review PR, resolve conflicts manually.
 
-```
-Error: Repository not found
-```
+### Rule engine errors
 
-**Solution**: Ensure the `target_repo` exists and the token has access to it.
+**Cause**: Invalid merge-rules.yml syntax.
+**Solution**: Validate YAML syntax and check schema.
 
-### No Changes Detected
+## Security
 
-```
-No changes detected, template is already up to date
-```
+- Minimal required permissions
+- Does not expose secrets
+- Validates inputs
+- Respects exclusion patterns
 
-**Solution**: This is expected if the template is already up to date. The action will skip PR creation.
+## License
 
-### Permission Denied
-
-```
-Error: Resource not accessible by integration
-```
-
-**Solution**: Ensure the `github_token` has `contents: write` and `pull-requests: write` permissions.
-
-### Branch Already Exists
-
-The action will checkout the existing branch and update it. If you want a fresh branch, use a different `branch_name` or delete the existing branch first.
-
-## Best Practices
-
-1. **Review PRs**: Always review the generated PRs before merging
-2. **Test Changes**: Run tests on the PR branch before merging
-3. **Version Pinning**: Use specific versions for production updates instead of "latest"
-4. **Branch Names**: Use descriptive branch names when updating multiple apps
-5. **PR Titles**: Customize PR titles to include context about the update
-
-## Related
-
-- [Provision Template Action](../provision-template/README.md) - For creating new apps from templates
-- [Update Provisioned App Reusable Workflow](../../workflows/update-provisioned-app-reusable.yml) - Reusable workflow wrapper
-- [Template System Documentation](../../../README.md) - General template system documentation
+MIT License - see repository LICENSE file
