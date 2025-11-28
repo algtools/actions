@@ -1,3 +1,10 @@
+# [1.38.0](https://github.com/algtools/actions/compare/v1.37.1...v1.38.0) (2025-11-28)
+
+
+### Features
+
+* implement incremental update system for provisioned apps ([7c9868b](https://github.com/algtools/actions/commit/7c9868b8b77363edbe56cd462ab12034bac62bd6))
+
 ## [1.37.1](https://github.com/algtools/actions/compare/v1.37.0...v1.37.1) (2025-11-27)
 
 
