@@ -1,3 +1,10 @@
+# [1.39.0](https://github.com/algtools/actions/compare/v1.38.0...v1.39.0) (2025-12-08)
+
+
+### Features
+
+* add manage-ephemeral-vectorize action for PR preview index management ([4eb66c1](https://github.com/algtools/actions/commit/4eb66c1e6966038105f9205bdcfd914fe823087d))
+
 # [1.38.0](https://github.com/algtools/actions/compare/v1.37.1...v1.38.0) (2025-11-28)
 
 
