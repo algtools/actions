@@ -46,6 +46,22 @@ inputs:
     description: "Cloudflare Account ID for D1 database creation (optional, core-template only)"
     required: false
     default: ""
+  vectorize_index_name_base:
+    description: "Base name for Vectorize indexes (e.g., 'janovix-pep-names'). If not provided, uses database_name. Indexes will be named '{vectorize_index_name_base}-{env}' (core-template only)"
+    required: false
+    default: ""
+  vectorize_dimensions:
+    description: "Vector dimensions for Vectorize indexes (default: 1536 - common for OpenAI embeddings)"
+    required: false
+    default: "1536"
+  vectorize_metric:
+    description: "Similarity metric for Vectorize indexes - cosine, euclidean, or dot-product (default: cosine)"
+    required: false
+    default: "cosine"
+  enable_vectorize:
+    description: "Whether to create Vectorize indexes during provisioning (default: false)"
+    required: false
+    default: "false"
   alias:
     description: "Optional alias to override the default algtools.alias value in package.json"
     required: false
@@ -451,6 +467,141 @@ runs:
         echo "  Prod: ${DB_NAME}-prod (${PROD_DB_ID})"
         echo ""
         echo "Note: Databases were either found existing or created as needed."
+        echo ""
+
+    - name: Create Vectorize indexes and update bindings
+      shell: bash
+      working-directory: template
+      env:
+        DB_NAME: ${{ inputs.database_name }}
+        VECTORIZE_INDEX_NAME_BASE: ${{ inputs.vectorize_index_name_base }}
+        VECTORIZE_DIMENSIONS: ${{ inputs.vectorize_dimensions }}
+        VECTORIZE_METRIC: ${{ inputs.vectorize_metric }}
+        ENABLE_VECTORIZE: ${{ inputs.enable_vectorize }}
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare_api_token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare_account_id }}
+      run: |
+        set -euo pipefail
+
+        # Skip if Vectorize is not enabled or no database_name provided or wrangler.jsonc doesn't exist
+        if [ "${ENABLE_VECTORIZE}" != "true" ] || [ -z "${DB_NAME}" ] || [ ! -f "wrangler.jsonc" ]; then
+          echo "ℹ️  Skipping Vectorize index creation (enable_vectorize=false or not core-template or no database_name provided)"
+          exit 0
+        fi
+
+        # Verify Cloudflare credentials are provided
+        if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
+          echo "::error::ENABLE_VECTORIZE=true but CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is missing"
+          exit 1
+        fi
+
+        echo "=========================================="
+        echo "CREATING VECTORIZE INDEXES"
+        echo "=========================================="
+
+        # Determine index name base
+        if [ -n "${VECTORIZE_INDEX_NAME_BASE}" ]; then
+          INDEX_NAME_BASE="${VECTORIZE_INDEX_NAME_BASE}"
+        else
+          INDEX_NAME_BASE="${DB_NAME}"
+        fi
+
+        echo "Index base name: ${INDEX_NAME_BASE}"
+        echo "Dimensions: ${VECTORIZE_DIMENSIONS}"
+        echo "Metric: ${VECTORIZE_METRIC}"
+        echo ""
+
+        # Install Wrangler if not already installed
+        if ! command -v wrangler &> /dev/null; then
+          echo "Installing Wrangler..."
+          npm install -g wrangler
+          echo ""
+        fi
+
+        # Function to get or create Vectorize index
+        get_or_create_vectorize_index() {
+          local index_name=$1
+          local index_env=$2
+          local dimensions=${3:-1536}
+          local metric=${4:-cosine}
+
+          echo "Processing ${index_env} Vectorize index: ${index_name}" >&2
+
+          # List existing indexes
+          echo "  Checking if index exists..." >&2
+          if ! INDEX_LIST=$(wrangler vectorize list 2>&1); then
+            echo "::error::Failed to list Vectorize indexes. Wrangler error:" >&2
+            echo "${INDEX_LIST}" >&2
+            return 1
+          fi
+
+          # Check if index exists
+          if echo "${INDEX_LIST}" | grep -qF "${index_name}"; then
+            echo "  ✓ Found existing index: ${index_name}" >&2
+            echo "exists"
+          else
+            echo "  Creating new index..." >&2
+            if ! CREATE_OUTPUT=$(wrangler vectorize create "${index_name}" --dimensions "${dimensions}" --metric "${metric}" 2>&1); then
+              echo "::error::Failed to create ${index_env} Vectorize index. Wrangler error:" >&2
+              echo "${CREATE_OUTPUT}" >&2
+              return 1
+            fi
+            echo "  ✓ Created new index: ${index_name}" >&2
+            echo "created"
+          fi
+        }
+
+        # Get or create dev index
+        echo "Starting dev Vectorize index provisioning..."
+        get_or_create_vectorize_index "${INDEX_NAME_BASE}-dev" "dev" "${VECTORIZE_DIMENSIONS}" "${VECTORIZE_METRIC}" || {
+          echo "::error::Failed to provision dev Vectorize index"
+          exit 1
+        }
+        echo ""
+
+        # Get or create qa index
+        echo "Starting qa Vectorize index provisioning..."
+        get_or_create_vectorize_index "${INDEX_NAME_BASE}-qa" "qa" "${VECTORIZE_DIMENSIONS}" "${VECTORIZE_METRIC}" || {
+          echo "::error::Failed to provision qa Vectorize index"
+          exit 1
+        }
+        echo ""
+
+        # Get or create prod index
+        echo "Starting prod Vectorize index provisioning..."
+        get_or_create_vectorize_index "${INDEX_NAME_BASE}-prod" "prod" "${VECTORIZE_DIMENSIONS}" "${VECTORIZE_METRIC}" || {
+          echo "::error::Failed to provision prod Vectorize index"
+          exit 1
+        }
+        echo ""
+
+        # Update wrangler.jsonc with index names
+        echo "Updating wrangler.jsonc with Vectorize index bindings..."
+
+        # Replace tokens in wrangler.jsonc
+        if [ "$(uname)" = "Darwin" ]; then
+          sed -i '' "s|{{VECTORIZE_INDEX_NAME}}-dev|${INDEX_NAME_BASE}-dev|g" wrangler.jsonc
+          sed -i '' "s|{{VECTORIZE_INDEX_NAME}}-qa|${INDEX_NAME_BASE}-qa|g" wrangler.jsonc
+          sed -i '' "s|{{VECTORIZE_INDEX_NAME}}-prod|${INDEX_NAME_BASE}-prod|g" wrangler.jsonc
+          sed -i '' "s|{{VECTORIZE_INDEX_NAME}}-local|${INDEX_NAME_BASE}-local|g" wrangler.jsonc
+        else
+          sed -i "s|{{VECTORIZE_INDEX_NAME}}-dev|${INDEX_NAME_BASE}-dev|g" wrangler.jsonc
+          sed -i "s|{{VECTORIZE_INDEX_NAME}}-qa|${INDEX_NAME_BASE}-qa|g" wrangler.jsonc
+          sed -i "s|{{VECTORIZE_INDEX_NAME}}-prod|${INDEX_NAME_BASE}-prod|g" wrangler.jsonc
+          sed -i "s|{{VECTORIZE_INDEX_NAME}}-local|${INDEX_NAME_BASE}-local|g" wrangler.jsonc
+        fi
+
+        echo "✓ Updated wrangler.jsonc with Vectorize index bindings"
+        echo ""
+        echo "=========================================="
+        echo "VECTORIZE INDEXES CONFIGURED SUCCESSFULLY"
+        echo "=========================================="
+        echo "The following indexes are bound in wrangler.jsonc:"
+        echo "  Dev:  ${INDEX_NAME_BASE}-dev"
+        echo "  QA:   ${INDEX_NAME_BASE}-qa"
+        echo "  Prod: ${INDEX_NAME_BASE}-prod"
+        echo ""
+        echo "Note: Indexes were either found existing or created as needed."
         echo ""
 
     - name: Initialize repository contents

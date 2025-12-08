@@ -1,0 +1,357 @@
+name: "Manage Ephemeral Vectorize Index"
+description: "Manages ephemeral Vectorize indexes for PR previews - creates/recreates indexes and updates wrangler config"
+author: "Algenium Systems"
+
+inputs:
+  # Repository configuration
+  repository_name:
+    description: "Repository name (used for logging, fallback for index naming if vectorize_index_name_base not provided)"
+    required: true
+  vectorize_index_name_base:
+    description: "Base name for Vectorize index (e.g., 'janovix-pep-names'). If not provided, uses repository_name. Index will be named '{vectorize_index_name_base}-pr-{pr_number}'"
+    required: false
+  pr_number:
+    description: "Pull request number"
+    required: true
+
+  # Cloudflare credentials
+  cloudflare_api_token:
+    description: "Cloudflare API token with Vectorize permissions"
+    required: true
+  cloudflare_account_id:
+    description: "Cloudflare account ID"
+    required: true
+
+  # Vectorize configuration
+  dimensions:
+    description: "Vector dimensions (default: 1536 - common for OpenAI embeddings)"
+    required: false
+    default: "1536"
+  metric:
+    description: "Similarity metric - cosine, euclidean, or dot-product (default: cosine)"
+    required: false
+    default: "cosine"
+
+  # Wrangler configuration
+  wrangler_config:
+    description: "Path to wrangler.jsonc file to update (relative to working directory)"
+    required: false
+    default: "wrangler.jsonc"
+  vectorize_binding:
+    description: "Vectorize binding name in wrangler config"
+    required: false
+    default: "VECTORIZE"
+  working_directory:
+    description: "Working directory for running scripts"
+    required: false
+    default: "."
+  wrangler_version:
+    description: 'Version of Wrangler to install (e.g., "3.78.0" or "latest")'
+    required: false
+    default: "latest"
+
+  # Action behavior
+  force_create:
+    description: "Force index creation even if index exists (always recreates)"
+    required: false
+    default: "true"
+
+outputs:
+  index_created:
+    description: "Whether an ephemeral index was created (always true for this action)"
+    value: ${{ steps.create-index.outputs.index_created }}
+  index_name:
+    description: "Name of the ephemeral index (e.g., 'janovix-pep-names-pr-4')"
+    value: ${{ steps.create-index.outputs.index_name }}
+  index_dimensions:
+    description: "Dimensions used for the index"
+    value: ${{ steps.create-index.outputs.index_dimensions }}
+  index_metric:
+    description: "Metric used for the index"
+    value: ${{ steps.create-index.outputs.index_metric }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Display Action Version
+      shell: bash
+      run: |
+        ACTION_NAME="Manage Ephemeral Vectorize Index"
+        # Change to repo root (3 levels up from action directory)
+        cd "${GITHUB_ACTION_PATH}/../../.."
+        VERSION="v$(jq -r '.version' package.json)"
+
+        echo "🔧 algtools/actions: ${ACTION_NAME} | Version: ${VERSION}"
+        echo "## 🔧 ${ACTION_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Validate inputs
+      shell: bash
+      run: |
+        echo "::group::Validating inputs"
+
+        if [ -z "${{ inputs.repository_name }}" ]; then
+          echo "::error::repository_name input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.pr_number }}" ]; then
+          echo "::error::pr_number input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.cloudflare_api_token }}" ]; then
+          echo "::error::cloudflare_api_token input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.cloudflare_account_id }}" ]; then
+          echo "::error::cloudflare_account_id input is required"
+          exit 1
+        fi
+
+        # Validate metric
+        METRIC="${{ inputs.metric }}"
+        if [ "$METRIC" != "cosine" ] && [ "$METRIC" != "euclidean" ] && [ "$METRIC" != "dot-product" ]; then
+          echo "::error::metric must be one of: cosine, euclidean, dot-product"
+          exit 1
+        fi
+
+        # Validate dimensions
+        DIMENSIONS="${{ inputs.dimensions }}"
+        if ! [[ "$DIMENSIONS" =~ ^[0-9]+$ ]] || [ "$DIMENSIONS" -le 0 ]; then
+          echo "::error::dimensions must be a positive integer"
+          exit 1
+        fi
+
+        echo "✓ All required inputs validated"
+        echo ""
+        echo "Configuration:"
+        echo "  Repository: ${{ inputs.repository_name }}"
+        echo "  PR Number: ${{ inputs.pr_number }}"
+        echo "  Dimensions: ${{ inputs.dimensions }}"
+        echo "  Metric: ${{ inputs.metric }}"
+        echo "  Working Directory: ${{ inputs.working_directory }}"
+        echo "  Wrangler Config: ${{ inputs.wrangler_config }}"
+        echo "  Vectorize Binding: ${{ inputs.vectorize_binding }}"
+        echo "::endgroup::"
+
+    - name: Install Wrangler
+      shell: bash
+      run: |
+        echo "::group::Installing Wrangler"
+
+        if [ "${{ inputs.wrangler_version }}" = "latest" ]; then
+          echo "Installing latest version of Wrangler..."
+          npm install -g wrangler
+        else
+          echo "Installing Wrangler version ${{ inputs.wrangler_version }}..."
+          npm install -g wrangler@${{ inputs.wrangler_version }}
+        fi
+
+        WRANGLER_VERSION=$(wrangler --version)
+        echo ""
+        echo "✓ Wrangler installed successfully"
+        echo "  Version: $WRANGLER_VERSION"
+        echo "::endgroup::"
+
+    - name: Create or recreate ephemeral index
+      id: create-index
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare_api_token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare_account_id }}
+      run: |
+        echo "::group::Managing ephemeral Vectorize index"
+
+        # Mask sensitive values
+        echo "::add-mask::${{ inputs.cloudflare_api_token }}"
+        echo "::add-mask::${{ inputs.cloudflare_account_id }}"
+
+        REPO_NAME="${{ inputs.repository_name }}"
+        PR_NUMBER="${{ inputs.pr_number }}"
+        DIMENSIONS="${{ inputs.dimensions }}"
+        METRIC="${{ inputs.metric }}"
+
+        # Determine index name base
+        if [ -n "${{ inputs.vectorize_index_name_base }}" ]; then
+          INDEX_NAME_BASE="${{ inputs.vectorize_index_name_base }}"
+        else
+          INDEX_NAME_BASE="${REPO_NAME}"
+        fi
+
+        # Determine index name
+        INDEX_NAME="${INDEX_NAME_BASE}-pr-${PR_NUMBER}"
+
+        echo "Creating ephemeral Vectorize index: $INDEX_NAME"
+        echo "  Dimensions: $DIMENSIONS"
+        echo "  Metric: $METRIC"
+        echo ""
+
+        # Check if index already exists
+        echo "Checking for existing index..."
+        INDEX_LIST=$(wrangler vectorize list 2>&1 || echo "")
+
+        if echo "$INDEX_LIST" | grep -qF "$INDEX_NAME"; then
+          echo "⚠️  Index $INDEX_NAME already exists"
+          echo "🗑️  Deleting existing index to ensure clean state..."
+
+          wrangler vectorize delete "$INDEX_NAME" || {
+            echo "::warning::Failed to delete existing index, will try to create anyway"
+          }
+
+          # Wait a moment for deletion to propagate
+          sleep 2
+        else
+          echo "✓ No existing index found"
+        fi
+
+        # Create new index
+        echo ""
+        echo "Creating new ephemeral Vectorize index..."
+        CREATE_OUTPUT=$(wrangler vectorize create "$INDEX_NAME" --dimensions "$DIMENSIONS" --metric "$METRIC" 2>&1)
+
+        if [ $? -ne 0 ]; then
+          echo "::error::Failed to create Vectorize index"
+          echo "$CREATE_OUTPUT"
+          exit 1
+        fi
+
+        echo "$CREATE_OUTPUT"
+
+        echo ""
+        echo "✓ Ephemeral Vectorize index created successfully"
+        echo "  Name: $INDEX_NAME"
+        echo "  Dimensions: $DIMENSIONS"
+        echo "  Metric: $METRIC"
+
+        echo "index_created=true" >> $GITHUB_OUTPUT
+        echo "index_name=$INDEX_NAME" >> $GITHUB_OUTPUT
+        echo "index_dimensions=$DIMENSIONS" >> $GITHUB_OUTPUT
+        echo "index_metric=$METRIC" >> $GITHUB_OUTPUT
+
+        echo "::endgroup::"
+
+    - name: Configure wrangler for ephemeral index
+      if: steps.create-index.outputs.index_created == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      env:
+        PR_INDEX_NAME: ${{ steps.create-index.outputs.index_name }}
+      run: |
+        echo "::group::Configuring wrangler.jsonc"
+
+        WRANGLER_CONFIG="${{ inputs.wrangler_config }}"
+        BINDING="${{ inputs.vectorize_binding }}"
+
+        echo "Updating wrangler config: $WRANGLER_CONFIG"
+        echo "  Index Name: $PR_INDEX_NAME"
+        echo "  Binding: $BINDING"
+        echo ""
+
+        # Use Node.js to update the config
+        node -e "
+          const fs = require('fs');
+          const path = require('path');
+
+          const configPath = '$WRANGLER_CONFIG';
+          const indexName = process.env.PR_INDEX_NAME;
+          const binding = '$BINDING';
+
+          if (!fs.existsSync(configPath)) {
+            console.error('wrangler config not found at:', configPath);
+            process.exit(1);
+          }
+
+          // Read and parse JSONC
+          let content = fs.readFileSync(configPath, 'utf-8');
+
+          // Strip comments from JSONC
+          // Remove single-line comments (but preserve URLs with //)
+          content = content.split('\n').map(line => {
+            const commentIndex = line.indexOf('//');
+            if (commentIndex !== -1) {
+              const beforeComment = line.substring(0, commentIndex);
+              const quoteCount = (beforeComment.match(/\"/g) || []).length;
+              if (quoteCount % 2 === 0) {
+                return line.substring(0, commentIndex);
+              }
+            }
+            return line;
+          }).join('\n');
+
+          // Remove multi-line comments
+          content = content.replace(/\/\*[\s\S]*?\*\//g, '');
+          // Remove trailing commas
+          content = content.replace(/,(\s*[}\]])/g, '\$1');
+
+          try {
+            const config = JSON.parse(content);
+
+            // Update root level vectorize
+            if (!config.vectorize) {
+              config.vectorize = [];
+            }
+
+            const rootIndexIndex = config.vectorize.findIndex(idx => idx.binding === binding);
+            if (rootIndexIndex >= 0) {
+              config.vectorize[rootIndexIndex].index_name = indexName;
+              console.log('✓ Updated Vectorize binding in root config');
+            } else {
+              config.vectorize.push({
+                binding: binding,
+                index_name: indexName
+              });
+              console.log('✓ Added new Vectorize binding to root config');
+            }
+
+            // Update preview environment if it exists
+            if (config.env && config.env.preview) {
+              if (!config.env.preview.vectorize) {
+                config.env.preview.vectorize = [];
+              }
+
+              const previewIndexIndex = config.env.preview.vectorize.findIndex(idx => idx.binding === binding);
+              if (previewIndexIndex >= 0) {
+                config.env.preview.vectorize[previewIndexIndex].index_name = indexName;
+                console.log('✓ Updated Vectorize binding in preview environment');
+              } else {
+                config.env.preview.vectorize.push({
+                  binding: binding,
+                  index_name: indexName
+                });
+                console.log('✓ Added new Vectorize binding to preview environment');
+              }
+            }
+
+            // Write back as JSON
+            fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
+            console.log('✓ Configuration updated successfully');
+          } catch (error) {
+            console.error('Failed to update config:', error.message);
+            process.exit(1);
+          }
+        " || exit 1
+
+        echo ""
+        echo "✓ Wrangler config updated"
+        echo "::endgroup::"
+
+    - name: Summary
+      shell: bash
+      run: |
+        echo "::group::Ephemeral Vectorize Index Summary"
+        echo "=========================================="
+        echo "Ephemeral Vectorize Index Management Complete"
+        echo "=========================================="
+        echo ""
+
+        INDEX_CREATED="${{ steps.create-index.outputs.index_created }}"
+
+        if [ "$INDEX_CREATED" = "true" ]; then
+          echo "✓ Ephemeral Vectorize index created"
+          echo "  Name: ${{ steps.create-index.outputs.index_name }}"
+          echo "  Dimensions: ${{ steps.create-index.outputs.index_dimensions }}"
+          echo "  Metric: ${{ steps.create-index.outputs.index_metric }}"
+        else
+          echo "ℹ️  No ephemeral index was created"
+        fi
+
+        echo "::endgroup::"
