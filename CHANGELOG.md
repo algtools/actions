@@ -1,3 +1,10 @@
+## [1.39.2](https://github.com/algtools/actions/compare/v1.39.1...v1.39.2) (2025-12-09)
+
+
+### Bug Fixes
+
+* improve index name validation in manage-ephemeral-vectorize ([e22d90a](https://github.com/algtools/actions/commit/e22d90a7ae2b6fce55ca6a78ed725b115627687e))
+
 ## [1.39.1](https://github.com/algtools/actions/compare/v1.39.0...v1.39.1) (2025-12-09)
 
 
