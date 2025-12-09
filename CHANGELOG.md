@@ -1,3 +1,10 @@
+## [1.39.3](https://github.com/algtools/actions/compare/v1.39.2...v1.39.3) (2025-12-09)
+
+
+### Bug Fixes
+
+* add Vectorize permissions check in manage-ephemeral-vectorize action ([7450927](https://github.com/algtools/actions/commit/74509276fa40d2ccba6ce63d4868c7ed787d1d24))
+
 ## [1.39.2](https://github.com/algtools/actions/compare/v1.39.1...v1.39.2) (2025-12-09)
 
 
