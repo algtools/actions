@@ -62,6 +62,14 @@ inputs:
     description: "Whether to create Vectorize indexes during provisioning (default: false)"
     required: false
     default: "false"
+  kv_namespace_name_base:
+    description: "Base name for KV namespaces (e.g., 'bff-template-cache'). If not provided, uses app_name. Namespaces will be named '{kv_namespace_name_base}-{env}' (bff-template only)"
+    required: false
+    default: ""
+  enable_kv:
+    description: "Whether to create KV namespaces during provisioning (default: false, bff-template only)"
+    required: false
+    default: "false"
   alias:
     description: "Optional alias to override the default algtools.alias value in package.json"
     required: false
@@ -602,6 +610,142 @@ runs:
         echo "  Prod: ${INDEX_NAME_BASE}-prod"
         echo ""
         echo "Note: Indexes were either found existing or created as needed."
+        echo ""
+
+    - name: Create KV namespaces and update bindings
+      shell: bash
+      working-directory: template
+      env:
+        APP_NAME: ${{ inputs.app_name }}
+        KV_NAMESPACE_NAME_BASE: ${{ inputs.kv_namespace_name_base }}
+        ENABLE_KV: ${{ inputs.enable_kv }}
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare_api_token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare_account_id }}
+      run: |
+        set -euo pipefail
+
+        # Skip if KV is not enabled or wrangler.jsonc doesn't exist
+        if [ "${ENABLE_KV}" != "true" ] || [ ! -f "wrangler.jsonc" ]; then
+          echo "ℹ️  Skipping KV namespace creation (enable_kv=false or no wrangler.jsonc found)"
+          exit 0
+        fi
+
+        # Verify Cloudflare credentials are provided
+        if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
+          echo "::error::enable_kv is true but CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is missing"
+          exit 1
+        fi
+
+        echo "=========================================="
+        echo "CREATING CLOUDFLARE KV NAMESPACES"
+        echo "=========================================="
+        NAMESPACE_NAME_BASE="${KV_NAMESPACE_NAME_BASE:-${APP_NAME}}"
+        echo "KV namespace base name: ${NAMESPACE_NAME_BASE}"
+        echo ""
+
+        # Install Wrangler (if not already installed by D1/Vectorize step)
+        if ! command -v wrangler &> /dev/null; then
+          echo "Installing Wrangler..."
+          npm install -g wrangler
+          echo ""
+        fi
+
+        # Function to get or create KV namespace
+        get_or_create_kv_namespace() {
+          local namespace_name=$1
+          local namespace_env=$2
+
+          echo "Processing ${namespace_env} KV namespace: ${namespace_name}" >&2
+
+          # List existing namespaces
+          echo "  Checking if namespace exists..." >&2
+          if ! NAMESPACE_LIST=$(wrangler kv:namespace list 2>&1); then
+            echo "::error::Failed to list KV namespaces. Wrangler error:" >&2
+            echo "${NAMESPACE_LIST}" >&2
+            return 1
+          fi
+
+          # Check if namespace exists
+          if echo "${NAMESPACE_LIST}" | grep -qF "${namespace_name}"; then
+            echo "  ✓ Found existing namespace: ${namespace_name}" >&2
+            # Extract namespace ID
+            NAMESPACE_ID=$(echo "${NAMESPACE_LIST}" | grep -F "${namespace_name}" | head -1 | sed -n 's/.*id = "\([^"]*\)".*/\1/p' || echo "")
+            echo "${NAMESPACE_ID}"
+          else
+            echo "  Creating new namespace..." >&2
+            if ! CREATE_OUTPUT=$(wrangler kv:namespace create "${namespace_name}" 2>&1); then
+              echo "::error::Failed to create ${namespace_env} KV namespace. Wrangler error:" >&2
+              echo "${CREATE_OUTPUT}" >&2
+              return 1
+            fi
+            echo "  ✓ Created new namespace: ${namespace_name}" >&2
+            # Extract namespace ID from output
+            NAMESPACE_ID=$(echo "${CREATE_OUTPUT}" | grep -oP 'id = "\K[^"]+' | head -1 || echo "")
+            if [ -z "$NAMESPACE_ID" ]; then
+              # Try alternative pattern
+              NAMESPACE_ID=$(echo "${CREATE_OUTPUT}" | sed -n 's/.*id.*"\([^"]*\)".*/\1/p' | head -1 || echo "")
+            fi
+            # If still not found, get from list
+            if [ -z "$NAMESPACE_ID" ]; then
+              sleep 2
+              NAMESPACE_LIST=$(wrangler kv:namespace list 2>&1 || echo "")
+              NAMESPACE_ID=$(echo "${NAMESPACE_LIST}" | grep -F "${namespace_name}" | head -1 | sed -n 's/.*id = "\([^"]*\)".*/\1/p' || echo "")
+            fi
+            echo "${NAMESPACE_ID}"
+          fi
+        }
+
+        # Get or create dev namespace
+        echo "Starting dev KV namespace provisioning..."
+        DEV_KV_ID=$(get_or_create_kv_namespace "${NAMESPACE_NAME_BASE}-dev" "dev") || {
+          echo "::error::Failed to provision dev KV namespace"
+          exit 1
+        }
+        echo "  Dev KV namespace ID: ${DEV_KV_ID}"
+        echo ""
+
+        # Get or create qa namespace
+        echo "Starting qa KV namespace provisioning..."
+        QA_KV_ID=$(get_or_create_kv_namespace "${NAMESPACE_NAME_BASE}-qa" "qa") || {
+          echo "::error::Failed to provision qa KV namespace"
+          exit 1
+        }
+        echo "  QA KV namespace ID: ${QA_KV_ID}"
+        echo ""
+
+        # Get or create prod namespace
+        echo "Starting prod KV namespace provisioning..."
+        PROD_KV_ID=$(get_or_create_kv_namespace "${NAMESPACE_NAME_BASE}-prod" "prod") || {
+          echo "::error::Failed to provision prod KV namespace"
+          exit 1
+        }
+        echo "  Prod KV namespace ID: ${PROD_KV_ID}"
+        echo ""
+
+        # Update wrangler.jsonc with KV namespace IDs
+        echo "Updating wrangler.jsonc with KV namespace bindings..."
+        if [ "$(uname)" = "Darwin" ]; then
+          sed -i '' "s|{{KV_NAMESPACE_ID}}-dev|${DEV_KV_ID}|g" wrangler.jsonc
+          sed -i '' "s|{{KV_NAMESPACE_ID}}-qa|${QA_KV_ID}|g" wrangler.jsonc
+          sed -i '' "s|{{KV_NAMESPACE_ID}}-prod|${PROD_KV_ID}|g" wrangler.jsonc
+          sed -i '' "s|{{KV_NAMESPACE_ID}}-local|local-fake-kv-id|g" wrangler.jsonc
+        else
+          sed -i "s|{{KV_NAMESPACE_ID}}-dev|${DEV_KV_ID}|g" wrangler.jsonc
+          sed -i "s|{{KV_NAMESPACE_ID}}-qa|${QA_KV_ID}|g" wrangler.jsonc
+          sed -i "s|{{KV_NAMESPACE_ID}}-prod|${PROD_KV_ID}|g" wrangler.jsonc
+          sed -i "s|{{KV_NAMESPACE_ID}}-local|local-fake-kv-id|g" wrangler.jsonc
+        fi
+        echo "✓ Updated wrangler.jsonc with KV namespace bindings"
+        echo ""
+        echo "=========================================="
+        echo "KV NAMESPACES CONFIGURED SUCCESSFULLY"
+        echo "=========================================="
+        echo "The following namespaces are bound in wrangler.jsonc:"
+        echo "  Dev:  ${NAMESPACE_NAME_BASE}-dev (${DEV_KV_ID})"
+        echo "  QA:   ${NAMESPACE_NAME_BASE}-qa (${QA_KV_ID})"
+        echo "  Prod: ${NAMESPACE_NAME_BASE}-prod (${PROD_KV_ID})"
+        echo ""
+        echo "Note: Namespaces were either found existing or created as needed."
         echo ""
 
     - name: Initialize repository contents

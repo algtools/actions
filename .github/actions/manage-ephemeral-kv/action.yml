@@ -1,0 +1,408 @@
+name: "Manage Ephemeral KV Namespace"
+description: "Manages ephemeral KV namespaces for PR previews - creates/recreates namespaces and updates wrangler config"
+author: "Algenium Systems"
+
+inputs:
+  # Repository configuration
+  repository_name:
+    description: "Repository name (used for logging, fallback for namespace naming if kv_namespace_name_base not provided)"
+    required: true
+  kv_namespace_name_base:
+    description: "Base name for KV namespace (e.g., 'bff-template-cache'). If not provided, uses repository_name. Namespace will be named '{kv_namespace_name_base}-pr-{pr_number}'"
+    required: false
+  pr_number:
+    description: "Pull request number"
+    required: true
+
+  # Cloudflare credentials
+  cloudflare_api_token:
+    description: "Cloudflare API token with KV permissions"
+    required: true
+  cloudflare_account_id:
+    description: "Cloudflare account ID"
+    required: true
+
+  # Wrangler configuration
+  wrangler_config:
+    description: "Path to wrangler.jsonc file to update (relative to working directory)"
+    required: false
+    default: "wrangler.jsonc"
+  kv_binding:
+    description: "KV binding name in wrangler config"
+    required: false
+    default: "CACHE"
+  working_directory:
+    description: "Working directory for running scripts"
+    required: false
+    default: "."
+  wrangler_version:
+    description: 'Version of Wrangler to install (e.g., "3.78.0" or "latest")'
+    required: false
+    default: "latest"
+
+  # Action behavior
+  force_create:
+    description: "Force namespace creation even if namespace exists (always recreates)"
+    required: false
+    default: "true"
+
+outputs:
+  namespace_created:
+    description: "Whether an ephemeral namespace was created (always true for this action)"
+    value: ${{ steps.create-namespace.outputs.namespace_created }}
+  namespace_name:
+    description: "Name of the ephemeral namespace (e.g., 'bff-template-cache-pr-4')"
+    value: ${{ steps.create-namespace.outputs.namespace_name }}
+  namespace_id:
+    description: "ID of the ephemeral namespace"
+    value: ${{ steps.create-namespace.outputs.namespace_id }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Display Action Version
+      shell: bash
+      run: |
+        ACTION_NAME="Manage Ephemeral KV Namespace"
+        # Change to repo root (3 levels up from action directory)
+        cd "${GITHUB_ACTION_PATH}/../../.."
+        VERSION="v$(jq -r '.version' package.json)"
+
+        echo "🔧 algtools/actions: ${ACTION_NAME} | Version: ${VERSION}"
+        echo "## 🔧 ${ACTION_NAME} | ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Validate inputs
+      shell: bash
+      run: |
+        echo "::group::Validating inputs"
+
+        if [ -z "${{ inputs.repository_name }}" ]; then
+          echo "::error::repository_name input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.pr_number }}" ]; then
+          echo "::error::pr_number input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.cloudflare_api_token }}" ]; then
+          echo "::error::cloudflare_api_token input is required"
+          exit 1
+        fi
+        if [ -z "${{ inputs.cloudflare_account_id }}" ]; then
+          echo "::error::cloudflare_account_id input is required"
+          exit 1
+        fi
+
+        echo "✓ All required inputs validated"
+        echo ""
+        echo "Configuration:"
+        echo "  Repository: ${{ inputs.repository_name }}"
+        echo "  PR Number: ${{ inputs.pr_number }}"
+        echo "  Working Directory: ${{ inputs.working_directory }}"
+        echo "  Wrangler Config: ${{ inputs.wrangler_config }}"
+        echo "  KV Binding: ${{ inputs.kv_binding }}"
+        echo "::endgroup::"
+
+    - name: Install Wrangler
+      shell: bash
+      run: |
+        echo "::group::Installing Wrangler"
+
+        if [ "${{ inputs.wrangler_version }}" = "latest" ]; then
+          echo "Installing latest version of Wrangler..."
+          npm install -g wrangler
+        else
+          echo "Installing Wrangler version ${{ inputs.wrangler_version }}..."
+          npm install -g wrangler@${{ inputs.wrangler_version }}
+        fi
+
+        WRANGLER_VERSION=$(wrangler --version)
+        echo ""
+        echo "✓ Wrangler installed successfully"
+        echo "  Version: $WRANGLER_VERSION"
+        echo "::endgroup::"
+
+    - name: Create or recreate ephemeral namespace
+      id: create-namespace
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare_api_token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare_account_id }}
+      run: |
+        echo "::group::Managing ephemeral KV namespace"
+
+        # Mask sensitive values
+        echo "::add-mask::${{ inputs.cloudflare_api_token }}"
+        echo "::add-mask::${{ inputs.cloudflare_account_id }}"
+
+        REPO_NAME="${{ inputs.repository_name }}"
+        PR_NUMBER="${{ inputs.pr_number }}"
+
+        # Verify environment variables are set
+        if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+          echo "::error::CLOUDFLARE_API_TOKEN environment variable is not set"
+          exit 1
+        fi
+        if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+          echo "::error::CLOUDFLARE_ACCOUNT_ID environment variable is not set"
+          exit 1
+        fi
+
+        # Verify wrangler is available
+        if ! command -v wrangler &> /dev/null; then
+          echo "::error::wrangler command not found in PATH"
+          exit 1
+        fi
+
+        # Determine namespace name base
+        if [ -n "${{ inputs.kv_namespace_name_base }}" ]; then
+          NAMESPACE_NAME_BASE="${{ inputs.kv_namespace_name_base }}"
+        else
+          NAMESPACE_NAME_BASE="${REPO_NAME}"
+        fi
+
+        # Determine namespace name
+        NAMESPACE_NAME="${NAMESPACE_NAME_BASE}-pr-${PR_NUMBER}"
+
+        # Validate namespace name format (Cloudflare requirements: lowercase, alphanumeric, hyphens only, max 63 chars)
+        if ! echo "$NAMESPACE_NAME" | grep -qE '^[a-z0-9-]+$'; then
+          echo "::error::Invalid namespace name format: $NAMESPACE_NAME"
+          echo "Namespace names must be lowercase, alphanumeric, and contain only hyphens (no underscores or uppercase)"
+          exit 1
+        fi
+
+        if [ ${#NAMESPACE_NAME} -gt 63 ]; then
+          echo "::error::Namespace name too long: $NAMESPACE_NAME (${#NAMESPACE_NAME} chars, max 63)"
+          echo "Please use a shorter kv_namespace_name_base"
+          exit 1
+        fi
+
+        echo "✓ Namespace name validated: $NAMESPACE_NAME (${#NAMESPACE_NAME} characters)"
+        echo ""
+        echo "Creating ephemeral KV namespace: $NAMESPACE_NAME"
+        echo ""
+
+        # Verify wrangler can authenticate
+        echo "Verifying wrangler authentication..."
+        WHOAMI_OUTPUT=$(wrangler whoami 2>&1) || {
+          echo "::error::Wrangler authentication failed. Check CLOUDFLARE_API_TOKEN"
+          echo "Whoami output:"
+          echo "$WHOAMI_OUTPUT"
+          exit 1
+        }
+        echo "✓ Wrangler authentication verified"
+        echo "  Account info: $(echo "$WHOAMI_OUTPUT" | head -1)"
+        echo ""
+
+        # Check if we can list KV namespaces (tests permissions)
+        echo "Testing KV permissions..."
+        if ! wrangler kv:namespace list > /dev/null 2>&1; then
+          LIST_ERROR=$(wrangler kv:namespace list 2>&1)
+          if echo "$LIST_ERROR" | grep -qi "permission\|authentication\|10000"; then
+            echo "::error::API token does not have KV permissions"
+            echo ""
+            echo "=== Permission Error ==="
+            echo "The CLOUDFLARE_API_TOKEN does not have the required KV permissions."
+            echo ""
+            echo "Required permissions:"
+            echo "  - Cloudflare Workers:Edit (to create/delete KV namespaces)"
+            echo "  - Account:Read (to verify account access)"
+            echo ""
+            echo "To fix this:"
+            echo "  1. Go to https://dash.cloudflare.com/profile/api-tokens"
+            echo "  2. Edit your API token (or create a new one)"
+            echo "  3. Add 'Cloudflare Workers:Edit' permission"
+            echo "  4. Ensure the token has access to the correct account: $CLOUDFLARE_ACCOUNT_ID"
+            echo ""
+            echo "Current token permissions can be viewed at:"
+            echo "  https://dash.cloudflare.com/profile/api-tokens"
+            echo ""
+            echo "List command error output:"
+            echo "$LIST_ERROR"
+            exit 1
+          fi
+        fi
+        echo "✓ KV permissions verified"
+        echo ""
+
+        # Check if namespace already exists
+        echo "Checking for existing namespace..."
+        NAMESPACE_LIST=$(wrangler kv:namespace list 2>&1 || echo "")
+
+        if echo "$NAMESPACE_LIST" | grep -qF "$NAMESPACE_NAME"; then
+          echo "⚠️  Namespace $NAMESPACE_NAME already exists"
+          if [ "${{ inputs.force_create }}" = "true" ]; then
+            echo "🗑️  Deleting existing namespace to ensure clean state..."
+
+            # Extract namespace ID from list
+            NAMESPACE_ID=$(echo "$NAMESPACE_LIST" | grep -F "$NAMESPACE_NAME" | head -1 | sed -n 's/.*id = "\([^"]*\)".*/\1/p' || echo "")
+
+            if [ -n "$NAMESPACE_ID" ]; then
+              wrangler kv:namespace delete --namespace-id "$NAMESPACE_ID" || {
+                echo "::warning::Failed to delete existing namespace, will try to create anyway"
+              }
+              sleep 2 # Wait for deletion to propagate
+            else
+              echo "::warning::Could not extract namespace ID, will try to create anyway"
+            fi
+          else
+            echo "✓ Using existing namespace (force_create is false)"
+            # Extract namespace ID
+            NAMESPACE_ID=$(echo "$NAMESPACE_LIST" | grep -F "$NAMESPACE_NAME" | head -1 | sed -n 's/.*id = "\([^"]*\)".*/\1/p' || echo "")
+            echo "namespace_created=false" >> $GITHUB_OUTPUT
+            echo "namespace_name=$NAMESPACE_NAME" >> $GITHUB_OUTPUT
+            echo "namespace_id=$NAMESPACE_ID" >> $GITHUB_OUTPUT
+            echo "::endgroup::"
+            exit 0
+          fi
+        else
+          echo "✓ No existing namespace found"
+        fi
+
+        # Create new namespace
+        echo ""
+        echo "Creating new ephemeral KV namespace..."
+        echo "Command: wrangler kv:namespace create \"$NAMESPACE_NAME\""
+        echo ""
+        echo "Debug info:"
+        echo "  Namespace name: $NAMESPACE_NAME"
+        echo "  Account ID: ${CLOUDFLARE_ACCOUNT_ID:0:8}... (masked)"
+        echo "  API Token: ${CLOUDFLARE_API_TOKEN:0:8}... (masked)"
+        echo ""
+
+        # Run the command and capture output
+        echo "Executing kv:namespace create command..."
+        set +e  # Don't exit on error immediately
+        CREATE_OUTPUT=$(wrangler kv:namespace create "$NAMESPACE_NAME" 2>&1)
+        CREATE_EXIT_CODE=$?
+        set -e  # Re-enable exit on error
+
+        echo "Command exit code: $CREATE_EXIT_CODE"
+        echo "Command output length: ${#CREATE_OUTPUT} characters"
+
+        if [ $CREATE_EXIT_CODE -ne 0 ]; then
+          echo "::error::Failed to create KV namespace (exit code: $CREATE_EXIT_CODE)"
+          echo ""
+          echo "=== Full Wrangler Output ==="
+          echo "$CREATE_OUTPUT"
+          echo "============================"
+          echo ""
+          echo "=== Troubleshooting ==="
+          echo "Namespace name: $NAMESPACE_NAME"
+          echo ""
+          echo "Common issues:"
+          echo "  1. Namespace name must be lowercase, alphanumeric, hyphens only (no underscores)"
+          echo "  2. API token must have Cloudflare Workers:Edit permission"
+          echo "  3. Account may have reached KV namespace limit"
+          echo "  4. Namespace name must be 63 characters or less"
+          echo ""
+          echo "Verifying environment:"
+          echo "  CLOUDFLARE_ACCOUNT_ID is set: $([ -n "$CLOUDFLARE_ACCOUNT_ID" ] && echo 'yes' || echo 'no')"
+          echo "  CLOUDFLARE_API_TOKEN is set: $([ -n "$CLOUDFLARE_API_TOKEN" ] && echo 'yes' || echo 'no')"
+          exit 1
+        fi
+
+        echo "$CREATE_OUTPUT"
+
+        # Extract namespace ID from output
+        NAMESPACE_ID=$(echo "$CREATE_OUTPUT" | grep -oP 'id = "\K[^"]+' | head -1 || echo "")
+        if [ -z "$NAMESPACE_ID" ]; then
+          # Try alternative pattern
+          NAMESPACE_ID=$(echo "$CREATE_OUTPUT" | sed -n 's/.*id.*"\([^"]*\)".*/\1/p' | head -1 || echo "")
+        fi
+
+        if [ -z "$NAMESPACE_ID" ]; then
+          echo "::warning::Could not extract namespace ID from output, will try to get it from list"
+          # Get ID from list
+          sleep 2
+          NAMESPACE_LIST=$(wrangler kv:namespace list 2>&1 || echo "")
+          NAMESPACE_ID=$(echo "$NAMESPACE_LIST" | grep -F "$NAMESPACE_NAME" | head -1 | sed -n 's/.*id = "\([^"]*\)".*/\1/p' || echo "")
+        fi
+
+        echo ""
+        echo "✓ Ephemeral KV namespace created successfully"
+        echo "  Name: $NAMESPACE_NAME"
+        echo "  ID: $NAMESPACE_ID"
+
+        echo "namespace_created=true" >> $GITHUB_OUTPUT
+        echo "namespace_name=$NAMESPACE_NAME" >> $GITHUB_OUTPUT
+        echo "namespace_id=$NAMESPACE_ID" >> $GITHUB_OUTPUT
+
+        echo "::endgroup::"
+
+    - name: Configure wrangler for ephemeral namespace
+      if: steps.create-namespace.outputs.namespace_created == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      env:
+        PR_NAMESPACE_NAME: ${{ steps.create-namespace.outputs.namespace_name }}
+        PR_NAMESPACE_ID: ${{ steps.create-namespace.outputs.namespace_id }}
+      run: |
+        echo "::group::Configuring wrangler.jsonc for KV"
+
+        WRANGLER_CONFIG="${{ inputs.wrangler_config }}"
+        BINDING="${{ inputs.kv_binding }}"
+
+        echo "Updating wrangler config: $WRANGLER_CONFIG"
+        echo "  Namespace Name: $PR_NAMESPACE_NAME"
+        echo "  Namespace ID: $PR_NAMESPACE_ID"
+        echo "  Binding: $BINDING"
+
+        node -e "
+          const fs = require('fs');
+          const configPath = '$WRANGLER_CONFIG';
+          const binding = '$BINDING';
+          const namespaceId = '$PR_NAMESPACE_ID';
+
+          let content = fs.readFileSync(configPath, 'utf-8');
+          // Remove comments
+          content = content.replace(/\/\*[\s\S]*?\*\//g, '');
+          content = content.replace(/\/\/.*/g, '');
+          // Remove trailing commas
+          content = content.replace(/,(\\s*[}\\]])/g, '\$1');
+
+          try {
+            const config = JSON.parse(content);
+
+            // Update root-level kv_namespaces
+            if (!config.kv_namespaces) { config.kv_namespaces = []; }
+            let rootKv = config.kv_namespaces.find(kv => kv.binding === binding);
+            if (rootKv) {
+              rootKv.id = namespaceId;
+            } else {
+              config.kv_namespaces.push({ binding: binding, id: namespaceId });
+            }
+
+            // Update env.preview kv_namespaces
+            if (config.env && config.env.preview) {
+              if (!config.env.preview.kv_namespaces) { config.env.preview.kv_namespaces = []; }
+              let previewKv = config.env.preview.kv_namespaces.find(kv => kv.binding === binding);
+              if (previewKv) {
+                previewKv.id = namespaceId;
+              } else {
+                config.env.preview.kv_namespaces.push({ binding: binding, id: namespaceId });
+              }
+            }
+
+            fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\\n');
+            console.log('✓ Configuration updated successfully');
+          } catch (error) {
+            console.error('Failed to update config:', error.message);
+            process.exit(1);
+          }
+        " || exit 1
+        echo "✓ Wrangler config updated"
+        echo "::endgroup::"
+
+    - name: Summary
+      shell: bash
+      run: |
+        echo "::group::Ephemeral KV Namespace Summary"
+        echo "=========================================="
+        echo "Ephemeral KV Namespace Management Complete"
+        echo "=========================================="
+        echo "✓ Ephemeral KV namespace created"
+        echo "  Name: ${{ steps.create-namespace.outputs.namespace_name }}"
+        echo "  ID: ${{ steps.create-namespace.outputs.namespace_id }}"
+        echo "::endgroup::"
