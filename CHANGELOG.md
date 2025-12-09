@@ -1,3 +1,10 @@
+## [1.39.1](https://github.com/algtools/actions/compare/v1.39.0...v1.39.1) (2025-12-09)
+
+
+### Bug Fixes
+
+* add environment checks and enhanced error handling in manage-ephemeral-vectorize ([36df724](https://github.com/algtools/actions/commit/36df7240ad6677cc7bf171e70156b9ec122e88c0))
+
 # [1.39.0](https://github.com/algtools/actions/compare/v1.38.0...v1.39.0) (2025-12-08)
 
 
