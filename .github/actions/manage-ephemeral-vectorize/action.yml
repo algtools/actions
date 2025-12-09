@@ -196,6 +196,21 @@ runs:
         # Determine index name
         INDEX_NAME="${INDEX_NAME_BASE}-pr-${PR_NUMBER}"
 
+        # Validate index name format (Cloudflare requirements: lowercase, alphanumeric, hyphens only, max 64 chars)
+        if ! echo "$INDEX_NAME" | grep -qE '^[a-z0-9-]+$'; then
+          echo "::error::Invalid index name format: $INDEX_NAME"
+          echo "Index names must be lowercase, alphanumeric, and contain only hyphens (no underscores or uppercase)"
+          exit 1
+        fi
+
+        if [ ${#INDEX_NAME} -gt 64 ]; then
+          echo "::error::Index name too long: $INDEX_NAME (${#INDEX_NAME} chars, max 64)"
+          echo "Please use a shorter vectorize_index_name_base"
+          exit 1
+        fi
+
+        echo "✓ Index name validated: $INDEX_NAME (${#INDEX_NAME} characters)"
+
         echo "Creating ephemeral Vectorize index: $INDEX_NAME"
         echo "  Dimensions: $DIMENSIONS"
         echo "  Metric: $METRIC"
@@ -223,28 +238,68 @@ runs:
         echo ""
         echo "Creating new ephemeral Vectorize index..."
         echo "Command: wrangler vectorize create \"$INDEX_NAME\" --dimensions \"$DIMENSIONS\" --metric \"$METRIC\""
+        echo ""
+        echo "Debug info:"
+        echo "  Index name: $INDEX_NAME"
+        echo "  Dimensions: $DIMENSIONS"
+        echo "  Metric: $METRIC"
+        echo "  Account ID: ${CLOUDFLARE_ACCOUNT_ID:0:8}... (masked)"
+        echo "  API Token: ${CLOUDFLARE_API_TOKEN:0:8}... (masked)"
+        echo ""
+
+        # Verify wrangler can authenticate
+        echo "Verifying wrangler authentication..."
+        WHOAMI_OUTPUT=$(wrangler whoami 2>&1) || {
+          echo "::error::Wrangler authentication failed. Check CLOUDFLARE_API_TOKEN"
+          echo "Whoami output:"
+          echo "$WHOAMI_OUTPUT"
+          exit 1
+        }
+        echo "✓ Wrangler authentication verified"
+        echo "  Account info: $(echo "$WHOAMI_OUTPUT" | head -1)"
+        echo ""
+
+        # Verify account ID matches
+        if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+          echo "Account ID from input: $CLOUDFLARE_ACCOUNT_ID"
+        else
+          echo "::warning::CLOUDFLARE_ACCOUNT_ID not set, wrangler will use default account"
+        fi
+        echo ""
 
         # Run the command and capture output
+        echo "Executing vectorize create command..."
+        echo "Full command: wrangler vectorize create \"$INDEX_NAME\" --dimensions \"$DIMENSIONS\" --metric \"$METRIC\""
         set +e  # Don't exit on error immediately
         CREATE_OUTPUT=$(wrangler vectorize create "$INDEX_NAME" --dimensions "$DIMENSIONS" --metric "$METRIC" 2>&1)
         CREATE_EXIT_CODE=$?
         set -e  # Re-enable exit on error
 
+        echo "Command exit code: $CREATE_EXIT_CODE"
+        echo "Command output length: ${#CREATE_OUTPUT} characters"
+
         if [ $CREATE_EXIT_CODE -ne 0 ]; then
           echo "::error::Failed to create Vectorize index (exit code: $CREATE_EXIT_CODE)"
-          echo "=== Wrangler Error Output ==="
+          echo ""
+          echo "=== Full Wrangler Output ==="
           echo "$CREATE_OUTPUT"
           echo "============================"
           echo ""
-          echo "Troubleshooting:"
-          echo "  - Index name: $INDEX_NAME"
-          echo "  - Dimensions: $DIMENSIONS"
-          echo "  - Metric: $METRIC"
-          echo "  - Check that the index name is valid (lowercase, alphanumeric, hyphens allowed)"
-          echo "  - Verify Cloudflare API token has Vectorize permissions"
-          echo "  - Ensure dimensions and metric values are valid"
-          echo "  - Check Cloudflare account limits for Vectorize indexes"
-          echo "  - Verify CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are set correctly"
+          echo "=== Troubleshooting ==="
+          echo "Index name: $INDEX_NAME"
+          echo "Dimensions: $DIMENSIONS"
+          echo "Metric: $METRIC"
+          echo ""
+          echo "Common issues:"
+          echo "  1. Index name must be lowercase, alphanumeric, hyphens only (no underscores)"
+          echo "  2. API token must have Vectorize:Edit permission"
+          echo "  3. Account may have reached Vectorize index limit"
+          echo "  4. Dimensions must be a positive integer (common: 1536, 768, 384)"
+          echo "  5. Metric must be: cosine, euclidean, or dot-product"
+          echo ""
+          echo "Verifying environment:"
+          echo "  CLOUDFLARE_ACCOUNT_ID is set: $([ -n "$CLOUDFLARE_ACCOUNT_ID" ] && echo 'yes' || echo 'no')"
+          echo "  CLOUDFLARE_API_TOKEN is set: $([ -n "$CLOUDFLARE_API_TOKEN" ] && echo 'yes' || echo 'no')"
           exit 1
         fi
 
