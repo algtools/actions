@@ -267,6 +267,37 @@ runs:
         fi
         echo ""
 
+        # Check if we can list Vectorize indexes (tests permissions)
+        echo "Testing Vectorize permissions..."
+        if ! wrangler vectorize list > /dev/null 2>&1; then
+          LIST_ERROR=$(wrangler vectorize list 2>&1)
+          if echo "$LIST_ERROR" | grep -qi "permission\|authentication\|10000"; then
+            echo "::error::API token does not have Vectorize permissions"
+            echo ""
+            echo "=== Permission Error ==="
+            echo "The CLOUDFLARE_API_TOKEN does not have the required Vectorize permissions."
+            echo ""
+            echo "Required permissions:"
+            echo "  - Vectorize:Edit (to create/delete indexes)"
+            echo "  - Account:Read (to verify account access)"
+            echo ""
+            echo "To fix this:"
+            echo "  1. Go to https://dash.cloudflare.com/profile/api-tokens"
+            echo "  2. Edit your API token (or create a new one)"
+            echo "  3. Add 'Vectorize:Edit' permission"
+            echo "  4. Ensure the token has access to the correct account: $CLOUDFLARE_ACCOUNT_ID"
+            echo ""
+            echo "Current token permissions can be viewed at:"
+            echo "  https://dash.cloudflare.com/profile/api-tokens"
+            echo ""
+            echo "List command error output:"
+            echo "$LIST_ERROR"
+            exit 1
+          fi
+        fi
+        echo "✓ Vectorize permissions verified"
+        echo ""
+
         # Run the command and capture output
         echo "Executing vectorize create command..."
         echo "Full command: wrangler vectorize create \"$INDEX_NAME\" --dimensions \"$DIMENSIONS\" --metric \"$METRIC\""
