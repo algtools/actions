@@ -165,6 +165,22 @@ runs:
         echo "::add-mask::${{ inputs.cloudflare_api_token }}"
         echo "::add-mask::${{ inputs.cloudflare_account_id }}"
 
+        # Verify environment variables are set
+        if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+          echo "::error::CLOUDFLARE_API_TOKEN environment variable is not set"
+          exit 1
+        fi
+        if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+          echo "::error::CLOUDFLARE_ACCOUNT_ID environment variable is not set"
+          exit 1
+        fi
+
+        # Verify wrangler is available
+        if ! command -v wrangler &> /dev/null; then
+          echo "::error::wrangler command not found in PATH"
+          exit 1
+        fi
+
         REPO_NAME="${{ inputs.repository_name }}"
         PR_NUMBER="${{ inputs.pr_number }}"
         DIMENSIONS="${{ inputs.dimensions }}"
@@ -206,11 +222,29 @@ runs:
         # Create new index
         echo ""
         echo "Creating new ephemeral Vectorize index..."
-        CREATE_OUTPUT=$(wrangler vectorize create "$INDEX_NAME" --dimensions "$DIMENSIONS" --metric "$METRIC" 2>&1)
+        echo "Command: wrangler vectorize create \"$INDEX_NAME\" --dimensions \"$DIMENSIONS\" --metric \"$METRIC\""
 
-        if [ $? -ne 0 ]; then
-          echo "::error::Failed to create Vectorize index"
+        # Run the command and capture output
+        set +e  # Don't exit on error immediately
+        CREATE_OUTPUT=$(wrangler vectorize create "$INDEX_NAME" --dimensions "$DIMENSIONS" --metric "$METRIC" 2>&1)
+        CREATE_EXIT_CODE=$?
+        set -e  # Re-enable exit on error
+
+        if [ $CREATE_EXIT_CODE -ne 0 ]; then
+          echo "::error::Failed to create Vectorize index (exit code: $CREATE_EXIT_CODE)"
+          echo "=== Wrangler Error Output ==="
           echo "$CREATE_OUTPUT"
+          echo "============================"
+          echo ""
+          echo "Troubleshooting:"
+          echo "  - Index name: $INDEX_NAME"
+          echo "  - Dimensions: $DIMENSIONS"
+          echo "  - Metric: $METRIC"
+          echo "  - Check that the index name is valid (lowercase, alphanumeric, hyphens allowed)"
+          echo "  - Verify Cloudflare API token has Vectorize permissions"
+          echo "  - Ensure dimensions and metric values are valid"
+          echo "  - Check Cloudflare account limits for Vectorize indexes"
+          echo "  - Verify CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are set correctly"
           exit 1
         fi
 
