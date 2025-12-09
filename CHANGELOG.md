@@ -1,3 +1,10 @@
+## [1.39.4](https://github.com/algtools/actions/compare/v1.39.3...v1.39.4) (2025-12-09)
+
+
+### Bug Fixes
+
+* add KV namespace provisioning and configuration to action.yml ([9e6bca0](https://github.com/algtools/actions/commit/9e6bca0db99b6f480ea881742aabaedebd79357f))
+
 ## [1.39.3](https://github.com/algtools/actions/compare/v1.39.2...v1.39.3) (2025-12-09)
 
 
