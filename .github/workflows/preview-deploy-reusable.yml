@@ -519,6 +519,20 @@ jobs:
 
           echo "::endgroup::"
 
+      - name: Prepare secrets JSON
+        id: secrets
+        run: |
+          SECRETS_JSON=$(jq -nc '{}')
+          echo "json=$SECRETS_JSON" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare vars JSON
+        id: vars
+        run: |
+          VARS_JSON=$(jq -nc \
+            --arg core_api_url "https://auth-core.janovix.algenium.dev" \
+            '{CORE_API_URL: $core_api_url}')
+          echo "json=$VARS_JSON" >> "$GITHUB_OUTPUT"
+
       - name: Deploy to Cloudflare Workers
         id: deploy-worker
         uses: algtools/actions/.github/actions/deploy-cloudflare-from-artifact@main
@@ -533,8 +547,8 @@ jobs:
           custom_domain: ${{ steps.preview-domain.outputs.domain }}
           zone_id: ${{ inputs.zone }}
           dry_run: "false"
-          secrets_json: "{}"
-          vars_json: "{}"
+          secrets_json: '${{ steps.secrets.outputs.json }}'
+          vars_json: '${{ steps.vars.outputs.json }}'
           sync_secrets_before_deploy: ${{ inputs.sync_secrets_before_deploy }}
           sync_vars_before_deploy: ${{ inputs.sync_vars_before_deploy }}
 
