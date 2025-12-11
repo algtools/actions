@@ -1,3 +1,10 @@
+# [1.40.0](https://github.com/algtools/actions/compare/v1.39.4...v1.40.0) (2025-12-11)
+
+
+### Features
+
+* enhance Cloudflare deployment action with versioning support and improved URL extraction ([63d2652](https://github.com/algtools/actions/commit/63d2652b19611cac9fc03dc444b5e19be797b162))
+
 ## [1.39.4](https://github.com/algtools/actions/compare/v1.39.3...v1.39.4) (2025-12-09)
 
 
