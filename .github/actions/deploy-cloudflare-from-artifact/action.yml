@@ -30,6 +30,14 @@ inputs:
     description: 'Environment to deploy to (e.g., "production", "staging"). Maps to wrangler environment config.'
     required: false
     default: ""
+  use_versions:
+    description: "If true, uses wrangler versions upload/deploy instead of direct deploy. For dev and preview environments."
+    required: false
+    default: "false"
+  version_alias:
+    description: 'Version alias to use when deploying with versions (e.g., "algtools-web-template-dev"). Only used if use_versions is true.'
+    required: false
+    default: ""
   custom_domain:
     description: 'Custom domain to attach to the worker (e.g., "app.example.com"). If provided, requires zone_id.'
     required: false
@@ -628,23 +636,81 @@ runs:
         if [ -n "$ENVIRONMENT" ]; then
           echo "  Environment: $ENVIRONMENT"
         fi
+
+        USE_VERSIONS="${{ inputs.use_versions }}"
+        VERSION_ALIAS="${{ inputs.version_alias }}"
+
+        if [ "$USE_VERSIONS" = "true" ]; then
+          echo "  Using versioned deployment"
+          if [ -n "$VERSION_ALIAS" ]; then
+            echo "  Version Alias: $VERSION_ALIAS"
+          fi
+        fi
         echo ""
 
-        # Build deploy command
-        DEPLOY_CMD="wrangler deploy --config \"$CONFIG_PATH\" --name \"$WORKER_NAME\""
+        # Determine deployment strategy
+        if [ "$USE_VERSIONS" = "true" ] && [ -n "$VERSION_ALIAS" ]; then
+          # Use versioned deployment for dev/preview
+          echo "Uploading version..."
+          VERSION_UPLOAD_CMD="wrangler versions upload --config \"$CONFIG_PATH\" --name \"$WORKER_NAME\""
 
-        if [ -n "$ENVIRONMENT" ]; then
-          DEPLOY_CMD="$DEPLOY_CMD --env \"$ENVIRONMENT\""
+          if [ -n "$ENVIRONMENT" ]; then
+            VERSION_UPLOAD_CMD="$VERSION_UPLOAD_CMD --env \"$ENVIRONMENT\""
+          fi
+
+          if [ "$DRY_RUN" = "true" ]; then
+            VERSION_UPLOAD_CMD="$VERSION_UPLOAD_CMD --dry-run"
+            echo "⚠️  DRY RUN MODE - No actual deployment will occur"
+            echo ""
+          fi
+
+          VERSION_OUTPUT=$(eval $VERSION_UPLOAD_CMD 2>&1) || VERSION_EXIT=$?
+          echo "$VERSION_OUTPUT"
+
+          if [ "${VERSION_EXIT:-0}" -ne 0 ]; then
+            echo "::error::Version upload failed"
+            echo "status=failure" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          # Extract version ID from output
+          VERSION_ID=$(echo "$VERSION_OUTPUT" | grep -oP 'version_id:\s*\K[^\s]+' | head -1 || echo "")
+
+          if [ -z "$VERSION_ID" ]; then
+            # Try alternative pattern
+            VERSION_ID=$(echo "$VERSION_OUTPUT" | grep -oP 'Version ID:\s*\K[^\s]+' | head -1 || echo "")
+          fi
+
+          if [ -z "$VERSION_ID" ] && [ "$DRY_RUN" != "true" ]; then
+            echo "::error::Could not extract version ID from upload output"
+            echo "status=failure" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          echo "Deploying version with alias..."
+          DEPLOY_CMD="wrangler versions deploy --version-id \"$VERSION_ID\" --alias \"$VERSION_ALIAS\""
+
+          if [ "$DRY_RUN" = "true" ]; then
+            DEPLOY_CMD="$DEPLOY_CMD --dry-run"
+          fi
+
+          echo "Command: wrangler versions deploy --version-id [VERSION_ID] --alias [ALIAS]"
+        else
+          # Use direct deployment for production
+          DEPLOY_CMD="wrangler deploy --config \"$CONFIG_PATH\" --name \"$WORKER_NAME\""
+
+          if [ -n "$ENVIRONMENT" ]; then
+            DEPLOY_CMD="$DEPLOY_CMD --env \"$ENVIRONMENT\""
+          fi
+
+          if [ "$DRY_RUN" = "true" ]; then
+            DEPLOY_CMD="$DEPLOY_CMD --dry-run"
+            echo "⚠️  DRY RUN MODE - No actual deployment will occur"
+            echo ""
+          fi
+
+          echo "Command: wrangler deploy --config [CONFIG] --name [WORKER_NAME]"
         fi
-
-        if [ "$DRY_RUN" = "true" ]; then
-          DEPLOY_CMD="$DEPLOY_CMD --dry-run"
-          echo "⚠️  DRY RUN MODE - No actual deployment will occur"
-          echo ""
-        fi
-
-        echo "Executing deployment..."
-        echo "Command: wrangler deploy --config [CONFIG] --name [WORKER_NAME]"
         echo ""
 
         # Execute deployment and capture output
@@ -674,20 +740,90 @@ runs:
           WORKER_URL="https://$CUSTOM_DOMAIN"
           echo "📍 Worker URL (custom domain): $WORKER_URL"
         else
-          # Extract worker URL from output
-          WORKER_URL=$(echo "$FILTERED_OUTPUT" | grep -oP 'https://[a-zA-Z0-9\-]+\.workers\.dev' | head -1 || echo "")
+          # Extract worker URL from output (including account subdomain)
+          # Pattern: https://worker-name.account-subdomain.workers.dev
+          WORKER_URL=$(echo "$FILTERED_OUTPUT" | grep -oP 'https://[a-zA-Z0-9\-]+\.[a-zA-Z0-9\-]+\.workers\.dev' | head -1 || echo "")
 
-          # If no workers.dev URL found, try to construct it
+          # If no workers.dev URL found, try alternative patterns
           if [ -z "$WORKER_URL" ]; then
-            # Try to find custom domain
-            WORKER_URL=$(echo "$FILTERED_OUTPUT" | grep -oP 'https://[a-zA-Z0-9\-\.]+' | grep -v "dash.cloudflare.com" | head -1 || echo "")
+            # Try pattern without account subdomain (fallback)
+            WORKER_URL=$(echo "$FILTERED_OUTPUT" | grep -oP 'https://[a-zA-Z0-9\-]+\.workers\.dev' | head -1 || echo "")
           fi
 
           if [ -z "$WORKER_URL" ]; then
-            # Construct default URL
-            WORKER_URL="https://$WORKER_NAME.workers.dev"
-            echo "⚠️  Could not extract URL from output, using default: $WORKER_URL"
+            # Try to find any URL in output
+            WORKER_URL=$(echo "$FILTERED_OUTPUT" | grep -oP 'https://[a-zA-Z0-9\-\.]+' | grep -v "dash.cloudflare.com" | grep "workers.dev" | head -1 || echo "")
+          fi
+
+          # If still no URL found, try to get account subdomain and construct URL
+          if [ -z "$WORKER_URL" ]; then
+            echo "Attempting to get account subdomain..."
+
+            # Method 1: Try to extract from deployment output
+            ACCOUNT_SUBDOMAIN=$(echo "$FILTERED_OUTPUT" | grep -oP '\.([a-zA-Z0-9\-]+)\.workers\.dev' | head -1 | sed 's/\.workers\.dev//' | sed 's/^\.//' || echo "")
+
+            # Method 2: Use wrangler whoami to get account info
+            if [ -z "$ACCOUNT_SUBDOMAIN" ]; then
+              echo "Getting account info from wrangler whoami..."
+              WHOAMI_OUTPUT=$(wrangler whoami 2>&1 || echo "")
+
+              # Extract account subdomain from whoami output
+              # wrangler whoami typically shows: "You are logged in as: <email> (<account-name>)"
+              # The account name is often the subdomain
+              ACCOUNT_SUBDOMAIN=$(echo "$WHOAMI_OUTPUT" | grep -oP '\([^)]+\)' | head -1 | sed 's/[()]//g' | tr '[:upper:]' '[:lower:]' || echo "")
+
+              # Alternative: Try to get from account settings via API
+              if [ -z "$ACCOUNT_SUBDOMAIN" ]; then
+                echo "Trying Cloudflare API to get account subdomain..."
+                ACCOUNT_INFO=$(curl -s -X GET "https://api.cloudflare.com/client/v4/accounts/${{ inputs.cloudflare_account_id }}" \
+                  -H "Authorization: Bearer ${{ inputs.cloudflare_api_token }}" \
+                  -H "Content-Type: application/json" 2>/dev/null || echo "")
+
+                # Extract account name (which is often the subdomain)
+                ACCOUNT_SUBDOMAIN=$(echo "$ACCOUNT_INFO" | grep -oP '"name":\s*"[^"]*"' | head -1 | cut -d'"' -f4 | tr '[:upper:]' '[:lower:]' | tr ' ' '-' || echo "")
+              fi
+            fi
+
+            # If we have account subdomain, construct URL
+            if [ -n "$ACCOUNT_SUBDOMAIN" ]; then
+              if [ "$USE_VERSIONS" = "true" ] && [ -n "$VERSION_ALIAS" ]; then
+                WORKER_URL="https://$VERSION_ALIAS.$ACCOUNT_SUBDOMAIN.workers.dev"
+              else
+                WORKER_URL="https://$WORKER_NAME.$ACCOUNT_SUBDOMAIN.workers.dev"
+              fi
+              echo "📍 Constructed worker URL with account subdomain: $WORKER_URL"
+            else
+              # Last resort: construct without account subdomain (will redirect)
+              if [ "$USE_VERSIONS" = "true" ] && [ -n "$VERSION_ALIAS" ]; then
+                WORKER_URL="https://$VERSION_ALIAS.workers.dev"
+              else
+                WORKER_URL="https://$WORKER_NAME.workers.dev"
+              fi
+              echo "⚠️  Could not extract account subdomain, using default format: $WORKER_URL"
+              echo "   Note: This URL may redirect to the correct account-specific URL"
+            fi
           else
+            # Verify the URL has account subdomain, if not try to add it
+            if echo "$WORKER_URL" | grep -qv '\.[a-zA-Z0-9\-]\+\.workers\.dev'; then
+              # URL doesn't have account subdomain, try to get it
+              echo "URL missing account subdomain, attempting to add it..."
+
+              # Extract worker name from URL
+              WORKER_NAME_FROM_URL=$(echo "$WORKER_URL" | sed 's|https://||' | sed 's|\.workers\.dev||')
+
+              # Try to get account subdomain
+              ACCOUNT_SUBDOMAIN=$(echo "$FILTERED_OUTPUT" | grep -oP '\.([a-zA-Z0-9\-]+)\.workers\.dev' | head -1 | sed 's/\.workers\.dev//' | sed 's/^\.//' || echo "")
+
+              if [ -z "$ACCOUNT_SUBDOMAIN" ]; then
+                WHOAMI_OUTPUT=$(wrangler whoami 2>&1 || echo "")
+                ACCOUNT_SUBDOMAIN=$(echo "$WHOAMI_OUTPUT" | grep -oP '\([^)]+\)' | head -1 | sed 's/[()]//g' | tr '[:upper:]' '[:lower:]' || echo "")
+              fi
+
+              if [ -n "$ACCOUNT_SUBDOMAIN" ]; then
+                WORKER_URL="https://$WORKER_NAME_FROM_URL.$ACCOUNT_SUBDOMAIN.workers.dev"
+                echo "📍 Updated worker URL with account subdomain: $WORKER_URL"
+              fi
+            fi
             echo "📍 Worker URL: $WORKER_URL"
           fi
         fi
